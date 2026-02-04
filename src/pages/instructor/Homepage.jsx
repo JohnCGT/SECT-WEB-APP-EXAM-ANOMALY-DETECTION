@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 const Homepage = () => {
   return (
-    <div className="container-fluid min-vh-100 bg-light">
+    <div className="d-flex flex-column min-vh-100 bg-light">
       {/* Navbar */}
       <nav className="navbar navbar-expand-lg navbar-dark bg-primary">
         <div className="container-fluid">
@@ -21,17 +21,18 @@ const Homepage = () => {
               </li>
               <li className="nav-item">
                 <a className="nav-link" href="#">Students</a>
-              </li>  
+              </li>
               <li className="nav-item">
-                <Link className="nav-link" to="/">Logout</Link>
+                Logout <Link to="/">Instructor Dashboard</Link>
               </li>
             </ul>
           </div>
         </div>
       </nav>
 
-      {/* Dashboard Cards */}
-      <div className="container mt-5">
+      {/* Main Content */}
+      <div className="container mt-5 flex-grow-1">
+        {/* Dashboard Cards */}
         <div className="row g-4">
           <div className="col-md-3">
             <div className="card text-center shadow-sm p-3">
@@ -108,7 +109,7 @@ const Homepage = () => {
       </div>
 
       {/* Footer */}
-      <footer className="bg-primary text-white text-center py-3 mt-auto">
+      <footer className="bg-primary text-white text-center py-3">
         &copy; 2026 SECT Web Exam Anomaly Detection
       </footer>
     </div>
@@ -116,5 +117,3 @@ const Homepage = () => {
 };
 
 export default Homepage;
-
-
