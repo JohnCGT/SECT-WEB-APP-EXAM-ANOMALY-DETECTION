@@ -28,7 +28,7 @@ const Homepage = () => {
               data-bs-toggle="dropdown" 
               aria-expanded="false"
             >
-              <span className="me-2">Instructor Name</span>
+              <span className="me-2 fw-bold">Welcome, Instructor Name</span>
             </button>
             <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="accountDropdown">
               <li><a className="dropdown-item" href="#">Account Settings</a></li>
@@ -43,43 +43,71 @@ const Homepage = () => {
       {/* Main Layout with Sidebar */}
       <div className="d-flex flex-grow-1">
         {/* Sidebar */}
-        <nav className="bg-dark text-white" style={{ width: '250px', minHeight: '100%' }}>
-          <ul className="nav flex-column p-3">
-            <li className="nav-item mb-2">
-              <a className="nav-link text-white active bg-primary rounded" href="#">
-                <i className="bi bi-speedometer2 me-2"></i> Dashboard
-              </a>
-            </li>
-            <li className="nav-item mb-2">
-              <a className="nav-link text-white" href="#">
-                <i className="bi bi-file-earmark-text me-2"></i> Exams
-              </a>
-            </li>
-            <li className="nav-item mb-2">
-              <a className="nav-link text-white" href="#">
-                <i className="bi bi-people me-2"></i> Students
-              </a>
-            </li>
-            <li className="nav-item mb-2">
-              <a className="nav-link text-white" href="#">
-                <i className="bi bi-exclamation-triangle me-2"></i> Alerts
-              </a>
-            </li>
-            <li className="nav-item mb-2">
-              <a className="nav-link text-white" href="#">
-                <i className="bi bi-bar-chart me-2"></i> Reports
-              </a>
-            </li>
-            <li className="nav-item mb-2">
-              <a className="nav-link text-white" href="#">
-                <i className="bi bi-gear me-2"></i> Settings
-              </a>
-            </li>
-          </ul>
+        <nav
+            className="text-black d-flex justify-content-center"
+            style={{ width: '110px', minHeight: '100%' }}
+        >
+            <ul className="nav flex-column p-3 align-items-center">
+                <li className="nav-item mb-3">
+                    <a
+                        className="nav-link text-white active bg-primary rounded fs-6 fw-semibold d-flex flex-column align-items-center py-3"
+                        href="#"
+                    >
+                        <i className="bi bi-speedometer2 fs-4 mb-1"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li className="nav-item mb-3">
+                    <a
+                        className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
+                        href="#"
+                    >
+                        <i className="bi bi-file-earmark-text fs-3 mb-1"></i>
+                        <span>Exams</span>
+                    </a>
+                </li>
+                <li className="nav-item mb-3">
+                    <a
+                        className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
+                        href="#"
+                    >
+                        <i className="bi bi-people fs-3 mb-1"></i>
+                        <span>Students</span>
+                    </a>
+                </li>
+                <li className="nav-item mb-3">
+                    <a
+                        className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
+                        href="#"
+                    >
+                        <i className="bi bi-exclamation-triangle fs-3 mb-1"></i>
+                        <span>Alerts</span>
+                    </a>
+                </li>
+                <li className="nav-item mb-3">
+                    <a
+                        className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
+                        href="#"
+                    >
+                        <i className="bi bi-bar-chart fs-3 mb-1"></i>
+                        <span>Reports</span>
+                    </a>
+                </li>
+                <li className="nav-item mb-3">
+                    <a
+                        className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
+                        href="#"
+                    >
+                        <i className="bi bi-gear fs-3 mb-1"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
+            </ul>
         </nav>
 
+
         {/* Main Content */}
-        <div className="flex-grow-1 bg-light p-4">
+        <div className="flex-grow-1 p-4 bg-light">
           <h4 className="mb-4">Dashboard</h4>
 
           {/* Dashboard Cards */}
@@ -229,7 +257,7 @@ const Homepage = () => {
                         <th>NAME</th>
                         <th>EMAIL</th>
                         <th>EXAM STATUS</th>
-                        <th>CHEATING SCORE</th>
+                        <th>CPI SCORE</th>
                       </tr>
                     </thead>
                     <tbody>

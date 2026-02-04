@@ -8,9 +8,11 @@ import LoginPage from "./components/LoginPage";
 import RegisterPage from "./components/RegisterPage";
 import Homepage from "./pages/instructor/Homepage";
 
-// Import css
+// Import bootstrap
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
+import 'bootstrap-icons/font/bootstrap-icons.css';
+
 
 // Routes
 createRoot(document.getElementById("root")).render(
