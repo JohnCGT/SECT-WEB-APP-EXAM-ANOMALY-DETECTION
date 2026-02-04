@@ -21,9 +21,9 @@ const Homepage = () => {
               </li>
               <li className="nav-item">
                 <a className="nav-link" href="#">Students</a>
-              </li>
+              </li>  
               <li className="nav-item">
-                <a className="nav-link" href="#">Logout</a>
+                <Link className="nav-link" to="/">Logout</Link>
               </li>
             </ul>
           </div>
