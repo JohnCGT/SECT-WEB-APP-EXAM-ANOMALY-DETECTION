@@ -31,8 +31,10 @@ const ExamPage = () => {
               <span className="me-2 fw-bold">Welcome, Instructor Name</span>
             </button>
             <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="accountDropdown">
-              <li><Link className="dropdown-item" to="/instructor/account-settings">Account Settings</Link></li>
-              <li><Link className="dropdown-item" to="/instructor/profile">Profile</Link></li>
+              <li>
+                <Link className="dropdown-item" to="/instructor/profile">Account Settings</Link></li>
+                <li>
+                <Link className="dropdown-item" to="/instructor/account-settings">Profile</Link></li>
               <li><hr className="dropdown-divider" /></li>
               <li><Link className="dropdown-item" to="/">Logout</Link></li>
             </ul>
@@ -94,13 +96,13 @@ const ExamPage = () => {
                     </a>
                 </li>
                 <li className="nav-item mb-3">
-                    <a
+                    <Link
                         className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        href="#"
+                        to="/instructor/account-settings"
                     >
-                        <i className="bi bi-gear fs-3 mb-1"></i>
+                        <i className="bi bi-file-earmark-text fs-3 mb-1"></i>
                         <span>Settings</span>
-                    </a>
+                    </Link>  
                 </li>
             </ul>
         </nav>

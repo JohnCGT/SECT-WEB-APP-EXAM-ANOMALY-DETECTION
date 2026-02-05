@@ -94,15 +94,15 @@ const Homepage = () => {
                         <i className="bi bi-bar-chart fs-3 mb-1"></i>
                         <span>Reports</span>
                     </a>
-                </li>
+                </li>              
                 <li className="nav-item mb-3">
-                    <a
+                    <Link
                         className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        href="#"
+                        to="/instructor/account-settings"
                     >
-                        <i className="bi bi-gear fs-3 mb-1"></i>
+                        <i className="bi bi-file-earmark-text fs-3 mb-1"></i>
                         <span>Settings</span>
-                    </a>
+                    </Link>  
                 </li>
             </ul>
         </nav>
