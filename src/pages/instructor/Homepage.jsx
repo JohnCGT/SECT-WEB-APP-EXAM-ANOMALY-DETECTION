@@ -31,8 +31,10 @@ const Homepage = () => {
               <span className="me-2 fw-bold">Welcome, Instructor Name</span>
             </button>
             <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="accountDropdown">
-              <li><a className="dropdown-item" href="#">Account Settings</a></li>
-              <li><a className="dropdown-item" href="#">Profile</a></li>
+              <li>
+                <Link className="dropdown-item" to="/instructor/profile">Account Settings</Link></li>
+                <li>
+                <Link className="dropdown-item" to="/instructor/account-settings">Profile</Link></li>
               <li><hr className="dropdown-divider" /></li>
               <li><Link className="dropdown-item" to="/">Logout</Link></li>
             </ul>
@@ -58,13 +60,13 @@ const Homepage = () => {
                     </a>
                 </li>
                 <li className="nav-item mb-3">
-                    <a
+                    <Link
                         className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        href="#"
+                        to="/instructor/exams"
                     >
                         <i className="bi bi-file-earmark-text fs-3 mb-1"></i>
                         <span>Exams</span>
-                    </a>
+                    </Link>
                 </li>
                 <li className="nav-item mb-3">
                     <a
