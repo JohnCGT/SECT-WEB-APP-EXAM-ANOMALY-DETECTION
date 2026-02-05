@@ -20,6 +20,9 @@ const LoginPage = () => {
         <p className="text-center mt-3">
           Don’t have an account? <Link to="/register">Register here</Link>
         </p>
+        <p className="text-center mt-3">
+          Go to instructor? <Link to="/instructor">Instructor Dashboard</Link>
+        </p>
       </div>
     </div>
   );
