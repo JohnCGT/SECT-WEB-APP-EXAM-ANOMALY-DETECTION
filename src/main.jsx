@@ -27,14 +27,18 @@ createRoot(document.getElementById("root")).render(
         <Route path="/" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* Instructor Page */}
+        {/* Instructor Page - JC */}
         <Route path="/instructor" element={<Homepage />} />
         <Route path="/instructor/exams" element={<ExamPage />} />
         <Route path="/instructor/profile" element={<ProfilePage />} />
         <Route path="/instructor/account-settings" element={<AccountSettings />} />
 
-        {/* Student Page */}
+        {/* Student Page - Esita */}
         <Route path="/student" element={<Dashboard />} />
+        
+        {/* Admin Page - Guban */}
+        <Route path="/admin" element={<AdminPage />} />
+
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
