@@ -94,6 +94,8 @@ git clone https://github.com/your-username/SECT.git
 npm install
 npm install react-router-dom
 npm install bootstrap bootstrap-icons
+npm install express mysql2 cors bcryptjs body-parser
+npm install axios
 ```
 
 ### Fetch all remote branches
