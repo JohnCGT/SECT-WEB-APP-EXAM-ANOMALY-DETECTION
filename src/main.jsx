@@ -11,6 +11,7 @@ import ExamPage from "./pages/instructor/ExamPage";
 import ProfilePage from "./pages/instructor/ProfilePage";
 import AccountSettings from "./pages/instructor/AccountSettings";
 import Dashboard from "./pages/student/Dashboard";
+import AdminPage from "./pages/admin/AdminPage";
 
 // Import bootstrap
 import "bootstrap/dist/css/bootstrap.min.css";
