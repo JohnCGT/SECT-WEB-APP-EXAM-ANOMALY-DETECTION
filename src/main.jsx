@@ -10,6 +10,7 @@ import Homepage from "./pages/instructor/Homepage";
 import ExamPage from "./pages/instructor/ExamPage";
 import ProfilePage from "./pages/instructor/ProfilePage";
 import AccountSettings from "./pages/instructor/AccountSettings";
+import Dashboard from "./pages/student/Dashboard";
 
 // Import bootstrap
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -21,12 +22,19 @@ createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
+
+        {/* Login and Register */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+
+        {/* Instructor Page */}
         <Route path="/instructor" element={<Homepage />} />
         <Route path="/instructor/exams" element={<ExamPage />} />
         <Route path="/instructor/profile" element={<ProfilePage />} />
         <Route path="/instructor/account-settings" element={<AccountSettings />} />
+
+        {/* Student Page */}
+        <Route path="/student" element={<Dashboard />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

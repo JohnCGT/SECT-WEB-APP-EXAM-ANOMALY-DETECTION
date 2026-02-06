@@ -23,6 +23,9 @@ const LoginPage = () => {
         <p className="text-center mt-3">
           Go to instructor? <Link to="/instructor">Instructor Dashboard</Link>
         </p>
+        <p className="text-center mt-3">
+          Go to student? <Link to="/student">Student Dashboard</Link>
+        </p>
       </div>
     </div>
   );
