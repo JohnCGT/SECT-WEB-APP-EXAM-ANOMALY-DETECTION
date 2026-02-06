@@ -253,60 +253,7 @@ const Dashboard = () => {
 
             {/* Right Column */}
             <div className="col-md-4">
-              {/* Today's Plan */}
-              <div className="card border-0 shadow-sm rounded-4 mb-4">
-                <div className="card-body">
-                  <h6 className="fw-bold mb-3">🗓 Today’s Study Plan</h6>
-
-                  <ul className="list-unstyled mb-3">
-                    <li className="mb-3">
-                      <strong>09:00 – 10:30</strong>
-                      <div className="text-muted small">
-                        Advanced Algorithms (Room 302)
-                      </div>
-                    </li>
-                    <li className="mb-3 text-muted">
-                      <strong>11:00 – 12:30</strong>
-                      <div className="small">Self Study: Databases</div>
-                    </li>
-                    <li className="text-muted">
-                      <strong>02:00 – 03:30</strong>
-                      <div className="small">Group Discussion</div>
-                    </li>
-                  </ul>
-
-                  <button className="btn btn-outline-secondary w-100 rounded-pill">
-                    Open Full Planner
-                  </button>
-                </div>
-              </div>
-
-              {/* Achievements */}
-              <div className="card border-0 shadow-sm rounded-4 mb-4">
-                <div className="card-body">
-                  <h6 className="fw-bold mb-3">🏅 Achievements</h6>
-
-                  <div className="d-flex align-items-center gap-3 mb-3">
-                    <span className="badge bg-success rounded-circle p-3">
-                      <i className="bi bi-check-lg fs-5"></i>
-                    </span>
-                    <div>
-                      <strong>7-Day Study Streak</strong>
-                      <div className="text-muted small">Consistency matters!</div>
-                    </div>
-                  </div>
-
-                  <div className="d-flex align-items-center gap-3">
-                    <span className="badge bg-primary rounded-circle p-3">
-                      <i className="bi bi-lightning-fill fs-5"></i>
-                    </span>
-                    <div>
-                      <strong>Fast Learner</strong>
-                      <div className="text-muted small">3 courses ahead of pace</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              
 
               {/* Announcements */}
               <div className="card border-0 shadow-sm rounded-4">
