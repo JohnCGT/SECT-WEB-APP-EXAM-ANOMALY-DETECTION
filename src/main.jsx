@@ -7,12 +7,12 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LoginPage from "./components/LoginPage";
 import RegisterPage from "./components/RegisterPage";
 import Homepage from "./pages/instructor/Homepage";
+import Dashboard from "./pages/student/Dashboard";
 
 // Import bootstrap
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
-import 'bootstrap-icons/font/bootstrap-icons.css';
-
+import "bootstrap-icons/font/bootstrap-icons.css";
 
 // Routes
 createRoot(document.getElementById("root")).render(
@@ -21,7 +21,8 @@ createRoot(document.getElementById("root")).render(
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/instructor" element={<Homepage />} /> {/* new route */}
+        <Route path="/instructor" element={<Homepage />} />
+        <Route path="/student" element={<Dashboard />} /> {/* new route */}
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
