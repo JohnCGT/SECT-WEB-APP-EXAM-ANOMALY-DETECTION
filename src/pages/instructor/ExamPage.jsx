@@ -32,9 +32,9 @@ const ExamPage = () => {
             </button>
             <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="accountDropdown">
               <li>
-                <Link className="dropdown-item" to="/instructor/profile">Account Settings</Link></li>
+                <Link className="dropdown-item" to="/instructor/account-settings">Account Settings</Link></li>
                 <li>
-                <Link className="dropdown-item" to="/instructor/account-settings">Profile</Link></li>
+                <Link className="dropdown-item" to="/instructor/profile">Profile</Link></li>
               <li><hr className="dropdown-divider" /></li>
               <li><Link className="dropdown-item" to="/">Logout</Link></li>
             </ul>
