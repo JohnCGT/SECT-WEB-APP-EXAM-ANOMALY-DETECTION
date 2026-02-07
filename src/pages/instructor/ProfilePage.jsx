@@ -50,7 +50,7 @@ const ProfilePage = () => {
             <ul className="nav flex-column p-3 align-items-center">
                 <li className="nav-item mb-3">
                     <Link
-                        className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
+                        className="nav-link text-white active bg-primary rounded fs-6 fw-semibold d-flex flex-column align-items-center py-3"
                         to="/instructor"
                     >
                         <i className="bi bi-speedometer2 fs-4 mb-1"></i>
@@ -67,40 +67,40 @@ const ProfilePage = () => {
                     </Link>
                 </li>
                 <li className="nav-item mb-3">
-                    <a
+                    <Link
                         className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        href="#"
+                        to="/instructor/students"
                     >
                         <i className="bi bi-people fs-3 mb-1"></i>
                         <span>Students</span>
-                    </a>
+                    </Link>
                 </li>
                 <li className="nav-item mb-3">
-                    <a
+                    <Link
                         className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        href="#"
+                        to="/instructor/alerts"
                     >
                         <i className="bi bi-exclamation-triangle fs-3 mb-1"></i>
                         <span>Alerts</span>
-                    </a>
+                    </Link>
                 </li>
                 <li className="nav-item mb-3">
-                    <a
+                    <Link
                         className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        href="#"
+                        to="/instructor/reports"
                     >
                         <i className="bi bi-bar-chart fs-3 mb-1"></i>
                         <span>Reports</span>
-                    </a>
-                </li>
+                    </Link>
+                </li>              
                 <li className="nav-item mb-3">
-                    <a
+                    <Link
                         className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        href="#"
+                        to="/instructor/account-settings"
                     >
-                        <i className="bi bi-gear fs-3 mb-1"></i>
+                        <i className="bi bi-file-earmark-text fs-3 mb-1"></i>
                         <span>Settings</span>
-                    </a>
+                    </Link>  
                 </li>
             </ul>
         </nav>

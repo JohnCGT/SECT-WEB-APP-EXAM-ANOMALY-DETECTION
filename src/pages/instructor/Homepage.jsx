@@ -69,31 +69,31 @@ const Homepage = () => {
                     </Link>
                 </li>
                 <li className="nav-item mb-3">
-                    <a
+                    <Link
                         className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        href="#"
+                        to="/instructor/students"
                     >
                         <i className="bi bi-people fs-3 mb-1"></i>
                         <span>Students</span>
-                    </a>
+                    </Link>
                 </li>
                 <li className="nav-item mb-3">
-                    <a
+                    <Link
                         className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        href="#"
+                        to="/instructor/alerts"
                     >
                         <i className="bi bi-exclamation-triangle fs-3 mb-1"></i>
                         <span>Alerts</span>
-                    </a>
+                    </Link>
                 </li>
                 <li className="nav-item mb-3">
-                    <a
+                    <Link
                         className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        href="#"
+                        to="/instructor/reports"
                     >
                         <i className="bi bi-bar-chart fs-3 mb-1"></i>
                         <span>Reports</span>
-                    </a>
+                    </Link>
                 </li>              
                 <li className="nav-item mb-3">
                     <Link
