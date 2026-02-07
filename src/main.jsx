@@ -4,8 +4,12 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 // Import pages
+
+// Login and Register
 import LoginPage from "./components/LoginPage";
 import RegisterPage from "./components/RegisterPage";
+
+// Instructor pages
 import Homepage from "./pages/instructor/Homepage";
 import ExamPage from "./pages/instructor/ExamPage";
 import ProfilePage from "./pages/instructor/ProfilePage";
@@ -14,8 +18,15 @@ import Students from "./pages/instructor/Students";
 import Reports from "./pages/instructor/Reports";
 import Alerts from "./pages/instructor/Alerts";
 
-import Dashboard from "./pages/student/Dashboard";
+// Admin Pages
+import UserManagement from "./pages/admin/UserManagement";
+import ExamManagement from "./pages/admin/ExamManagement";
+import AnomalyReports from "./pages/admin/AnomalyReports";
+import SystemLogs from "./pages/admin/SystemLogs";
 import AdminPage from "./pages/admin/AdminPage";
+
+// Student pages
+import Dashboard from "./pages/student/Dashboard";
 
 // Import bootstrap
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -46,6 +57,10 @@ createRoot(document.getElementById("root")).render(
         
         {/* Admin Page - Guban */}
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/users" element={<UserManagement />} />
+        <Route path="/admin/exams" element={<ExamManagement />} />
+        <Route path="/admin/anomalies" element={<AnomalyReports />} />
+        <Route path="/admin/logs" element={<SystemLogs />} />
 
       </Routes>
     </BrowserRouter>
