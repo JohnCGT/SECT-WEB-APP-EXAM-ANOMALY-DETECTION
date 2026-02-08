@@ -9,7 +9,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LoginPage from "./components/LoginPage";
 import RegisterPage from "./components/RegisterPage";
 
-// Instructor pages
+// Instructors Page
 import Homepage from "./pages/instructor/Homepage";
 import ExamPage from "./pages/instructor/ExamPage";
 import ProfilePage from "./pages/instructor/ProfilePage";
@@ -18,15 +18,19 @@ import Students from "./pages/instructor/Students";
 import Reports from "./pages/instructor/Reports";
 import Alerts from "./pages/instructor/Alerts";
 
-// Admin Pages
+// Students Page
+import Dashboard from "./pages/student/Dashboard";
+import SubjectPage from "./pages/student/SubjectPage";
+import TasksPage from "./pages/student/TasksPage";
+import GradesPage from "./pages/student/GradesPage";
+import StudentAccountSettings from "./pages/student/StudentAccountSettings";
+
+// Admin Page
+import AdminPage from "./pages/admin/AdminPage";
 import UserManagement from "./pages/admin/UserManagement";
 import ExamManagement from "./pages/admin/ExamManagement";
 import AnomalyReports from "./pages/admin/AnomalyReports";
 import SystemLogs from "./pages/admin/SystemLogs";
-import AdminPage from "./pages/admin/AdminPage";
-
-// Student pages
-import Dashboard from "./pages/student/Dashboard";
 
 // Import bootstrap
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -54,6 +58,10 @@ createRoot(document.getElementById("root")).render(
 
         {/* Student Page - Esita */}
         <Route path="/student" element={<Dashboard />} />
+        <Route path="/student/subjects" element={<SubjectPage />} />
+        <Route path="/student/tasks" element={<TasksPage />} />
+        <Route path="/student/grades" element={<GradesPage />} />
+        <Route path="/student/account-settings" element={<StudentAccountSettings />} />        
         
         {/* Admin Page - Guban */}
         <Route path="/admin" element={<AdminPage />} />
