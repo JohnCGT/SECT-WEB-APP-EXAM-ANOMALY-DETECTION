@@ -24,6 +24,7 @@ import SubjectPage from "./pages/student/SubjectPage";
 import TasksPage from "./pages/student/TasksPage";
 import GradesPage from "./pages/student/GradesPage";
 import StudentAccountSettings from "./pages/student/StudentAccountSettings";
+import StudentProfile from "./pages/student/StudentProfile";
 
 // Admin Page
 import AdminPage from "./pages/admin/AdminPage";
@@ -62,6 +63,7 @@ createRoot(document.getElementById("root")).render(
         <Route path="/student/tasks" element={<TasksPage />} />
         <Route path="/student/grades" element={<GradesPage />} />
         <Route path="/student/account-settings" element={<StudentAccountSettings />} />        
+        <Route path="/student/profile" element={<StudentProfile />} />        
         
         {/* Admin Page - Guban */}
         <Route path="/admin" element={<AdminPage />} />

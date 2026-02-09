@@ -28,7 +28,10 @@ const Dashboard = () => {
               type="button"
               data-bs-toggle="dropdown"
             >
-              <span className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: 32, height: 32 }}>
+              <span
+                className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center"
+                style={{ width: 32, height: 32 }}
+              >
                 A
               </span>
               <span className="fw-semibold">Alex</span>
@@ -36,10 +39,17 @@ const Dashboard = () => {
             </button>
 
             <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0">
-              <li><a className="dropdown-item" href="#">My Profile</a></li>
-              <li><a className="dropdown-item" href="#">Academic Settings</a></li>
+              <li>
+                <Link className="dropdown-item" to="/student/profile">
+                  My Profile
+                </Link>
+              </li>
               <li><hr className="dropdown-divider" /></li>
-              <li><Link className="dropdown-item text-danger" to="/">Logout</Link></li>
+              <li>
+                <Link className="dropdown-item text-danger" to="/">
+                  Logout
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
