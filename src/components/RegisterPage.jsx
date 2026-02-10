@@ -4,32 +4,26 @@ import API from "../api";
 import Swal from 'sweetalert2';
 
 const RegisterPage = () => {
-  // State management for form inputs
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState("student");  // Default to student
+  const [role, setRole] = useState("student");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  /**
-   * Handle registration form submission
-   */
   const handleSubmit = async (e) => {
-    e.preventDefault();  // Prevent page refresh
+    e.preventDefault();
     setLoading(true);
     setError("");
 
-    // Client-side validation - Password length
     if (password.length < 8) {
       setError('Password must be at least 8 characters long');
       setLoading(false);
       return;
     }
 
-    // Client-side validation - Password match
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       setLoading(false);
@@ -37,27 +31,26 @@ const RegisterPage = () => {
     }
 
     try {
-      // Send registration request to backend
       const response = await API.post('/register', { 
-        name: name.trim(),                    // Remove extra spaces
-        email: email.trim().toLowerCase(),    // Normalize email
-        password,                             // Password (will be hashed by backend)
-        role                                  // User role
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        role
       });
       
-      // Save user to localStorage
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+      // Store token in sessionStorage
+      const { user, token } = response.data;
+      sessionStorage.setItem('token', token);
+      sessionStorage.setItem('user', JSON.stringify(user));
       
-      // Show success message
       await Swal.fire({
         icon: 'success',
         title: 'Registration Successful!',
         text: 'Welcome! You will be redirected shortly.',
-        timer: 2000,              // Auto close after 2 seconds
-        showConfirmButton: false  // Hide OK button
+        timer: 2000,
+        showConfirmButton: false
       });
       
-      // Redirect based on role
       if (role === 'admin') {
         navigate('/admin');
       } else if (role === 'instructor') {
@@ -66,11 +59,8 @@ const RegisterPage = () => {
         navigate('/student');
       }
     } catch (err) {
-      // Handle errors
       console.error('Registration error:', err);
-      console.error('Error response:', err.response?.data);
       
-      // Show validation errors if any
       if (err.response?.data?.errors) {
         const errors = Object.values(err.response.data.errors).flat();
         setError(errors.join('. '));
@@ -87,7 +77,6 @@ const RegisterPage = () => {
       <div className="card shadow p-4" style={{ maxWidth: "400px", width: "100%" }}>
         <h2 className="text-center mb-4">Register</h2>
         
-        {/* Error Alert */}
         {error && (
           <div className="alert alert-danger" role="alert">
             {error}
@@ -95,7 +84,6 @@ const RegisterPage = () => {
         )}
 
         <form onSubmit={handleSubmit}>
-          {/* Name Input */}
           <div className="mb-3">
             <label htmlFor="name" className="form-label">Full Name</label>
             <input 
@@ -112,7 +100,6 @@ const RegisterPage = () => {
             />
           </div>
 
-          {/* Email Input */}
           <div className="mb-3">
             <label htmlFor="email" className="form-label">Email</label>
             <input 
@@ -128,7 +115,6 @@ const RegisterPage = () => {
             />
           </div>
 
-          {/* Password Input */}
           <div className="mb-3">
             <label htmlFor="password" className="form-label">Password</label>
             <input 
@@ -145,7 +131,6 @@ const RegisterPage = () => {
             />
           </div>
 
-          {/* Confirm Password Input */}
           <div className="mb-3">
             <label htmlFor="confirmPassword" className="form-label">Confirm Password</label>
             <input 
@@ -162,7 +147,6 @@ const RegisterPage = () => {
             />
           </div>
 
-          {/* Role Selection */}
           <div className="mb-3">
             <label htmlFor="role" className="form-label">Register as</label>
             <select 
@@ -179,7 +163,6 @@ const RegisterPage = () => {
             </select>
           </div>
 
-          {/* Submit Button */}
           <button 
             type="submit" 
             className="btn btn-success w-100"
@@ -189,7 +172,6 @@ const RegisterPage = () => {
           </button>
         </form>
 
-        {/* Login Link */}
         <p className="text-center mt-3">
           Already have an account? <Link to="/">Login here</Link>
         </p>

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../api";
-import Swal from 'sweetalert2';  // Import SweetAlert2
+import Swal from 'sweetalert2';
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -10,27 +10,23 @@ const LoginPage = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  /**
-   * Handle login form submission
-   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
     try {
-      // Send login request to backend
       const res = await API.post('/login', { 
         email: email.trim().toLowerCase(),
         password 
       });
       
-      const { user } = res.data;
+      const { user, token } = res.data;
       
-      // Save user to localStorage
-      localStorage.setItem('user', JSON.stringify(user));
+      // Store token in sessionStorage instead of localStorage
+      sessionStorage.setItem('token', token);
+      sessionStorage.setItem('user', JSON.stringify(user));
       
-      // Show success toast
       const Toast = Swal.mixin({
         toast: true,
         position: 'top-end',
@@ -44,7 +40,6 @@ const LoginPage = () => {
         title: `Welcome back, ${user.name}!`
       });
       
-      // Redirect based on role
       if (user.role === 'admin') {
         navigate('/admin');
       } else if (user.role === 'instructor') {
@@ -55,7 +50,6 @@ const LoginPage = () => {
     } catch (err) {
       console.error('Login error:', err);
       
-      // Show error with SweetAlert
       await Swal.fire({
         icon: 'error',
         title: 'Login Failed',
@@ -73,7 +67,6 @@ const LoginPage = () => {
       <div className="card shadow p-4" style={{ maxWidth: "400px", width: "100%" }}>
         <h2 className="text-center mb-4">Login</h2>
         
-        {/* Error Alert */}
         {error && (
           <div className="alert alert-danger" role="alert">
             {error}
@@ -81,7 +74,6 @@ const LoginPage = () => {
         )}
 
         <form onSubmit={handleSubmit}>
-          {/* Email Input */}
           <div className="mb-3">
             <label htmlFor="email" className="form-label">Email</label>
             <input 
@@ -97,7 +89,6 @@ const LoginPage = () => {
             />
           </div>
 
-          {/* Password Input */}
           <div className="mb-3">
             <label htmlFor="password" className="form-label">Password</label>
             <input 
@@ -113,7 +104,6 @@ const LoginPage = () => {
             />
           </div>
 
-          {/* Submit Button */}
           <button 
             type="submit" 
             className="btn btn-primary w-100"
@@ -123,7 +113,6 @@ const LoginPage = () => {
           </button>
         </form>
 
-        {/* Register Link */}
         <p className="text-center mt-3">
           Don't have an account? <Link to="/register">Register here</Link>
         </p>

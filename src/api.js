@@ -6,13 +6,13 @@ const API = axios.create({
         'Content-Type': 'application/json',
         'Accept': 'application/json',
     },
-    withCredentials: true, // Important for CORS with credentials
+    withCredentials: true,
 });
 
-// Add token to every request
 API.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
+        // Get token from sessionStorage instead of localStorage
+        const token = sessionStorage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -23,14 +23,12 @@ API.interceptors.request.use(
     }
 );
 
-// Handle token expiration
 API.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            // Token expired or invalid
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
+            sessionStorage.removeItem('token');
+            sessionStorage.removeItem('user');
             window.location.href = '/';
         }
         return Promise.reject(error);
