@@ -6,29 +6,15 @@ const API = axios.create({
         'Content-Type': 'application/json',
         'Accept': 'application/json',
     },
-    withCredentials: true,
+    withCredentials: true,  // ← IMPORTANT: Sends cookies automatically
 });
 
-API.interceptors.request.use(
-    (config) => {
-        // Get token from sessionStorage instead of localStorage
-        const token = sessionStorage.getItem('token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
-    }
-);
+// NO TOKEN INTERCEPTOR - cookies are sent automatically
 
 API.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            sessionStorage.removeItem('token');
-            sessionStorage.removeItem('user');
             window.location.href = '/';
         }
         return Promise.reject(error);

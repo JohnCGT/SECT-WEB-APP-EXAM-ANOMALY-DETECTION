@@ -31,6 +31,10 @@ const RegisterPage = () => {
     }
 
     try {
+      // Get CSRF cookie first
+      await API.get('http://localhost:8000/sanctum/csrf-cookie');
+      
+      // Send registration request to backend
       const response = await API.post('/register', { 
         name: name.trim(),
         email: email.trim().toLowerCase(),
@@ -38,10 +42,9 @@ const RegisterPage = () => {
         role
       });
       
-      // Store token in sessionStorage
-      const { user, token } = response.data;
-      sessionStorage.setItem('token', token);
-      sessionStorage.setItem('user', JSON.stringify(user));
+      const { user } = response.data;
+      
+      // NO sessionStorage or localStorage - authentication is in HTTP-only cookie
       
       await Swal.fire({
         icon: 'success',
@@ -51,6 +54,7 @@ const RegisterPage = () => {
         showConfirmButton: false
       });
       
+      // Redirect based on role
       if (role === 'admin') {
         navigate('/admin');
       } else if (role === 'instructor') {

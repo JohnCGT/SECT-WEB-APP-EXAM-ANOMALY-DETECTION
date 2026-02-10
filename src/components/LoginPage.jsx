@@ -16,16 +16,18 @@ const LoginPage = () => {
     setError("");
 
     try {
+      // Get CSRF cookie first
+      await API.get('http://localhost:8000/sanctum/csrf-cookie');
+      
+      // Send login request
       const res = await API.post('/login', { 
         email: email.trim().toLowerCase(),
         password 
       });
       
-      const { user, token } = res.data;
+      const { user } = res.data;
       
-      // Store token in sessionStorage instead of localStorage
-      sessionStorage.setItem('token', token);
-      sessionStorage.setItem('user', JSON.stringify(user));
+      // NO sessionStorage - authentication is in HTTP-only cookie
       
       const Toast = Swal.mixin({
         toast: true,
