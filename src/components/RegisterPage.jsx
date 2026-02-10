@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../api";
+import Swal from 'sweetalert2';
 
 const RegisterPage = () => {
   // State management for form inputs
@@ -48,7 +49,13 @@ const RegisterPage = () => {
       localStorage.setItem('user', JSON.stringify(response.data.user));
       
       // Show success message
-      alert('Registration successful!');
+      await Swal.fire({
+        icon: 'success',
+        title: 'Registration Successful!',
+        text: 'Welcome! You will be redirected shortly.',
+        timer: 2000,              // Auto close after 2 seconds
+        showConfirmButton: false  // Hide OK button
+      });
       
       // Redirect based on role
       if (role === 'admin') {

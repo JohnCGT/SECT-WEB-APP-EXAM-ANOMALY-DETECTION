@@ -1,37 +1,50 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../api";
+import Swal from 'sweetalert2';  // Import SweetAlert2
 
 const LoginPage = () => {
-  // State management
-  const [email, setEmail] = useState("");           // Store email input
-  const [password, setPassword] = useState("");     // Store password input
-  const [loading, setLoading] = useState(false);    // Loading state for button
-  const [error, setError] = useState("");           // Error message
-  const navigate = useNavigate();                   // Navigation hook
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   /**
    * Handle login form submission
    */
   const handleSubmit = async (e) => {
-    e.preventDefault();  // Prevent page refresh
-    setLoading(true);    // Show loading state
-    setError("");        // Clear previous errors
+    e.preventDefault();
+    setLoading(true);
+    setError("");
 
     try {
       // Send login request to backend
       const res = await API.post('/login', { 
-        email: email.trim().toLowerCase(),  // Normalize email
+        email: email.trim().toLowerCase(),
         password 
       });
       
-      // Extract user data from response
       const { user } = res.data;
       
-      // Save user to localStorage (browser storage)
+      // Save user to localStorage
       localStorage.setItem('user', JSON.stringify(user));
       
-      // Redirect based on user role
+      // Show success toast
+      const Toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
+      });
+
+      await Toast.fire({
+        icon: 'success',
+        title: `Welcome back, ${user.name}!`
+      });
+      
+      // Redirect based on role
       if (user.role === 'admin') {
         navigate('/admin');
       } else if (user.role === 'instructor') {
@@ -40,11 +53,18 @@ const LoginPage = () => {
         navigate('/student');
       }
     } catch (err) {
-      // Handle errors
       console.error('Login error:', err);
+      
+      // Show error with SweetAlert
+      await Swal.fire({
+        icon: 'error',
+        title: 'Login Failed',
+        text: err.response?.data?.message || 'Invalid email or password',
+      });
+      
       setError(err.response?.data?.message || 'Login failed! Please check your credentials.');
     } finally {
-      setLoading(false);  // Hide loading state
+      setLoading(false);
     }
   };
 
