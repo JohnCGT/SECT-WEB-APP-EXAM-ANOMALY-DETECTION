@@ -12,7 +12,7 @@ const RegisterPage = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
@@ -30,23 +30,24 @@ const RegisterPage = () => {
       return;
     }
 
-    try {
-      const response = await API.post('/register', { 
+    const data = {
         name: name.trim(), 
         email: email.trim().toLowerCase(), 
         password, 
         role 
-      });
+    };
+
+    console.log('📤 Sending to backend:', data);
+
+    try {
+      const response = await API.post('/register', data);
       
-      const { token } = response.data;
+      console.log('✅ Success response:', response.data);
       
-      // Auto-login after registration
-      localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       
       alert('Registration successful!');
       
-      // Redirect based on role
       if (role === 'admin') {
         navigate('/admin');
       } else if (role === 'instructor') {
@@ -55,11 +56,18 @@ const RegisterPage = () => {
         navigate('/student');
       }
     } catch (err) {
-      console.error('Registration error:', err);
-      const errorMsg = err.response?.data?.message || 
-                       err.response?.data?.errors?.email?.[0] || 
-                       'Registration failed!';
-      setError(errorMsg);
+      console.error('❌ Full error object:', err);
+      console.error('❌ Error response:', err.response);
+      console.error('❌ Error data:', err.response?.data);
+      
+      // Better error handling
+      if (err.response?.data?.errors) {
+        const errors = Object.values(err.response.data.errors).flat();
+        console.error('❌ Validation errors:', errors); // ADD THIS
+        setError(errors.join('. '));
+      } else {
+        setError(err.response?.data?.message || 'Registration failed!');
+      }
     } finally {
       setLoading(false);
     }

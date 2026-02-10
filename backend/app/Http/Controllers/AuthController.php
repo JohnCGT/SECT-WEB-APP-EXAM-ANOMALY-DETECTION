@@ -5,34 +5,34 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    // Register with security
+    /**
+     * Register a new user
+     * Accepts: name, email, password, role
+     * Returns: user data on success
+     */
     public function register(Request $request)
     {
         try {
-            // Validate input
-            $validated = $request->validate([
-                'name' => 'required|string|max:255|min:2',
-                'email' => 'required|email|max:255|unique:users,email',
-                'password' => 'required|string|min:8|max:255',
-                'role' => 'required|in:admin,instructor,student',
+            // Validate incoming data
+            $request->validate([
+                'name' => 'required|string|max:255',           // Name is required
+                'email' => 'required|email|unique:users,email', // Email must be unique
+                'password' => 'required|string|min:8',         // Password min 8 chars
+                'role' => 'required|in:admin,instructor,student', // Role must be one of these
             ]);
 
-            // Create user with hashed password
+            // Create new user with hashed password
             $user = User::create([
-                'name' => strip_tags($validated['name']), // XSS protection
-                'email' => strtolower($validated['email']), // Normalize email
-                'password' => Hash::make($validated['password']), // Bcrypt hashing
-                'role' => $validated['role'],
+                'name' => $request->name,                      // Store name as-is
+                'email' => strtolower($request->email),        // Store email in lowercase
+                'password' => Hash::make($request->password),  // Hash the password (bcrypt)
+                'role' => $request->role,                      // Store role
             ]);
 
-            // Create secure token
-            $token = $user->createToken('auth_token')->plainTextToken;
-
+            // Return success response with user data
             return response()->json([
                 'message' => 'Registration successful!',
                 'user' => [
@@ -41,65 +41,49 @@ class AuthController extends Controller
                     'email' => $user->email,
                     'role' => $user->role,
                 ],
-                'token' => $token,
-            ], 201);
+            ], 201); // 201 = Created
 
-        } catch (ValidationException $e) {
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Validation failed - return errors
             return response()->json([
                 'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
+                'errors' => $e->errors() // Shows which fields failed
+            ], 422); // 422 = Unprocessable Entity
+
         } catch (\Exception $e) {
+            // Server error - return error message
             return response()->json([
                 'message' => 'Registration failed',
                 'error' => $e->getMessage()
-            ], 500);
+            ], 500); // 500 = Internal Server Error
         }
     }
 
-    // Login with rate limiting
+    /**
+     * Login user
+     * Accepts: email, password
+     * Returns: user data on success
+     */
     public function login(Request $request)
     {
-        $email = $request->email;
-
-        // Rate limiting: max 5 attempts per minute
-        $key = 'login-attempts:' . $request->ip();
-        
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            $seconds = RateLimiter::availableIn($key);
-            return response()->json([
-                'message' => "Too many login attempts. Please try again in {$seconds} seconds.",
-            ], 429);
-        }
-
         try {
             // Validate input
-            $validated = $request->validate([
+            $request->validate([
                 'email' => 'required|email',
-                'password' => 'required|string',
+                'password' => 'required',
             ]);
 
-            // Find user
-            $user = User::where('email', strtolower($validated['email']))->first();
+            // Find user by email (case-insensitive)
+            $user = User::where('email', strtolower($request->email))->first();
 
-            // Check credentials
-            if (!$user || !Hash::check($validated['password'], $user->password)) {
-                RateLimiter::hit($key, 60); // Track failed attempt
-                
+            // Check if user exists and password matches
+            if (!$user || !Hash::check($request->password, $user->password)) {
                 return response()->json([
                     'message' => 'Invalid credentials'
-                ], 401);
+                ], 401); // 401 = Unauthorized
             }
 
-            // Clear rate limit on success
-            RateLimiter::clear($key);
-
-            // Revoke old tokens (logout from other devices)
-            $user->tokens()->delete();
-
-            // Create new secure token
-            $token = $user->createToken('auth_token', ['*'], now()->addDays(7))->plainTextToken;
-
+            // Login successful - return user data
             return response()->json([
                 'message' => 'Login successful',
                 'user' => [
@@ -108,42 +92,14 @@ class AuthController extends Controller
                     'email' => $user->email,
                     'role' => $user->role,
                 ],
-                'token' => $token,
-            ], 200);
+            ], 200); // 200 = OK
 
-        } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
         } catch (\Exception $e) {
+            // Server error
             return response()->json([
                 'message' => 'Login failed',
                 'error' => $e->getMessage()
             ], 500);
         }
-    }
-
-    // Logout
-    public function logout(Request $request)
-    {
-        $request->user()->currentAccessToken()->delete();
-
-        return response()->json([
-            'message' => 'Logout successful'
-        ], 200);
-    }
-
-    // Get current user
-    public function me(Request $request)
-    {
-        return response()->json([
-            'user' => [
-                'id' => $request->user()->id,
-                'name' => $request->user()->name,
-                'email' => $request->user()->email,
-                'role' => $request->user()->role,
-            ]
-        ], 200);
     }
 }
