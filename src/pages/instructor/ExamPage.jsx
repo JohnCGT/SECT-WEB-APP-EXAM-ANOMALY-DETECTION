@@ -6,11 +6,17 @@ import Swal from 'sweetalert2';
 const ExamPage = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
   const [courses, setCourses] = useState([]);
   const [exams, setExams] = useState([]);
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [showExamModal, setShowExamModal] = useState(false);
+  const [displayCount, setDisplayCount] = useState(20);
   const navigate = useNavigate();
+
+  // Cache configuration
+  const CACHE_KEY = 'examPageData';
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
   const handleLogout = async () => {
     try {
@@ -18,7 +24,8 @@ const ExamPage = () => {
     } catch (err) {
       console.error('Logout failed:', err);
     } finally {
-      // Always clear local state and redirect regardless of server response
+      // Clear cache on logout
+      localStorage.removeItem(CACHE_KEY);
       localStorage.removeItem('user');
       navigate('/');
     }
@@ -27,20 +34,55 @@ const ExamPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // ProtectedRoute already verified auth — just fetch the data
+        // Check cache first
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          try {
+            const { data, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+              // Use cached data
+              setUser(data.user);
+              setCourses(data.courses);
+              setExams(data.exams);
+              setLoading(false);
+              setDataLoading(false);
+              return;
+            }
+          } catch (parseErr) {
+            // If cache is corrupted, clear it and continue
+            localStorage.removeItem(CACHE_KEY);
+          }
+        }
+
+        // Fetch user first to show UI immediately
         const userRes = await API.get('/me');
         setUser(userRes.data.user);
+        setLoading(false); // Show navbar and sidebar immediately
 
-        const coursesRes = await API.get('/courses');
-        setCourses(coursesRes.data.courses || []);
+        // Fetch courses and exams in parallel
+        const [coursesRes, examsRes] = await Promise.all([
+          API.get('/courses'),
+          API.get('/exams')
+        ]);
 
-        const examsRes = await API.get('/exams');
-        setExams(examsRes.data.exams || []);
+        const data = {
+          user: userRes.data.user,
+          courses: coursesRes.data.courses || [],
+          exams: examsRes.data.exams || []
+        };
+
+        // Update state
+        setCourses(data.courses);
+        setExams(data.exams);
+
+        // Cache the data
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+          data,
+          timestamp: Date.now()
+        }));
 
       } catch (err) {
         console.error('Failed to fetch data:', err);
-        // Do NOT navigate('/') here — ProtectedRoute handles auth redirects.
-        // Only show an error message so the user knows something went wrong.
         Swal.fire({
           icon: 'error',
           title: 'Failed to load data',
@@ -48,11 +90,17 @@ const ExamPage = () => {
         });
       } finally {
         setLoading(false);
+        setDataLoading(false);
       }
     };
 
     fetchData();
   }, []);
+
+  // Clear cache when creating new exam or course
+  const clearCache = () => {
+    localStorage.removeItem(CACHE_KEY);
+  };
 
   const getExamStats = () => {
     const total = exams.length;
@@ -79,6 +127,7 @@ const ExamPage = () => {
       try {
         await API.delete(`/exams/${examId}`);
         setExams(exams.filter(e => e.id !== examId));
+        clearCache(); // Clear cache after deletion
         Swal.fire('Deleted!', 'Exam has been deleted.', 'success');
       } catch (err) {
         console.error('Delete failed:', err);
@@ -207,146 +256,166 @@ const ExamPage = () => {
           </div>
 
           {/* Stats Cards */}
-          <div className="row g-4 mb-4">
-            <div className="col-md-3">
-              <div className="card shadow-sm border-0">
-                <div className="card-body">
-                  <h6 className="card-title text-muted">Total Exams</h6>
-                  <p className="card-text display-6 fw-bold text-primary">{stats.total}</p>
-                  <small className="text-muted">All time</small>
-                </div>
+          {dataLoading ? (
+            <div className="text-center py-5">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Loading stats...</span>
               </div>
             </div>
-            <div className="col-md-3">
-              <div className="card shadow-sm border-0">
-                <div className="card-body">
-                  <h6 className="card-title text-muted">Active Exams</h6>
-                  <p className="card-text display-6 fw-bold text-success">{stats.active}</p>
-                  <small className="text-success">Currently ongoing</small>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-3">
-              <div className="card shadow-sm border-0">
-                <div className="card-body">
-                  <h6 className="card-title text-muted">Scheduled</h6>
-                  <p className="card-text display-6 fw-bold text-warning">{stats.scheduled}</p>
-                  <small className="text-warning">Upcoming exams</small>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-3">
-              <div className="card shadow-sm border-0">
-                <div className="card-body">
-                  <h6 className="card-title text-muted">Completed</h6>
-                  <p className="card-text display-6 fw-bold text-info">{stats.completed}</p>
-                  <small className="text-muted">Archived</small>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Exams Table */}
-          <div className="card shadow-sm border-0 mb-4">
-            <div className="card-body">
-              <h5 className="card-title mb-3">All Exams</h5>
-              <div className="table-responsive">
-                <table className="table table-hover">
-                  <thead className="table-light">
-                    <tr>
-                      <th>EXAM NAME</th>
-                      <th>COURSE</th>
-                      <th>TYPE</th>
-                      <th>START TIME</th>
-                      <th>DURATION</th>
-                      <th>QUESTIONS</th>
-                      <th>STATUS</th>
-                      <th>ACTIONS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {exams.length === 0 ? (
-                      <tr>
-                        <td colSpan="8" className="text-center text-muted">
-                          No exams found. Create your first exam!
-                        </td>
-                      </tr>
-                    ) : (
-                      exams.map((exam) => (
-                        <tr key={exam.id}>
-                          <td>{exam.title}</td>
-                          <td>{exam.course?.code} - {exam.course?.name}</td>
-                          <td><span className="badge bg-secondary">{exam.type}</span></td>
-                          <td>{new Date(exam.start_time).toLocaleString()}</td>
-                          <td>{exam.duration_minutes} min</td>
-                          <td>{exam.questions_count || 0}</td>
-                          <td>
-                            <span className={`badge ${getStatusBadge(exam.status)}`}>
-                              {exam.status}
-                            </span>
-                          </td>
-                          <td>
-                            <Link
-                              to={`/instructor/exams/${exam.id}`}
-                              className="btn btn-sm btn-outline-primary me-1"
-                            >
-                              <i className="bi bi-eye"></i>
-                            </Link>
-                            <Link
-                              to={`/instructor/exams/${exam.id}/edit`}
-                              className="btn btn-sm btn-outline-secondary me-1"
-                            >
-                              <i className="bi bi-pencil"></i>
-                            </Link>
-                            <button
-                              className="btn btn-sm btn-outline-danger"
-                              onClick={() => handleDeleteExam(exam.id)}
-                            >
-                              <i className="bi bi-trash"></i>
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Courses Section */}
-          <div className="card shadow-sm border-0">
-            <div className="card-body">
-              <h5 className="card-title mb-3">Your Courses</h5>
-              <div className="row g-3">
-                {courses.length === 0 ? (
-                  <div className="col-12 text-center text-muted">
-                    No courses found. Create your first course!
+          ) : (
+            <>
+              <div className="row g-4 mb-4">
+                <div className="col-md-3">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-body">
+                      <h6 className="card-title text-muted">Total Exams</h6>
+                      <p className="card-text display-6 fw-bold text-primary">{stats.total}</p>
+                      <small className="text-muted">All time</small>
+                    </div>
                   </div>
-                ) : (
-                  courses.map((course) => (
-                    <div key={course.id} className="col-md-4">
-                      <div className="card border h-100">
-                        <div className="card-body">
-                          <h6 className="card-title">{course.code}</h6>
-                          <p className="card-text">{course.name}</p>
-                          <small className="text-muted">{course.exams_count || 0} exams</small>
-                          <div className="mt-3">
-                            <Link
-                              to={`/instructor/courses/${course.id}`}
-                              className="btn btn-sm btn-primary me-2"
-                            >
-                              View Exams
-                            </Link>
+                </div>
+                <div className="col-md-3">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-body">
+                      <h6 className="card-title text-muted">Active Exams</h6>
+                      <p className="card-text display-6 fw-bold text-success">{stats.active}</p>
+                      <small className="text-success">Currently ongoing</small>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-body">
+                      <h6 className="card-title text-muted">Scheduled</h6>
+                      <p className="card-text display-6 fw-bold text-warning">{stats.scheduled}</p>
+                      <small className="text-warning">Upcoming exams</small>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-body">
+                      <h6 className="card-title text-muted">Completed</h6>
+                      <p className="card-text display-6 fw-bold text-info">{stats.completed}</p>
+                      <small className="text-muted">Archived</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Exams Table */}
+              <div className="card shadow-sm border-0 mb-4">
+                <div className="card-body">
+                  <h5 className="card-title mb-3">All Exams</h5>
+                  <div className="table-responsive">
+                    <table className="table table-hover">
+                      <thead className="table-light">
+                        <tr>
+                          <th>EXAM NAME</th>
+                          <th>COURSE</th>
+                          <th>TYPE</th>
+                          <th>START TIME</th>
+                          <th>DURATION</th>
+                          <th>QUESTIONS</th>
+                          <th>STATUS</th>
+                          <th>ACTIONS</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {exams.length === 0 ? (
+                          <tr>
+                            <td colSpan="8" className="text-center text-muted">
+                              No exams found. Create your first exam!
+                            </td>
+                          </tr>
+                        ) : (
+                          exams.slice(0, displayCount).map((exam) => (
+                            <tr key={exam.id}>
+                              <td>{exam.title}</td>
+                              <td>{exam.course?.code} - {exam.course?.name}</td>
+                              <td><span className="badge bg-secondary">{exam.type}</span></td>
+                              <td>{new Date(exam.start_time).toLocaleString()}</td>
+                              <td>{exam.duration_minutes} min</td>
+                              <td>{exam.questions_count || 0}</td>
+                              <td>
+                                <span className={`badge ${getStatusBadge(exam.status)}`}>
+                                  {exam.status}
+                                </span>
+                              </td>
+                              <td>
+                                <Link
+                                  to={`/instructor/exams/${exam.id}`}
+                                  className="btn btn-sm btn-outline-primary me-1"
+                                >
+                                  <i className="bi bi-eye"></i>
+                                </Link>
+                                <Link
+                                  to={`/instructor/exams/${exam.id}/edit`}
+                                  className="btn btn-sm btn-outline-secondary me-1"
+                                >
+                                  <i className="bi bi-pencil"></i>
+                                </Link>
+                                <button
+                                  className="btn btn-sm btn-outline-danger"
+                                  onClick={() => handleDeleteExam(exam.id)}
+                                >
+                                  <i className="bi bi-trash"></i>
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  {exams.length > displayCount && (
+                    <div className="text-center mt-3">
+                      <button 
+                        className="btn btn-outline-primary"
+                        onClick={() => setDisplayCount(prev => prev + 20)}
+                      >
+                        Load More Exams ({exams.length - displayCount} remaining)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Courses Section */}
+              <div className="card shadow-sm border-0">
+                <div className="card-body">
+                  <h5 className="card-title mb-3">Your Courses</h5>
+                  <div className="row g-3">
+                    {courses.length === 0 ? (
+                      <div className="col-12 text-center text-muted">
+                        No courses found. Create your first course!
+                      </div>
+                    ) : (
+                      courses.map((course) => (
+                        <div key={course.id} className="col-md-4">
+                          <div className="card border h-100">
+                            <div className="card-body">
+                              <h6 className="card-title">{course.code}</h6>
+                              <p className="card-text">{course.name}</p>
+                              <small className="text-muted">{course.exams_count || 0} exams</small>
+                              <div className="mt-3">
+                                <Link
+                                  to={`/instructor/courses/${course.id}`}
+                                  className="btn btn-sm btn-primary me-2"
+                                >
+                                  View Exams
+                                </Link>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  ))
-                )}
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -357,6 +426,7 @@ const ExamPage = () => {
         onSuccess={(newCourse) => {
           setCourses([newCourse, ...courses]);
           setShowCourseModal(false);
+          clearCache(); // Clear cache after creating course
         }}
       />
 
@@ -368,6 +438,7 @@ const ExamPage = () => {
         onSuccess={(newExam) => {
           setExams([newExam, ...exams]);
           setShowExamModal(false);
+          clearCache(); // Clear cache after creating exam
         }}
       />
     </div>
@@ -383,9 +454,11 @@ const CreateCourseModal = ({ show, onHide, onSuccess }) => {
     semester: '',
     credits: 3
   });
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     try {
       const res = await API.post('/courses', formData);
       Swal.fire('Success!', 'Course created successfully', 'success');
@@ -394,6 +467,8 @@ const CreateCourseModal = ({ show, onHide, onSuccess }) => {
     } catch (err) {
       console.error('Create course failed:', err);
       Swal.fire('Error!', err.response?.data?.message || 'Failed to create course', 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -405,7 +480,7 @@ const CreateCourseModal = ({ show, onHide, onSuccess }) => {
         <div className="modal-content">
           <div className="modal-header">
             <h5 className="modal-title">Create New Course</h5>
-            <button type="button" className="btn-close" onClick={onHide}></button>
+            <button type="button" className="btn-close" onClick={onHide} disabled={submitting}></button>
           </div>
           <form onSubmit={handleSubmit}>
             <div className="modal-body">
@@ -418,6 +493,7 @@ const CreateCourseModal = ({ show, onHide, onSuccess }) => {
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                   required
+                  disabled={submitting}
                 />
               </div>
               <div className="mb-3">
@@ -429,6 +505,7 @@ const CreateCourseModal = ({ show, onHide, onSuccess }) => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
+                  disabled={submitting}
                 />
               </div>
               <div className="mb-3">
@@ -438,6 +515,7 @@ const CreateCourseModal = ({ show, onHide, onSuccess }) => {
                   rows="3"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  disabled={submitting}
                 ></textarea>
               </div>
               <div className="mb-3">
@@ -448,6 +526,7 @@ const CreateCourseModal = ({ show, onHide, onSuccess }) => {
                   placeholder="e.g., Fall 2026"
                   value={formData.semester}
                   onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+                  disabled={submitting}
                 />
               </div>
               <div className="mb-3">
@@ -459,12 +538,24 @@ const CreateCourseModal = ({ show, onHide, onSuccess }) => {
                   max="6"
                   value={formData.credits}
                   onChange={(e) => setFormData({ ...formData, credits: parseInt(e.target.value) })}
+                  disabled={submitting}
                 />
               </div>
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={onHide}>Cancel</button>
-              <button type="submit" className="btn btn-primary">Create Course</button>
+              <button type="button" className="btn btn-secondary" onClick={onHide} disabled={submitting}>
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Creating...
+                  </>
+                ) : (
+                  'Create Course'
+                )}
+              </button>
             </div>
           </form>
         </div>
@@ -484,9 +575,11 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
     end_time: '',
     duration_minutes: 60
   });
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     try {
       const res = await API.post('/exams', formData);
       Swal.fire('Success!', 'Exam created successfully', 'success');
@@ -503,6 +596,8 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
     } catch (err) {
       console.error('Create exam failed:', err);
       Swal.fire('Error!', err.response?.data?.message || 'Failed to create exam', 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -514,7 +609,7 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
         <div className="modal-content">
           <div className="modal-header">
             <h5 className="modal-title">Create New Exam</h5>
-            <button type="button" className="btn-close" onClick={onHide}></button>
+            <button type="button" className="btn-close" onClick={onHide} disabled={submitting}></button>
           </div>
           <form onSubmit={handleSubmit}>
             <div className="modal-body">
@@ -525,6 +620,7 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
                   value={formData.course_id}
                   onChange={(e) => setFormData({ ...formData, course_id: e.target.value })}
                   required
+                  disabled={submitting}
                 >
                   <option value="">Select a course</option>
                   {courses.map((course) => (
@@ -543,6 +639,7 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   required
+                  disabled={submitting}
                 />
               </div>
               <div className="mb-3">
@@ -552,6 +649,7 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                   required
+                  disabled={submitting}
                 >
                   <option value="quiz">Quiz</option>
                   <option value="prelim">Prelim</option>
@@ -568,6 +666,7 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
                     value={formData.start_time}
                     onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
                     required
+                    disabled={submitting}
                   />
                 </div>
                 <div className="col-md-6 mb-3">
@@ -578,6 +677,7 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
                     value={formData.end_time}
                     onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
                     required
+                    disabled={submitting}
                   />
                 </div>
               </div>
@@ -590,6 +690,7 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
                   value={formData.duration_minutes}
                   onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) })}
                   required
+                  disabled={submitting}
                 />
               </div>
               <div className="mb-3">
@@ -599,12 +700,24 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
                   rows="3"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  disabled={submitting}
                 ></textarea>
               </div>
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={onHide}>Cancel</button>
-              <button type="submit" className="btn btn-primary">Create Exam</button>
+              <button type="button" className="btn btn-secondary" onClick={onHide} disabled={submitting}>
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Creating...
+                  </>
+                ) : (
+                  'Create Exam'
+                )}
+              </button>
             </div>
           </form>
         </div>
