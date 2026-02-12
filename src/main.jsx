@@ -17,6 +17,7 @@ import AccountSettings from "./pages/instructor/AccountSettings";
 import Students from "./pages/instructor/Students";
 import Reports from "./pages/instructor/Reports";
 import Alerts from "./pages/instructor/Alerts";
+import ExamDetail from './pages/instructor/ExamDetail';
 
 // Students Page
 import Dashboard from "./pages/student/Dashboard";
@@ -51,6 +52,7 @@ createRoot(document.getElementById("root")).render(
         {/* Instructor Page - JC */}
         <Route path="/instructor" element={<Homepage />} />
         <Route path="/instructor/exams" element={<ExamPage />} />
+        <Route path="/instructor/exams/:id" element={<ExamDetail />} />
         <Route path="/instructor/profile" element={<ProfilePage />} />
         <Route path="/instructor/account-settings" element={<AccountSettings />} />
         <Route path="/instructor/alerts" element={<Alerts />} />
