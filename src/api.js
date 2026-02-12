@@ -6,10 +6,28 @@ const API = axios.create({
         'Content-Type': 'application/json',
         'Accept': 'application/json',
     },
-    withCredentials: true,  // ← IMPORTANT: Sends cookies automatically
+    withCredentials: true,
 });
 
-// NO TOKEN INTERCEPTOR - cookies are sent automatically
+// Add CSRF token to requests
+API.interceptors.request.use(
+    (config) => {
+        // Get CSRF token from cookie
+        const token = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('XSRF-TOKEN='))
+            ?.split('=')[1];
+        
+        if (token) {
+            config.headers['X-XSRF-TOKEN'] = decodeURIComponent(token);
+        }
+        
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
 
 API.interceptors.response.use(
     (response) => response,

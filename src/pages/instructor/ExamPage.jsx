@@ -1,7 +1,54 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import API from "../../api";
 
 const ExamPage = () => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await API.post('/logout');
+      // Clear any local state if needed
+      navigate('/');
+    } catch (err) {
+      console.error('Logout failed:', err);
+      navigate('/');
+    }
+  };
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        console.log('🔍 Attempting to fetch user...');
+        const res = await API.get('/me');
+        console.log('✅ User data received:', res.data);
+        setUser(res.data.user);
+      } catch (err) {
+        console.error('❌ Failed to fetch user:', err);
+        console.error('Error status:', err.response?.status);
+        console.error('Error data:', err.response?.data);
+        // If user is not authenticated, redirect to login
+        navigate('/');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, [navigate]);
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center min-vh-100">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="d-flex flex-column min-vh-100">
       {/* Top Navbar */}
@@ -28,21 +75,31 @@ const ExamPage = () => {
               data-bs-toggle="dropdown" 
               aria-expanded="false"
             >
-              <span className="me-2 fw-bold">Welcome, Instructor Name</span>
+              <span className="me-2 fw-bold">Welcome, {user?.name || 'Instructor'}</span>
             </button>
             <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="accountDropdown">
               <li>
-                <Link className="dropdown-item" to="/instructor/account-settings">Account Settings</Link></li>
-                <li>
-                <Link className="dropdown-item" to="/instructor/profile">Profile</Link></li>
+                <Link className="dropdown-item" to="/instructor/account-settings">Account Settings</Link>
+              </li>
+              <li>
+                <Link className="dropdown-item" to="/instructor/profile">Profile</Link>
+              </li>
               <li><hr className="dropdown-divider" /></li>
-              <li><Link className="dropdown-item" to="/">Logout</Link></li>
+              <li>
+                <button 
+                  className="dropdown-item" 
+                  onClick={handleLogout}
+                  style={{ cursor: 'pointer', border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
+                >
+                  Logout
+                </button>
+              </li>
             </ul>
           </div>
         </div>
       </nav>
 
-      {/* Main Layout with Sidebar */}
+{/* Main Layout with Sidebar */}
       <div className="d-flex flex-grow-1">
         {/* Sidebar */}
         <nav

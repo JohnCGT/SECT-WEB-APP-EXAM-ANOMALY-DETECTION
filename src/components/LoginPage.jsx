@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import axios from 'axios';
 import API from "../api";
 import Swal from 'sweetalert2';
 
@@ -15,54 +16,54 @@ const LoginPage = () => {
     setLoading(true);
     setError("");
 
-    try {
-      // Get CSRF cookie first
-      await API.get('http://localhost:8000/sanctum/csrf-cookie');
-      
-      // Send login request
-      const res = await API.post('/login', { 
-        email: email.trim().toLowerCase(),
-        password 
-      });
-      
-      const { user } = res.data;
-      
-      // NO sessionStorage - authentication is in HTTP-only cookie
-      
-      const Toast = Swal.mixin({
-        toast: true,
-        position: 'top-end',
-        showConfirmButton: false,
-        timer: 1500,
-        timerProgressBar: true,
-      });
+  try {
+    // Get CSRF cookie first
+    await axios.get('http://localhost:8000/sanctum/csrf-cookie', {
+      withCredentials: true
+    });
+    
+    // Send login request
+    const res = await API.post('/login', { 
+      email: email.trim().toLowerCase(),
+      password 
+    });
+    
+    const { user } = res.data;
+    
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 1500,
+      timerProgressBar: true,
+    });
 
-      await Toast.fire({
-        icon: 'success',
-        title: `Welcome back, ${user.name}!`
-      });
-      
-      if (user.role === 'admin') {
-        navigate('/admin');
-      } else if (user.role === 'instructor') {
-        navigate('/instructor');
-      } else if (user.role === 'student') {
-        navigate('/student');
-      }
-    } catch (err) {
-      console.error('Login error:', err);
-      
-      await Swal.fire({
-        icon: 'error',
-        title: 'Login Failed',
-        text: err.response?.data?.message || 'Invalid email or password',
-      });
-      
-      setError(err.response?.data?.message || 'Login failed! Please check your credentials.');
-    } finally {
-      setLoading(false);
+    await Toast.fire({
+      icon: 'success',
+      title: `Welcome back, ${user.name}!`
+    });
+    
+    if (user.role === 'admin') {
+      navigate('/admin');
+    } else if (user.role === 'instructor') {
+      navigate('/instructor/exams');
+    } else if (user.role === 'student') {
+      navigate('/student');
     }
-  };
+  } catch (err) {
+    console.error('Login error:', err);
+    
+    await Swal.fire({
+      icon: 'error',
+      title: 'Login Failed',
+      text: err.response?.data?.message || 'Invalid email or password',
+    });
+    
+    setError(err.response?.data?.message || 'Login failed! Please check your credentials.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="d-flex vh-100 justify-content-center align-items-center bg-light">

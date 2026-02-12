@@ -10,7 +10,7 @@ return [
     /**
      * Allowed HTTP methods
      */
-    'allowed_methods' => ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    'allowed_methods' => ['*'],
 
     /**
      * Allow requests from these origins

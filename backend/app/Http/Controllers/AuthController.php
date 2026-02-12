@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
@@ -17,8 +18,17 @@ class AuthController extends Controller
             $request->validate([
                 'name' => 'required|string|max:255',
                 'email' => 'required|email|unique:users,email',
-                'password' => 'required|string|min:8',
+                'password' => [
+                'required',
+                'string',
+                'min:8',
+                'regex:/[a-z]/',      // at least one lowercase
+                'regex:/[A-Z]/',      // at least one uppercase
+                'regex:/[0-9]/',      // at least one number
+                'regex:/[@$!%*#?&]/', // at least one special char
+                ],
                 'role' => 'required|in:admin,instructor,student',
+                'password.regex' => 'Password must contain uppercase, lowercase, number and special character'
             ]);
 
             $user = User::create([
@@ -28,8 +38,8 @@ class AuthController extends Controller
                 'role' => $request->role,
             ]);
 
-            // Create Sanctum token
-            $token = $user->createToken('auth-token')->plainTextToken;
+            // Login the user immediately after registration
+            Auth::login($user);
 
             return response()->json([
                 'message' => 'Registration successful!',
@@ -39,7 +49,6 @@ class AuthController extends Controller
                     'email' => $user->email,
                     'role' => $user->role,
                 ],
-                'token' => $token,
             ], 201);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -75,8 +84,8 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            // Create Sanctum token
-            $token = $user->createToken('auth-token')->plainTextToken;
+            // Use session-based authentication
+            Auth::login($user);
 
             return response()->json([
                 'message' => 'Login successful',
@@ -86,7 +95,6 @@ class AuthController extends Controller
                     'email' => $user->email,
                     'role' => $user->role,
                 ],
-                'token' => $token,
             ], 200);
 
         } catch (\Exception $e) {
@@ -102,7 +110,10 @@ class AuthController extends Controller
      */
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        Auth::logout();
+        
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
         return response()->json([
             'message' => 'Logged out successfully'
