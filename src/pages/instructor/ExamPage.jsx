@@ -10,15 +10,16 @@ const ExamPage = () => {
   const [exams, setExams] = useState([]);
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [showExamModal, setShowExamModal] = useState(false);
-  const [selectedCourse, setSelectedCourse] = useState(null);
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
       await API.post('/logout');
-      navigate('/');
     } catch (err) {
       console.error('Logout failed:', err);
+    } finally {
+      // Always clear local state and redirect regardless of server response
+      localStorage.removeItem('user');
       navigate('/');
     }
   };
@@ -26,31 +27,38 @@ const ExamPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // ProtectedRoute already verified auth — just fetch the data
         const userRes = await API.get('/me');
         setUser(userRes.data.user);
 
         const coursesRes = await API.get('/courses');
-        setCourses(coursesRes.data.courses);
+        setCourses(coursesRes.data.courses || []);
 
         const examsRes = await API.get('/exams');
-        setExams(examsRes.data.exams);
+        setExams(examsRes.data.exams || []);
+
       } catch (err) {
         console.error('Failed to fetch data:', err);
-        navigate('/');
+        // Do NOT navigate('/') here — ProtectedRoute handles auth redirects.
+        // Only show an error message so the user knows something went wrong.
+        Swal.fire({
+          icon: 'error',
+          title: 'Failed to load data',
+          text: 'Please refresh the page and try again.',
+        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [navigate]);
+  }, []);
 
   const getExamStats = () => {
     const total = exams.length;
     const active = exams.filter(e => e.status === 'active').length;
     const scheduled = exams.filter(e => e.status === 'scheduled').length;
     const completed = exams.filter(e => e.status === 'completed').length;
-    
     return { total, active, scheduled, completed };
   };
 
@@ -71,7 +79,6 @@ const ExamPage = () => {
       try {
         await API.delete(`/exams/${examId}`);
         setExams(exams.filter(e => e.id !== examId));
-        
         Swal.fire('Deleted!', 'Exam has been deleted.', 'success');
       } catch (err) {
         console.error('Delete failed:', err);
@@ -106,22 +113,22 @@ const ExamPage = () => {
       <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
         <div className="container-fluid">
           <a className="navbar-brand fw-bold text-primary" href="#">SECT Instructor</a>
-          
+
           <form className="d-flex mx-auto" style={{ width: '40%' }}>
-            <input 
-              className="form-control" 
-              type="search" 
-              placeholder="Search exams..." 
+            <input
+              className="form-control"
+              type="search"
+              placeholder="Search exams..."
               aria-label="Search"
             />
           </form>
 
           <div className="dropdown">
-            <button 
-              className="btn btn-light dropdown-toggle d-flex align-items-center" 
-              type="button" 
-              id="accountDropdown" 
-              data-bs-toggle="dropdown" 
+            <button
+              className="btn btn-light dropdown-toggle d-flex align-items-center"
+              type="button"
+              id="accountDropdown"
+              data-bs-toggle="dropdown"
               aria-expanded="false"
             >
               <span className="me-2 fw-bold">Welcome, {user?.name || 'Instructor'}</span>
@@ -135,8 +142,8 @@ const ExamPage = () => {
               </li>
               <li><hr className="dropdown-divider" /></li>
               <li>
-                <button 
-                  className="dropdown-item" 
+                <button
+                  className="dropdown-item"
                   onClick={handleLogout}
                   style={{ cursor: 'pointer', border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
                 >
@@ -184,13 +191,13 @@ const ExamPage = () => {
           <div className="d-flex justify-content-between align-items-center mb-4">
             <h4>Exam Management</h4>
             <div>
-              <button 
+              <button
                 className="btn btn-outline-primary me-2"
                 onClick={() => setShowCourseModal(true)}
               >
                 <i className="bi bi-plus-circle me-2"></i>Create Course
               </button>
-              <button 
+              <button
                 className="btn btn-primary"
                 onClick={() => setShowExamModal(true)}
               >
@@ -279,7 +286,7 @@ const ExamPage = () => {
                             </span>
                           </td>
                           <td>
-                            <Link 
+                            <Link
                               to={`/instructor/exams/${exam.id}`}
                               className="btn btn-sm btn-outline-primary me-1"
                             >
@@ -291,7 +298,7 @@ const ExamPage = () => {
                             >
                               <i className="bi bi-pencil"></i>
                             </Link>
-                            <button 
+                            <button
                               className="btn btn-sm btn-outline-danger"
                               onClick={() => handleDeleteExam(exam.id)}
                             >
@@ -325,7 +332,7 @@ const ExamPage = () => {
                           <p className="card-text">{course.name}</p>
                           <small className="text-muted">{course.exams_count || 0} exams</small>
                           <div className="mt-3">
-                            <Link 
+                            <Link
                               to={`/instructor/courses/${course.id}`}
                               className="btn btn-sm btn-primary me-2"
                             >
@@ -344,7 +351,7 @@ const ExamPage = () => {
       </div>
 
       {/* Create Course Modal */}
-      <CreateCourseModal 
+      <CreateCourseModal
         show={showCourseModal}
         onHide={() => setShowCourseModal(false)}
         onSuccess={(newCourse) => {
@@ -354,7 +361,7 @@ const ExamPage = () => {
       />
 
       {/* Create Exam Modal */}
-      <CreateExamModal 
+      <CreateExamModal
         show={showExamModal}
         onHide={() => setShowExamModal(false)}
         courses={courses}

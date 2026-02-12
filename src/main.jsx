@@ -1,15 +1,13 @@
-// Import tools
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-// Import pages
-
-// Login and Register
+// Auth
 import LoginPage from "./components/LoginPage";
 import RegisterPage from "./components/RegisterPage";
+import ProtectedRoute from "./components/ProtectedRoute";
 
-// Instructors Page
+// Instructor Pages
 import Homepage from "./pages/instructor/Homepage";
 import ExamPage from "./pages/instructor/ExamPage";
 import ProfilePage from "./pages/instructor/ProfilePage";
@@ -17,9 +15,9 @@ import AccountSettings from "./pages/instructor/AccountSettings";
 import Students from "./pages/instructor/Students";
 import Reports from "./pages/instructor/Reports";
 import Alerts from "./pages/instructor/Alerts";
-import ExamDetail from './pages/instructor/ExamDetail';
+import ExamDetail from "./pages/instructor/ExamDetail";
 
-// Students Page
+// Student Pages
 import Dashboard from "./pages/student/Dashboard";
 import SubjectPage from "./pages/student/SubjectPage";
 import TasksPage from "./pages/student/TasksPage";
@@ -27,52 +25,89 @@ import GradesPage from "./pages/student/GradesPage";
 import StudentAccountSettings from "./pages/student/StudentAccountSettings";
 import StudentProfile from "./pages/student/StudentProfile";
 
-// Admin Page
+// Admin Pages
 import AdminPage from "./pages/admin/AdminPage";
 import UserManagement from "./pages/admin/UserManagement";
 import ExamManagement from "./pages/admin/ExamManagement";
 import AnomalyReports from "./pages/admin/AnomalyReports";
 import SystemLogs from "./pages/admin/SystemLogs";
 
-// Import bootstrap
+// Bootstrap
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
-import 'bootstrap-icons/font/bootstrap-icons.css';
+import "bootstrap-icons/font/bootstrap-icons.css";
 
-// Routes
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
 
-        {/* Login and Register */}
+        {/* Public routes */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* Instructor Page - JC */}
-        <Route path="/instructor" element={<Homepage />} />
-        <Route path="/instructor/exams" element={<ExamPage />} />
-        <Route path="/instructor/exams/:id" element={<ExamDetail />} />
-        <Route path="/instructor/profile" element={<ProfilePage />} />
-        <Route path="/instructor/account-settings" element={<AccountSettings />} />
-        <Route path="/instructor/alerts" element={<Alerts />} />
-        <Route path="/instructor/reports" element={<Reports />} />
-        <Route path="/instructor/students" element={<Students />} />
+        {/* Instructor routes */}
+        <Route path="/instructor" element={
+          <ProtectedRoute role="instructor"><Homepage /></ProtectedRoute>
+        } />
+        <Route path="/instructor/exams" element={
+          <ProtectedRoute role="instructor"><ExamPage /></ProtectedRoute>
+        } />
+        <Route path="/instructor/exams/:id" element={
+          <ProtectedRoute role="instructor"><ExamDetail /></ProtectedRoute>
+        } />
+        <Route path="/instructor/profile" element={
+          <ProtectedRoute role="instructor"><ProfilePage /></ProtectedRoute>
+        } />
+        <Route path="/instructor/account-settings" element={
+          <ProtectedRoute role="instructor"><AccountSettings /></ProtectedRoute>
+        } />
+        <Route path="/instructor/alerts" element={
+          <ProtectedRoute role="instructor"><Alerts /></ProtectedRoute>
+        } />
+        <Route path="/instructor/reports" element={
+          <ProtectedRoute role="instructor"><Reports /></ProtectedRoute>
+        } />
+        <Route path="/instructor/students" element={
+          <ProtectedRoute role="instructor"><Students /></ProtectedRoute>
+        } />
 
-        {/* Student Page - Esita */}
-        <Route path="/student" element={<Dashboard />} />
-        <Route path="/student/subjects" element={<SubjectPage />} />
-        <Route path="/student/tasks" element={<TasksPage />} />
-        <Route path="/student/grades" element={<GradesPage />} />
-        <Route path="/student/account-settings" element={<StudentAccountSettings />} />        
-        <Route path="/student/profile" element={<StudentProfile />} />        
-        
-        {/* Admin Page - Guban */}
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="/admin/users" element={<UserManagement />} />
-        <Route path="/admin/exams" element={<ExamManagement />} />
-        <Route path="/admin/anomalies" element={<AnomalyReports />} />
-        <Route path="/admin/logs" element={<SystemLogs />} />
+        {/* Student routes */}
+        <Route path="/student" element={
+          <ProtectedRoute role="student"><Dashboard /></ProtectedRoute>
+        } />
+        <Route path="/student/subjects" element={
+          <ProtectedRoute role="student"><SubjectPage /></ProtectedRoute>
+        } />
+        <Route path="/student/tasks" element={
+          <ProtectedRoute role="student"><TasksPage /></ProtectedRoute>
+        } />
+        <Route path="/student/grades" element={
+          <ProtectedRoute role="student"><GradesPage /></ProtectedRoute>
+        } />
+        <Route path="/student/account-settings" element={
+          <ProtectedRoute role="student"><StudentAccountSettings /></ProtectedRoute>
+        } />
+        <Route path="/student/profile" element={
+          <ProtectedRoute role="student"><StudentProfile /></ProtectedRoute>
+        } />
+
+        {/* Admin routes */}
+        <Route path="/admin" element={
+          <ProtectedRoute role="admin"><AdminPage /></ProtectedRoute>
+        } />
+        <Route path="/admin/users" element={
+          <ProtectedRoute role="admin"><UserManagement /></ProtectedRoute>
+        } />
+        <Route path="/admin/exams" element={
+          <ProtectedRoute role="admin"><ExamManagement /></ProtectedRoute>
+        } />
+        <Route path="/admin/anomalies" element={
+          <ProtectedRoute role="admin"><AnomalyReports /></ProtectedRoute>
+        } />
+        <Route path="/admin/logs" element={
+          <ProtectedRoute role="admin"><SystemLogs /></ProtectedRoute>
+        } />
 
       </Routes>
     </BrowserRouter>

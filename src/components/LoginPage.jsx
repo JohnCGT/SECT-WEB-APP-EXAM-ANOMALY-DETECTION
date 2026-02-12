@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from 'axios';
-import API from "../api";
+import API, { fetchCsrfToken } from "../api";
+import axios from "axios";
 import Swal from 'sweetalert2';
 
 const LoginPage = () => {
@@ -16,60 +16,65 @@ const LoginPage = () => {
     setLoading(true);
     setError("");
 
-  try {
-    // Get CSRF cookie first
-    await axios.get('http://localhost:8000/sanctum/csrf-cookie', {
-      withCredentials: true
-    });
-    
-    // Send login request
-    const res = await API.post('/login', { 
-      email: email.trim().toLowerCase(),
-      password 
-    });
-    
-    const { user } = res.data;
-    
-    const Toast = Swal.mixin({
-      toast: true,
-      position: 'top-end',
-      showConfirmButton: false,
-      timer: 1500,
-      timerProgressBar: true,
-    });
+    try {
+      // Step 1: Fetch CSRF cookie — Sanctum requires this before any POST
+      await fetchCsrfToken();
 
-    await Toast.fire({
-      icon: 'success',
-      title: `Welcome back, ${user.name}!`
-    });
-    
-    if (user.role === 'admin') {
-      navigate('/admin');
-    } else if (user.role === 'instructor') {
-      navigate('/instructor/exams');
-    } else if (user.role === 'student') {
-      navigate('/student');
+      // Step 2: Send login request
+      const res = await API.post('/login', {
+        email: email.trim().toLowerCase(),
+        password,
+      });
+
+      const { user } = res.data;
+
+      // Step 3: Persist user info so protected routes don't bounce back
+      // while the async /me session check is still in flight
+      localStorage.setItem('user', JSON.stringify(user));
+
+      // Step 4: Show success toast
+      const Toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
+      });
+
+      await Toast.fire({
+        icon: 'success',
+        title: `Welcome back, ${user.name}!`,
+      });
+
+      // Step 5: Redirect based on role
+      if (user.role === 'admin') {
+        navigate('/admin');
+      } else if (user.role === 'instructor') {
+        navigate('/instructor/exams');
+      } else if (user.role === 'student') {
+        navigate('/student');
+      }
+
+    } catch (err) {
+      console.error('Login error:', err);
+
+      await Swal.fire({
+        icon: 'error',
+        title: 'Login Failed',
+        text: err.response?.data?.message || 'Invalid email or password',
+      });
+
+      setError(err.response?.data?.message || 'Login failed! Please check your credentials.');
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error('Login error:', err);
-    
-    await Swal.fire({
-      icon: 'error',
-      title: 'Login Failed',
-      text: err.response?.data?.message || 'Invalid email or password',
-    });
-    
-    setError(err.response?.data?.message || 'Login failed! Please check your credentials.');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className="d-flex vh-100 justify-content-center align-items-center bg-light">
       <div className="card shadow p-4" style={{ maxWidth: "400px", width: "100%" }}>
         <h2 className="text-center mb-4">Login</h2>
-        
+
         {error && (
           <div className="alert alert-danger" role="alert">
             {error}
@@ -79,10 +84,10 @@ const LoginPage = () => {
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
             <label htmlFor="email" className="form-label">Email</label>
-            <input 
-              type="email" 
-              className="form-control" 
-              id="email" 
+            <input
+              type="email"
+              className="form-control"
+              id="email"
               placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -94,10 +99,10 @@ const LoginPage = () => {
 
           <div className="mb-3">
             <label htmlFor="password" className="form-label">Password</label>
-            <input 
-              type="password" 
-              className="form-control" 
-              id="password" 
+            <input
+              type="password"
+              className="form-control"
+              id="password"
               placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -107,8 +112,8 @@ const LoginPage = () => {
             />
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="btn btn-primary w-100"
             disabled={loading}
           >
