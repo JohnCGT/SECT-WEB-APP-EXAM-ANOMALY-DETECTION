@@ -16,6 +16,8 @@ import Students from "./pages/instructor/Students";
 import Reports from "./pages/instructor/Reports";
 import Alerts from "./pages/instructor/Alerts";
 import ExamDetail from "./pages/instructor/ExamDetail";
+import CourseDetail from "./pages/instructor/CourseDetail";
+import ExamEdit from "./pages/instructor/ExamEdit";
 
 // Student Pages
 import Dashboard from "./pages/student/Dashboard";
@@ -71,6 +73,12 @@ createRoot(document.getElementById("root")).render(
         <Route path="/instructor/students" element={
           <ProtectedRoute role="instructor"><Students /></ProtectedRoute>
         } />
+        <Route path="/instructor/exams/:id/edit" element={
+          <ProtectedRoute role="instructor"><ExamEdit /></ProtectedRoute>
+        } />
+        <Route path="/instructor/courses/:id" element={
+          <ProtectedRoute role="instructor"><CourseDetail /></ProtectedRoute>
+        } />                
 
         {/* Student routes */}
         <Route path="/student" element={
