@@ -26,6 +26,9 @@ import TasksPage from "./pages/student/TasksPage";
 import GradesPage from "./pages/student/GradesPage";
 import StudentAccountSettings from "./pages/student/StudentAccountSettings";
 import StudentProfile from "./pages/student/StudentProfile";
+import CourseExamsPage from "./pages/student/CourseExamsPage";
+import TakeExamPage from "./pages/student/TakeExamPage";
+import ExamResultsPage from "./pages/student/ExamResultsPage";
 
 // Admin Pages
 import AdminPage from "./pages/admin/AdminPage";
@@ -98,6 +101,15 @@ createRoot(document.getElementById("root")).render(
         } />
         <Route path="/student/profile" element={
           <ProtectedRoute role="student"><StudentProfile /></ProtectedRoute>
+        } />
+        <Route path="/student/courses/:courseId/exams" element={
+          <ProtectedRoute role="student"><CourseExamsPage /></ProtectedRoute>
+        } />
+        <Route path="/student/exams/:examId/take" element={
+          <ProtectedRoute role="student"><TakeExamPage /></ProtectedRoute>
+        } />
+        <Route path="/student/exams/:examId/results" element={
+          <ProtectedRoute role="student"><ExamResultsPage /></ProtectedRoute>
         } />
 
         {/* Admin routes */}
