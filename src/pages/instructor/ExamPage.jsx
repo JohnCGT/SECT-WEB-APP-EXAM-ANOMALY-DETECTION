@@ -14,9 +14,8 @@ const ExamPage = () => {
   const [displayCount, setDisplayCount] = useState(20);
   const navigate = useNavigate();
 
-  // Cache configuration
   const CACHE_KEY = 'examPageData';
-  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  const CACHE_DURATION = 5 * 60 * 1000;
 
   const handleLogout = async () => {
     try {
@@ -24,7 +23,6 @@ const ExamPage = () => {
     } catch (err) {
       console.error('Logout failed:', err);
     } finally {
-      // Clear cache on logout
       localStorage.removeItem(CACHE_KEY);
       localStorage.removeItem('user');
       navigate('/');
@@ -34,13 +32,11 @@ const ExamPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Check cache first
         const cached = localStorage.getItem(CACHE_KEY);
         if (cached) {
           try {
             const { data, timestamp } = JSON.parse(cached);
             if (Date.now() - timestamp < CACHE_DURATION) {
-              // Use cached data
               setUser(data.user);
               setCourses(data.courses);
               setExams(data.exams);
@@ -49,17 +45,14 @@ const ExamPage = () => {
               return;
             }
           } catch (parseErr) {
-            // If cache is corrupted, clear it and continue
             localStorage.removeItem(CACHE_KEY);
           }
         }
 
-        // Fetch user first to show UI immediately
         const userRes = await API.get('/me');
         setUser(userRes.data.user);
-        setLoading(false); // Show navbar and sidebar immediately
+        setLoading(false);
 
-        // Fetch courses and exams in parallel
         const [coursesRes, examsRes] = await Promise.all([
           API.get('/courses'),
           API.get('/exams')
@@ -71,11 +64,9 @@ const ExamPage = () => {
           exams: examsRes.data.exams || []
         };
 
-        // Update state
         setCourses(data.courses);
         setExams(data.exams);
 
-        // Cache the data
         localStorage.setItem(CACHE_KEY, JSON.stringify({
           data,
           timestamp: Date.now()
@@ -97,7 +88,6 @@ const ExamPage = () => {
     fetchData();
   }, []);
 
-  // Clear cache when creating new exam or course
   const clearCache = () => {
     localStorage.removeItem(CACHE_KEY);
   };
@@ -127,7 +117,7 @@ const ExamPage = () => {
       try {
         await API.delete(`/exams/${examId}`);
         setExams(exams.filter(e => e.id !== examId));
-        clearCache(); // Clear cache after deletion
+        clearCache();
         Swal.fire('Deleted!', 'Exam has been deleted.', 'success');
       } catch (err) {
         console.error('Delete failed:', err);
@@ -204,32 +194,66 @@ const ExamPage = () => {
         </div>
       </nav>
 
+      {/* Main Layout with Sidebar */}
       <div className="d-flex flex-grow-1">
         {/* Sidebar */}
-        <nav className="text-black d-flex justify-content-center" style={{ width: '110px', minHeight: '100%' }}>
+        <nav
+          className="text-black d-flex justify-content-center"
+          style={{ width: '110px', minHeight: '100%' }}
+        >
           <ul className="nav flex-column p-3 align-items-center">
             <li className="nav-item mb-3">
-              <Link className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3" to="/instructor">
+              <Link
+                className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
+                to="/instructor"
+              >
                 <i className="bi bi-speedometer2 fs-4 mb-1"></i>
                 <span>Dashboard</span>
               </Link>
             </li>
             <li className="nav-item mb-3">
-              <Link className="nav-link text-white active bg-primary rounded fs-6 fw-semibold d-flex flex-column align-items-center py-3" to="/instructor/exams">
+              <Link
+                className="nav-link text-white active bg-primary rounded fs-6 fw-semibold d-flex flex-column align-items-center py-3"
+                to="/instructor/exams"
+              >
                 <i className="bi bi-file-earmark-text fs-3 mb-1"></i>
                 <span>Exams</span>
               </Link>
             </li>
             <li className="nav-item mb-3">
-              <Link className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3" to="/instructor/courses">
-                <i className="bi bi-book fs-3 mb-1"></i>
-                <span>Courses</span>
+              <Link
+                className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
+                to="/instructor/students"
+              >
+                <i className="bi bi-people fs-3 mb-1"></i>
+                <span>Students</span>
               </Link>
             </li>
             <li className="nav-item mb-3">
-              <Link className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3" to="/instructor/students">
-                <i className="bi bi-people fs-3 mb-1"></i>
-                <span>Students</span>
+              <Link
+                className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
+                to="/instructor/alerts"
+              >
+                <i className="bi bi-exclamation-triangle fs-3 mb-1"></i>
+                <span>Alerts</span>
+              </Link>
+            </li>
+            <li className="nav-item mb-3">
+              <Link
+                className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
+                to="/instructor/reports"
+              >
+                <i className="bi bi-bar-chart fs-3 mb-1"></i>
+                <span>Reports</span>
+              </Link>
+            </li>
+            <li className="nav-item mb-3">
+              <Link
+                className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
+                to="/instructor/account-settings"
+              >
+                <i className="bi bi-gear fs-3 mb-1"></i>
+                <span>Settings</span>
               </Link>
             </li>
           </ul>
@@ -370,7 +394,7 @@ const ExamPage = () => {
                   </div>
                   {exams.length > displayCount && (
                     <div className="text-center mt-3">
-                      <button 
+                      <button
                         className="btn btn-outline-primary"
                         onClick={() => setDisplayCount(prev => prev + 20)}
                       >
@@ -426,7 +450,7 @@ const ExamPage = () => {
         onSuccess={(newCourse) => {
           setCourses([newCourse, ...courses]);
           setShowCourseModal(false);
-          clearCache(); // Clear cache after creating course
+          clearCache();
         }}
       />
 
@@ -438,7 +462,7 @@ const ExamPage = () => {
         onSuccess={(newExam) => {
           setExams([newExam, ...exams]);
           setShowExamModal(false);
-          clearCache(); // Clear cache after creating exam
+          clearCache();
         }}
       />
     </div>
