@@ -52,4 +52,10 @@ class Exam extends Model
     {
         return $this->hasMany(Question::class);
     }
+
+    public function submissions(): HasMany
+    {
+        return $this->hasMany(ExamSubmission::class);
+    }
+    
 }

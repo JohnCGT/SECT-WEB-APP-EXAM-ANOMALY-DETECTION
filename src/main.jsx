@@ -26,7 +26,7 @@ import TasksPage from "./pages/student/TasksPage";
 import GradesPage from "./pages/student/GradesPage";
 import StudentAccountSettings from "./pages/student/StudentAccountSettings";
 import StudentProfile from "./pages/student/StudentProfile";
-import CourseExamsPage from "./pages/student/CourseExamsPage";
+import CourseExamsPage from "./pages/student/CourseExamPage";
 import TakeExamPage from "./pages/student/TakeExamPage";
 import ExamResultsPage from "./pages/student/ExamResultsPage";
 
