@@ -171,7 +171,7 @@ const AdminPage = () => {
                     <td className="fw-bold text-success">Low</td>
                   </tr>
                   <tr>
-                    <td>Carlos Reyes</td>
+                    <td>Carlos G. Reyes</td>
                     <td>Quiz 2</td>
                     <td>0.51</td>
                     <td className="fw-bold text-warning">Medium</td>
