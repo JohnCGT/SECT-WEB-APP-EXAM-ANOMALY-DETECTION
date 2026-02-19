@@ -37,4 +37,14 @@ class ExamSubmission extends Model
     {
         return $this->hasMany(ExamAnswer::class, 'submission_id');
     }
+
+    public function anomalyLogs(): HasMany 
+    {
+    return $this->hasMany(ExamAnomalyLog::class, 'submission_id');
+    }
+
+    public function anomalySummary() 
+    {
+        return $this->hasOne(ExamAnomalySummary::class, 'submission_id');
+    }
 }

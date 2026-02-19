@@ -2,20 +2,28 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import API from "../../api";
 import Swal from "sweetalert2";
+import { AnomalyCollector } from "../../anomalyCollector";
 
 const TakeExamPage = () => {
   const { examId } = useParams();
   const navigate   = useNavigate();
 
-  const [loading, setLoading]       = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [exam, setExam]             = useState(null);
-  const [questions, setQuestions]   = useState([]);
-  const [answers, setAnswers]       = useState({});     // { questionId: answerString }
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [timeLeft, setTimeLeft]     = useState(null);   // seconds
+  const [loading, setLoading]           = useState(true);
+  const [submitting, setSubmitting]     = useState(false);
+  const [exam, setExam]                 = useState(null);
+  const [questions, setQuestions]       = useState([]);
+  const [answers, setAnswers]           = useState({});   // { questionId: answerString }
+  const [currentIdx, setCurrentIdx]     = useState(0);
+  const [timeLeft, setTimeLeft]         = useState(null); // seconds
   const [submissionId, setSubmissionId] = useState(null);
-  const timerRef = useRef(null);
+
+  const timerRef     = useRef(null);
+  const collectorRef = useRef(null);   // AnomalyCollector instance
+  const essayRefs    = useRef({});     // { questionId: <textarea DOM element> }
+
+  // ── CSRF token helper (needed by the collector's fetch calls) ─────────────
+  const getCsrfToken = () =>
+    document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? "";
 
   /* ── Start exam on mount ── */
   useEffect(() => {
@@ -37,6 +45,23 @@ const TakeExamPage = () => {
         const remaining  = Math.max(0, Math.floor((hardEnd - Date.now()) / 1000));
 
         setTimeLeft(remaining);
+
+        // ── Boot the anomaly collector ──────────────────────────────────────
+        // We instantiate after a successful exam start so we have a real
+        // submission in the DB for the backend to attach events to.
+        collectorRef.current = new AnomalyCollector({
+          examId:     parseInt(examId),
+          apiBaseUrl: "/api",
+          csrfToken:  getCsrfToken(),
+          onWarning:  handleAnomalyWarning,
+        });
+        collectorRef.current.start();
+
+        // Immediately tell the collector which question is shown first
+        if (qs.length > 0) {
+          collectorRef.current.setCurrentQuestion(qs[0].id);
+        }
+
       } catch (err) {
         const msg = err.response?.data?.message || "Failed to start exam.";
         await Swal.fire("Cannot Start Exam", msg, "error");
@@ -47,8 +72,76 @@ const TakeExamPage = () => {
     };
 
     startExam();
-    return () => clearInterval(timerRef.current);
+
+    // Cleanup: stop collector and timer when component unmounts
+    return () => {
+      clearInterval(timerRef.current);
+      collectorRef.current?.stop();
+    };
   }, [examId]);
+
+  /* ── Anomaly warning handler ─────────────────────────────────────────────
+     Called by the collector whenever the backend responds with
+     severity = medium | high.  We show a non-blocking toast so the student
+     is aware they are being monitored, without interrupting the exam.
+  ── */
+  const handleAnomalyWarning = useCallback((type, severity) => {
+    const labels = {
+      tab_switch:         "Tab switching detected",
+      keyboard_shortcut:  "Restricted shortcut detected",
+      response_time:      "Unusual response time detected",
+      keystroke_dynamics: "Unusual typing pattern detected",
+    };
+
+    const label = labels[type] ?? "Suspicious activity detected";
+
+    // Use SweetAlert2's mixin for a small, non-blocking toast
+    Swal.mixin({
+      toast:            true,
+      position:         "top-end",
+      showConfirmButton: false,
+      timer:            4000,
+      timerProgressBar: true,
+    }).fire({
+      icon:  severity === "high" ? "error" : "warning",
+      title: label,
+      text:  "This activity has been logged and will be reviewed.",
+    });
+  }, []);
+
+  /* ── Notify collector when the student changes question ─────────────────
+     1. Record response time for the question being LEFT
+     2. Start the clock for the question being ENTERED
+  ── */
+  const handleQuestionChange = useCallback((newIdx) => {
+    const leavingQuestion = questions[currentIdx];
+    const enteringQuestion = questions[newIdx];
+
+    if (collectorRef.current && leavingQuestion) {
+      // Record how long they spent on the question they're leaving
+      collectorRef.current.recordResponseTime(leavingQuestion.id);
+    }
+
+    setCurrentIdx(newIdx);
+
+    if (collectorRef.current && enteringQuestion) {
+      collectorRef.current.setCurrentQuestion(enteringQuestion.id);
+    }
+  }, [currentIdx, questions]);
+
+  /* ── Attach keystroke listener to essay textarea via callback ref ────────
+     React calls this function with the DOM element (or null on unmount).
+     We store the element and attach the collector once both are ready.
+  ── */
+  const essayCallbackRef = useCallback((el, questionId) => {
+    if (!el) return;
+    essayRefs.current[questionId] = el;
+    // Collector may not exist yet during the very first render;
+    // it will be ready by the time the student interacts with the field.
+    if (collectorRef.current) {
+      collectorRef.current.attachToAnswerField(el, questionId);
+    }
+  }, []);
 
   /* ── Countdown timer ── */
   useEffect(() => {
@@ -79,17 +172,18 @@ const TakeExamPage = () => {
 
   const timerColor = () => {
     if (timeLeft === null) return "text-muted";
-    if (timeLeft <= 60)  return "text-danger";
-    if (timeLeft <= 300) return "text-warning";
+    if (timeLeft <= 60)    return "text-danger";
+    if (timeLeft <= 300)   return "text-warning";
     return "text-success";
   };
 
   /* ── Answer helpers ── */
-  const setAnswer = (questionId, value) => {
+  const setAnswer = (questionId, value) =>
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
-  };
 
-  const answeredCount = questions.filter((q) => answers[q.id] !== undefined && answers[q.id] !== "").length;
+  const answeredCount = questions.filter(
+    (q) => answers[q.id] !== undefined && answers[q.id] !== ""
+  ).length;
 
   /* ── Submit ── */
   const handleSubmit = useCallback(async (isAuto = false) => {
@@ -102,9 +196,9 @@ const TakeExamPage = () => {
         : "Are you sure you want to submit?";
 
       const result = await Swal.fire({
-        title: "Submit Exam?",
-        text: confirmMsg,
-        icon: "question",
+        title:           "Submit Exam?",
+        text:            confirmMsg,
+        icon:            "question",
         showCancelButton: true,
         confirmButtonText: "Yes, submit!",
         confirmButtonColor: "#0d6efd",
@@ -115,13 +209,21 @@ const TakeExamPage = () => {
     setSubmitting(true);
     clearInterval(timerRef.current);
 
+    // Stop the collector before submitting — no more events needed
+    collectorRef.current?.stop();
+
+    // Record response time for whichever question was active at submit time
+    if (collectorRef.current && questions[currentIdx]) {
+      collectorRef.current.recordResponseTime(questions[currentIdx].id);
+    }
+
     try {
       await API.post(`/student/exams/${examId}/submit`, { answers });
       Swal.fire({
-        title: "Submitted!",
-        text: "Your exam has been submitted successfully.",
-        icon: "success",
-        confirmButtonText: "View Results",
+        title:              "Submitted!",
+        text:               "Your exam has been submitted successfully.",
+        icon:               "success",
+        confirmButtonText:  "View Results",
         confirmButtonColor: "#198754",
       }).then(() => navigate(`/student/exams/${examId}/results`));
     } catch (err) {
@@ -129,7 +231,7 @@ const TakeExamPage = () => {
       Swal.fire("Error", msg, "error");
       setSubmitting(false);
     }
-  }, [answers, questions, submitting, examId, navigate]);
+  }, [answers, questions, submitting, examId, navigate, currentIdx]);
 
   /* ── Loading ── */
   if (loading) return (
@@ -180,7 +282,10 @@ const TakeExamPage = () => {
         <div className="progress rounded-0" style={{ height: 4 }}>
           <div
             className="progress-bar bg-primary"
-            style={{ width: `${(answeredCount / questions.length) * 100}%`, transition: "width 0.3s" }}
+            style={{
+              width: `${(answeredCount / questions.length) * 100}%`,
+              transition: "width 0.3s",
+            }}
           />
         </div>
       </div>
@@ -195,12 +300,13 @@ const TakeExamPage = () => {
                 <h6 className="fw-bold mb-3 small text-uppercase text-muted">Questions</h6>
                 <div className="d-flex flex-wrap gap-2">
                   {questions.map((q, i) => {
-                    const answered = answers[q.id] !== undefined && answers[q.id] !== "";
+                    const answered  = answers[q.id] !== undefined && answers[q.id] !== "";
                     const isCurrent = i === currentIdx;
                     return (
                       <button
                         key={q.id}
-                        onClick={() => setCurrentIdx(i)}
+                        // ↓ Use handleQuestionChange instead of setCurrentIdx directly
+                        onClick={() => handleQuestionChange(i)}
                         className={`btn btn-sm rounded-3 fw-bold ${
                           isCurrent
                             ? "btn-primary"
@@ -263,7 +369,11 @@ const TakeExamPage = () => {
                             style={{ transition: "all 0.15s" }}
                           >
                             <span
-                              className={`me-3 badge rounded-circle ${selected ? "bg-white text-primary" : "bg-secondary-subtle text-secondary"}`}
+                              className={`me-3 badge rounded-circle ${
+                                selected
+                                  ? "bg-white text-primary"
+                                  : "bg-secondary-subtle text-secondary"
+                              }`}
                               style={{ width: 28, height: 28, lineHeight: "20px" }}
                             >
                               {String.fromCharCode(65 + oi)}
@@ -286,7 +396,9 @@ const TakeExamPage = () => {
                             onClick={() => setAnswer(currentQ.id, val)}
                             className={`btn flex-grow-1 p-3 rounded-3 border-2 fw-bold fs-5 ${
                               selected
-                                ? val === "True" ? "btn-success border-success" : "btn-danger border-danger"
+                                ? val === "True"
+                                  ? "btn-success border-success"
+                                  : "btn-danger border-danger"
                                 : "btn-outline-secondary"
                             }`}
                           >
@@ -303,6 +415,8 @@ const TakeExamPage = () => {
                   {currentQ.type === "essay" && (
                     <div>
                       <textarea
+                        // ↓ Callback ref wires keystroke-dynamics monitoring
+                        ref={(el) => essayCallbackRef(el, currentQ.id)}
                         className="form-control rounded-3 border-2"
                         rows={8}
                         placeholder="Write your answer here…"
@@ -314,7 +428,11 @@ const TakeExamPage = () => {
                         <div className="d-flex justify-content-between mt-2 small text-muted">
                           <span>Max: {currentQ.max_words} words</span>
                           <span>
-                            {(answers[currentQ.id] || "").trim().split(/\s+/).filter(Boolean).length} words
+                            {(answers[currentQ.id] || "")
+                              .trim()
+                              .split(/\s+/)
+                              .filter(Boolean).length}{" "}
+                            words
                           </span>
                         </div>
                       )}
@@ -325,7 +443,8 @@ const TakeExamPage = () => {
                   <div className="d-flex justify-content-between align-items-center mt-5 pt-3 border-top">
                     <button
                       className="btn btn-outline-secondary rounded-pill px-4"
-                      onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))}
+                      // ↓ Use handleQuestionChange instead of setCurrentIdx directly
+                      onClick={() => handleQuestionChange(Math.max(0, currentIdx - 1))}
                       disabled={currentIdx === 0}
                     >
                       <i className="bi bi-arrow-left me-2"></i>Previous
@@ -334,7 +453,8 @@ const TakeExamPage = () => {
                     {currentIdx < questions.length - 1 ? (
                       <button
                         className="btn btn-primary rounded-pill px-4"
-                        onClick={() => setCurrentIdx((i) => i + 1)}
+                        // ↓ Use handleQuestionChange instead of setCurrentIdx directly
+                        onClick={() => handleQuestionChange(currentIdx + 1)}
                       >
                         Next<i className="bi bi-arrow-right ms-2"></i>
                       </button>
