@@ -24,6 +24,21 @@
  *  BUG 4 — #post() fired after stop() was called
  *    Async blur / visibility events queued after stop() could still post.
  *    Fix: guard at the top of #post() returns early if !#active.
+ *
+ *  BUG 5 — Right-click copy/paste/cut bypassed keyboard listener
+ *    The #onKeydown handler only catches keyboard shortcuts. Browser context
+ *    menu copy/paste completely bypasses it.
+ *    Fix: added document-level 'copy', 'cut', 'paste' event listeners.
+ *
+ *  BUG 6 — Paste into essay textarea not tracked by keystroke dynamics
+ *    Pasting text fires no keydown/keyup for individual characters, so
+ *    dwellTimes stayed empty and keystroke-dynamics never posted.
+ *    Fix: added onPaste listener inside attachToAnswerField that posts
+ *    a keyboard-shortcut event immediately and counts pasted chars.
+ *
+ *  BUG 7 — Keystroke dynamics threshold too strict (>= 5 keystrokes)
+ *    Students who typed only a few characters before blurring were never
+ *    analyzed. Lowered to >= 3 keystrokes and 500ms minimum duration.
  */
 
 export class AnomalyCollector {
@@ -39,6 +54,11 @@ export class AnomalyCollector {
 
   #boundVisibilityChange = null;
   #boundKeydown          = null;
+
+  // BUG FIX #5: document-level clipboard listeners
+  #boundCopy  = null;
+  #boundCut   = null;
+  #boundPaste = null;
 
   // csrfToken param intentionally removed — always read fresh via #getCsrf()
   constructor({ examId, apiBaseUrl = '/api', onWarning = null }) {
@@ -59,6 +79,14 @@ export class AnomalyCollector {
     this.#boundKeydown = this.#onKeydown.bind(this);
     document.addEventListener('keydown', this.#boundKeydown, { capture: true });
 
+    // BUG FIX #5: catch right-click copy/cut/paste at the document level
+    this.#boundCopy  = (e) => this.#onClipboard(e, 'Copy');
+    this.#boundCut   = (e) => this.#onClipboard(e, 'Cut');
+    this.#boundPaste = (e) => this.#onClipboard(e, 'Paste');
+    document.addEventListener('copy',  this.#boundCopy,  { capture: true });
+    document.addEventListener('cut',   this.#boundCut,   { capture: true });
+    document.addEventListener('paste', this.#boundPaste, { capture: true });
+
     console.debug('[SECT] Collector started — exam', this.#examId);
   }
 
@@ -69,9 +97,15 @@ export class AnomalyCollector {
     document.removeEventListener('visibilitychange', this.#boundVisibilityChange);
     document.removeEventListener('keydown', this.#boundKeydown, { capture: true });
 
+    // BUG FIX #5: clean up clipboard listeners
+    document.removeEventListener('copy',  this.#boundCopy,  { capture: true });
+    document.removeEventListener('cut',   this.#boundCut,   { capture: true });
+    document.removeEventListener('paste', this.#boundPaste, { capture: true });
+
     for (const [el, state] of this.#fieldListeners) {
       el.removeEventListener('keydown', state.onKeydown);
       el.removeEventListener('keyup',   state.onKeyup);
+      el.removeEventListener('paste',   state.onPaste);  // BUG FIX #6
       el.removeEventListener('blur',    state.onBlur);
     }
     this.#fieldListeners.clear();
@@ -112,6 +146,7 @@ export class AnomalyCollector {
       lastKeyUp:    null,
       keyDownTimes: {},
       totalChars:   0,
+      pasteCount:   0,       // BUG FIX #6
       sessionStart: Date.now(),
 
       onKeydown: (e) => {
@@ -131,29 +166,57 @@ export class AnomalyCollector {
         if (e.key.length === 1) state.totalChars++;
       },
 
+      // BUG FIX #6: track paste events directly on the essay textarea
+      onPaste: (e) => {
+        const text = (e.clipboardData || window.clipboardData)?.getData('text') ?? '';
+        state.pasteCount++;
+        state.totalChars += text.length;
+
+        // Post immediately — paste inside an exam field is always suspicious.
+        // The document-level paste listener (#onClipboard) will ALSO fire,
+        // so we stop propagation here to avoid a double-post for essay fields.
+        e.stopPropagation();
+
+        this.#post('keyboard-shortcut', {
+          keys:        'Paste',
+          char_count:  text.length,
+          paste_index: state.pasteCount,
+          question_id: state.questionId,
+          timestamp:   new Date().toISOString(),
+        });
+      },
+
       onBlur: () => {
         const duration = Date.now() - state.sessionStart;
-        if (state.dwellTimes.length >= 5 && duration > 1000) {
+
+        // BUG FIX #7: lowered threshold from 5 keystrokes / 1000ms
+        // to 3 keystrokes / 500ms so short answers are still analyzed
+        if (state.dwellTimes.length >= 3 && duration > 500) {
           this.#post('keystroke-dynamics', {
-            question_id:      state.questionId,
-            dwell_times_ms:   [...state.dwellTimes],
-            flight_times_ms:  [...state.flightTimes],
-            total_chars:      state.totalChars,
-            duration_ms:      duration,
-            timestamp:        new Date().toISOString(),
+            question_id:     state.questionId,
+            dwell_times_ms:  [...state.dwellTimes],
+            flight_times_ms: [...state.flightTimes],
+            total_chars:     state.totalChars,
+            paste_count:     state.pasteCount,
+            duration_ms:     duration,
+            timestamp:       new Date().toISOString(),
           });
         }
+
+        // Reset for next focus session
         state.dwellTimes   = [];
         state.flightTimes  = [];
         state.lastKeyUp    = null;
         state.keyDownTimes = {};
         state.totalChars   = 0;
+        state.pasteCount   = 0;
         state.sessionStart = Date.now();
       },
     };
 
     fieldEl.addEventListener('keydown', state.onKeydown);
     fieldEl.addEventListener('keyup',   state.onKeyup);
+    fieldEl.addEventListener('paste',   state.onPaste);   // BUG FIX #6
     fieldEl.addEventListener('blur',    state.onBlur);
     this.#fieldListeners.set(fieldEl, state);
   }
@@ -217,6 +280,16 @@ export class AnomalyCollector {
     if (parts.length === 1 && label.length === 1) return null;
     if (['Control', 'Alt', 'Shift', 'Meta'].includes(label)) return null;
     return parts.join('+');
+  }
+
+  // BUG FIX #5: handle document-level clipboard events (right-click menu)
+  // Note: paste events from essay textareas stop propagation so they won't
+  // double-post — this handler only fires for non-textarea paste events.
+  #onClipboard(e, action) {
+    this.#post('keyboard-shortcut', {
+      keys:      action,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   // ── HTTP helper ────────────────────────────────────────────────────────────

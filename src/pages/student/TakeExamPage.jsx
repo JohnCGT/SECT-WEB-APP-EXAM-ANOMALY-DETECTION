@@ -42,16 +42,25 @@ const TakeExamPage = () => {
         setTimeLeft(remaining);
 
         // ── Boot collector ──────────────────────────────────────────────────
-        // BUG FIX: removed csrfToken param — collector reads it fresh each request
         collectorRef.current = new AnomalyCollector({
-          examId:    parseInt(examId),
+          examId:     parseInt(examId),
           apiBaseUrl: "/api",
-          onWarning: handleAnomalyWarning,
+          onWarning:  handleAnomalyWarning,
         });
         collectorRef.current.start();
 
         if (qs.length > 0) {
           collectorRef.current.setCurrentQuestion(qs[0].id);
+        }
+
+        // ── BUG FIX: attach to any essay fields that already mounted ───────
+        // React may have mounted essay textareas before the collector was
+        // ready (if the API resolved slowly). Flush essayRefs now so those
+        // fields get keystroke monitoring attached.
+        for (const [questionId, el] of Object.entries(essayRefs.current)) {
+          if (el) {
+            collectorRef.current.attachToAnswerField(el, parseInt(questionId));
+          }
         }
 
       } catch (err) {
@@ -106,9 +115,12 @@ const TakeExamPage = () => {
   /* ── Attach keystroke monitoring to essay textarea ── */
   const essayCallbackRef = useCallback((el, questionId) => {
     if (!el) return;
+
+    // Always store the DOM element so the post-start flush in startExam()
+    // can attach the collector if it wasn't ready yet when this fired.
     essayRefs.current[questionId] = el;
-    // collectorRef.current is guaranteed to exist by the time a student
-    // focuses an essay field, since loading is false before any question renders
+
+    // If the collector is already running, attach immediately.
     if (collectorRef.current) {
       collectorRef.current.attachToAnswerField(el, questionId);
     }
