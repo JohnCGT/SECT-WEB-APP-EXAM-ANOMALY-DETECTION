@@ -2,24 +2,36 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Course;
 use App\Models\Exam;
 use App\Models\ExamSubmission;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class StudentExamController extends Controller
 {
-    // ── Private helper: get authenticated student or abort 401 ──────────────
-    private function getStudent()
+    // ── Private helper: resolve authenticated student ────────────────────────
+    private function getStudent(Request $request)
     {
-        $student = Auth::user();
+        $student = $request->user();
 
         if (!$student) {
             abort(401, 'Unauthenticated.');
         }
 
         return $student;
+    }
+
+    // ── Private helper: verify student is enrolled in course ─────────────────
+    // Mirrors exactly how StudentCourseController checks enrollment,
+    // using the enrolledCourses() relationship on User (pivot: course_students, student_id)
+    private function assertEnrolled($student, int $courseId): void
+    {
+        $enrolled = $student->enrolledCourses()
+            ->where('courses.id', $courseId)
+            ->exists();
+
+        if (!$enrolled) {
+            abort(403, 'You are not enrolled in this course.');
+        }
     }
 
     /**
@@ -30,12 +42,8 @@ class StudentExamController extends Controller
      */
     public function courseExams(Request $request, $courseId)
     {
-        $student = $this->getStudent();
-
-        // Verify student is enrolled in this course
-        $course = Course::whereHas('students', function ($query) use ($student) {
-            $query->where('users.id', $student->id);
-        })->findOrFail($courseId);
+        $student = $this->getStudent($request);
+        $this->assertEnrolled($student, (int) $courseId);
 
         $exams = Exam::where('course_id', $courseId)
             ->withCount('questions')
@@ -74,21 +82,19 @@ class StudentExamController extends Controller
      * POST /student/exams/{examId}/start
      *
      * Starts an exam for the authenticated student.
-     * Creates a submission record with status = 'in_progress'.
-     * If an in_progress submission already exists, returns it (resume support).
+     * Creates a submission with status = 'in_progress'.
+     * If an in_progress submission already exists, returns it (resume).
      */
     public function start(Request $request, $examId)
     {
-        $student = $this->getStudent();
+        $student = $this->getStudent($request);
 
         $exam = Exam::with(['questions' => function ($query) {
             $query->orderBy('order');
         }])->findOrFail($examId);
 
-        // Verify student is enrolled in the course
-        Course::whereHas('students', function ($query) use ($student) {
-            $query->where('users.id', $student->id);
-        })->findOrFail($exam->course_id);
+        // Use enrolledCourses() — consistent with StudentCourseController
+        $this->assertEnrolled($student, (int) $exam->course_id);
 
         $now = now();
 
@@ -109,14 +115,16 @@ class StudentExamController extends Controller
             return response()->json(['message' => 'You have already submitted this exam.'], 403);
         }
 
-        // Create new submission or return existing in_progress one
+        // Create submission or return existing in_progress one.
+        // Status MUST be 'in_progress' — AnomalyController::getActiveSubmission()
+        // queries for this exact value.
         $submission = ExamSubmission::firstOrCreate(
             [
                 'exam_id'    => $examId,
                 'student_id' => $student->id,
             ],
             [
-                'status'       => 'in_progress',   // ← AnomalyController looks for this exact value
+                'status'       => 'in_progress',
                 'started_at'   => now(),
                 'total_points' => $exam->total_points,
             ]
@@ -156,12 +164,12 @@ class StudentExamController extends Controller
     /**
      * POST /student/exams/{examId}/submit
      *
-     * Grades objective questions automatically and marks submission as submitted.
-     * Status changes from 'in_progress' → 'submitted'.
+     * Grades objective questions and marks submission as submitted.
+     * Status changes: 'in_progress' → 'submitted'
      */
     public function submit(Request $request, $examId)
     {
-        $student = $this->getStudent();
+        $student = $this->getStudent($request);
 
         $exam = Exam::with('questions')->findOrFail($examId);
 
@@ -189,12 +197,12 @@ class StudentExamController extends Controller
             $score += $pointsEarned;
 
             $gradedAnswers[] = [
-                'question_id'    => $question->id,
-                'student_answer' => $studentAnswer,
-                'correct_answer' => $question->correct_answer,
-                'is_correct'     => $isCorrect,
-                'points_earned'  => $pointsEarned,
-                'points_possible'=> $question->points,
+                'question_id'     => $question->id,
+                'student_answer'  => $studentAnswer,
+                'correct_answer'  => $question->correct_answer,
+                'is_correct'      => $isCorrect,
+                'points_earned'   => $pointsEarned,
+                'points_possible' => $question->points,
             ];
         }
 
@@ -223,7 +231,7 @@ class StudentExamController extends Controller
      */
     public function results(Request $request, $examId)
     {
-        $student = $this->getStudent();
+        $student = $this->getStudent($request);
 
         $submission = ExamSubmission::with(['exam.questions'])
             ->where('exam_id', $examId)
