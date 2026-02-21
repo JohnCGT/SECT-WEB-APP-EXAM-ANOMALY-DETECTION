@@ -12,18 +12,14 @@ const TakeExamPage = () => {
   const [submitting, setSubmitting]     = useState(false);
   const [exam, setExam]                 = useState(null);
   const [questions, setQuestions]       = useState([]);
-  const [answers, setAnswers]           = useState({});   // { questionId: answerString }
+  const [answers, setAnswers]           = useState({});
   const [currentIdx, setCurrentIdx]     = useState(0);
-  const [timeLeft, setTimeLeft]         = useState(null); // seconds
+  const [timeLeft, setTimeLeft]         = useState(null);
   const [submissionId, setSubmissionId] = useState(null);
 
   const timerRef     = useRef(null);
-  const collectorRef = useRef(null);   // AnomalyCollector instance
-  const essayRefs    = useRef({});     // { questionId: <textarea DOM element> }
-
-  // ── CSRF token helper (needed by the collector's fetch calls) ─────────────
-  const getCsrfToken = () =>
-    document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? "";
+  const collectorRef = useRef(null);
+  const essayRefs    = useRef({});
 
   /* ── Start exam on mount ── */
   useEffect(() => {
@@ -36,7 +32,6 @@ const TakeExamPage = () => {
         setQuestions(qs);
         setSubmissionId(submission.id);
 
-        // Calculate remaining time
         const startedAt  = new Date(submission.started_at).getTime();
         const durationMs = examData.duration_minutes * 60 * 1000;
         const endByTimer = startedAt + durationMs;
@@ -46,18 +41,15 @@ const TakeExamPage = () => {
 
         setTimeLeft(remaining);
 
-        // ── Boot the anomaly collector ──────────────────────────────────────
-        // We instantiate after a successful exam start so we have a real
-        // submission in the DB for the backend to attach events to.
+        // ── Boot collector ──────────────────────────────────────────────────
+        // BUG FIX: removed csrfToken param — collector reads it fresh each request
         collectorRef.current = new AnomalyCollector({
-          examId:     parseInt(examId),
+          examId:    parseInt(examId),
           apiBaseUrl: "/api",
-          csrfToken:  getCsrfToken(),
-          onWarning:  handleAnomalyWarning,
+          onWarning: handleAnomalyWarning,
         });
         collectorRef.current.start();
 
-        // Immediately tell the collector which question is shown first
         if (qs.length > 0) {
           collectorRef.current.setCurrentQuestion(qs[0].id);
         }
@@ -73,18 +65,13 @@ const TakeExamPage = () => {
 
     startExam();
 
-    // Cleanup: stop collector and timer when component unmounts
     return () => {
       clearInterval(timerRef.current);
       collectorRef.current?.stop();
     };
   }, [examId]);
 
-  /* ── Anomaly warning handler ─────────────────────────────────────────────
-     Called by the collector whenever the backend responds with
-     severity = medium | high.  We show a non-blocking toast so the student
-     is aware they are being monitored, without interrupting the exam.
-  ── */
+  /* ── Warning toast ── */
   const handleAnomalyWarning = useCallback((type, severity) => {
     const labels = {
       tab_switch:         "Tab switching detected",
@@ -92,58 +79,42 @@ const TakeExamPage = () => {
       response_time:      "Unusual response time detected",
       keystroke_dynamics: "Unusual typing pattern detected",
     };
-
-    const label = labels[type] ?? "Suspicious activity detected";
-
-    // Use SweetAlert2's mixin for a small, non-blocking toast
     Swal.mixin({
-      toast:            true,
-      position:         "top-end",
-      showConfirmButton: false,
-      timer:            4000,
-      timerProgressBar: true,
+      toast: true, position: "top-end",
+      showConfirmButton: false, timer: 4000, timerProgressBar: true,
     }).fire({
       icon:  severity === "high" ? "error" : "warning",
-      title: label,
+      title: labels[type] ?? "Suspicious activity detected",
       text:  "This activity has been logged and will be reviewed.",
     });
   }, []);
 
-  /* ── Notify collector when the student changes question ─────────────────
-     1. Record response time for the question being LEFT
-     2. Start the clock for the question being ENTERED
-  ── */
+  /* ── Question change — records response time on leave, starts clock on enter ── */
   const handleQuestionChange = useCallback((newIdx) => {
-    const leavingQuestion = questions[currentIdx];
-    const enteringQuestion = questions[newIdx];
+    const leaving  = questions[currentIdx];
+    const entering = questions[newIdx];
 
-    if (collectorRef.current && leavingQuestion) {
-      // Record how long they spent on the question they're leaving
-      collectorRef.current.recordResponseTime(leavingQuestion.id);
+    if (collectorRef.current && leaving) {
+      collectorRef.current.recordResponseTime(leaving.id);
     }
-
     setCurrentIdx(newIdx);
-
-    if (collectorRef.current && enteringQuestion) {
-      collectorRef.current.setCurrentQuestion(enteringQuestion.id);
+    if (collectorRef.current && entering) {
+      collectorRef.current.setCurrentQuestion(entering.id);
     }
   }, [currentIdx, questions]);
 
-  /* ── Attach keystroke listener to essay textarea via callback ref ────────
-     React calls this function with the DOM element (or null on unmount).
-     We store the element and attach the collector once both are ready.
-  ── */
+  /* ── Attach keystroke monitoring to essay textarea ── */
   const essayCallbackRef = useCallback((el, questionId) => {
     if (!el) return;
     essayRefs.current[questionId] = el;
-    // Collector may not exist yet during the very first render;
-    // it will be ready by the time the student interacts with the field.
+    // collectorRef.current is guaranteed to exist by the time a student
+    // focuses an essay field, since loading is false before any question renders
     if (collectorRef.current) {
       collectorRef.current.attachToAnswerField(el, questionId);
     }
   }, []);
 
-  /* ── Countdown timer ── */
+  /* ── Countdown ── */
   useEffect(() => {
     if (timeLeft === null) return;
     if (timeLeft <= 0) { handleSubmit(true); return; }
@@ -158,7 +129,6 @@ const TakeExamPage = () => {
     return () => clearInterval(timerRef.current);
   }, [timeLeft !== null]);
 
-  /* Auto-submit when timer hits 0 */
   useEffect(() => {
     if (timeLeft === 0) handleSubmit(true);
   }, [timeLeft]);
@@ -172,12 +142,11 @@ const TakeExamPage = () => {
 
   const timerColor = () => {
     if (timeLeft === null) return "text-muted";
-    if (timeLeft <= 60)    return "text-danger";
-    if (timeLeft <= 300)   return "text-warning";
+    if (timeLeft <= 60)   return "text-danger";
+    if (timeLeft <= 300)  return "text-warning";
     return "text-success";
   };
 
-  /* ── Answer helpers ── */
   const setAnswer = (questionId, value) =>
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
 
@@ -196,11 +165,8 @@ const TakeExamPage = () => {
         : "Are you sure you want to submit?";
 
       const result = await Swal.fire({
-        title:           "Submit Exam?",
-        text:            confirmMsg,
-        icon:            "question",
-        showCancelButton: true,
-        confirmButtonText: "Yes, submit!",
+        title: "Submit Exam?", text: confirmMsg, icon: "question",
+        showCancelButton: true, confirmButtonText: "Yes, submit!",
         confirmButtonColor: "#0d6efd",
       });
       if (!result.isConfirmed) return;
@@ -209,21 +175,18 @@ const TakeExamPage = () => {
     setSubmitting(true);
     clearInterval(timerRef.current);
 
-    // Stop the collector before submitting — no more events needed
-    collectorRef.current?.stop();
-
-    // Record response time for whichever question was active at submit time
+    // Record the final active question's response time before stopping
     if (collectorRef.current && questions[currentIdx]) {
       collectorRef.current.recordResponseTime(questions[currentIdx].id);
     }
+    // Stop collector — no more events after this point
+    collectorRef.current?.stop();
 
     try {
       await API.post(`/student/exams/${examId}/submit`, { answers });
       Swal.fire({
-        title:              "Submitted!",
-        text:               "Your exam has been submitted successfully.",
-        icon:               "success",
-        confirmButtonText:  "View Results",
+        title: "Submitted!", text: "Your exam has been submitted successfully.",
+        icon: "success", confirmButtonText: "View Results",
         confirmButtonColor: "#198754",
       }).then(() => navigate(`/student/exams/${examId}/results`));
     } catch (err) {
@@ -233,7 +196,6 @@ const TakeExamPage = () => {
     }
   }, [answers, questions, submitting, examId, navigate, currentIdx]);
 
-  /* ── Loading ── */
   if (loading) return (
     <div className="d-flex justify-content-center align-items-center min-vh-100 flex-column gap-3">
       <div className="spinner-border text-primary" role="status" />
@@ -246,24 +208,19 @@ const TakeExamPage = () => {
   return (
     <div className="min-vh-100 bg-light d-flex flex-column">
 
-      {/* ── Fixed header bar ── */}
+      {/* ── Fixed header ── */}
       <div className="bg-white border-bottom shadow-sm sticky-top">
         <div className="container-fluid px-4 py-2 d-flex align-items-center justify-content-between">
           <div>
             <div className="fw-bold text-primary">{exam?.title}</div>
-            <small className="text-muted">
-              {answeredCount}/{questions.length} answered
-            </small>
+            <small className="text-muted">{answeredCount}/{questions.length} answered</small>
           </div>
 
-          {/* Timer */}
           <div className={`d-flex align-items-center gap-2 fw-bold fs-5 ${timerColor()}`}>
             <i className="bi bi-clock"></i>
             {formatTime(timeLeft)}
-            {timeLeft <= 60 && (
-              <span className="badge bg-danger ms-1 animate__animated animate__pulse">
-                Hurry!
-              </span>
+            {timeLeft !== null && timeLeft <= 60 && (
+              <span className="badge bg-danger ms-1">Hurry!</span>
             )}
           </div>
 
@@ -278,22 +235,16 @@ const TakeExamPage = () => {
           </button>
         </div>
 
-        {/* Progress bar */}
         <div className="progress rounded-0" style={{ height: 4 }}>
-          <div
-            className="progress-bar bg-primary"
-            style={{
-              width: `${(answeredCount / questions.length) * 100}%`,
-              transition: "width 0.3s",
-            }}
-          />
+          <div className="progress-bar bg-primary"
+            style={{ width: `${(answeredCount / questions.length) * 100}%`, transition: "width 0.3s" }} />
         </div>
       </div>
 
       <div className="container-fluid px-4 py-4 flex-grow-1">
         <div className="row g-4">
 
-          {/* ── Question navigator sidebar ── */}
+          {/* ── Navigator sidebar ── */}
           <div className="col-lg-3 order-lg-2">
             <div className="card border-0 shadow-sm rounded-4 sticky-top" style={{ top: 80 }}>
               <div className="card-body p-3">
@@ -303,16 +254,10 @@ const TakeExamPage = () => {
                     const answered  = answers[q.id] !== undefined && answers[q.id] !== "";
                     const isCurrent = i === currentIdx;
                     return (
-                      <button
-                        key={q.id}
-                        // ↓ Use handleQuestionChange instead of setCurrentIdx directly
+                      <button key={q.id}
                         onClick={() => handleQuestionChange(i)}
                         className={`btn btn-sm rounded-3 fw-bold ${
-                          isCurrent
-                            ? "btn-primary"
-                            : answered
-                            ? "btn-success"
-                            : "btn-outline-secondary"
+                          isCurrent ? "btn-primary" : answered ? "btn-success" : "btn-outline-secondary"
                         }`}
                         style={{ width: 38, height: 38 }}
                         title={`Question ${i + 1}${answered ? " (answered)" : ""}`}
@@ -338,7 +283,6 @@ const TakeExamPage = () => {
               <div className="card border-0 shadow-sm rounded-4">
                 <div className="card-body p-4 p-lg-5">
 
-                  {/* Question header */}
                   <div className="d-flex justify-content-between align-items-center mb-4">
                     <span className="badge bg-primary-subtle text-primary px-3 py-2 rounded-pill fw-semibold">
                       Question {currentIdx + 1} of {questions.length}
@@ -352,30 +296,19 @@ const TakeExamPage = () => {
                     {currentQ.question_text}
                   </h5>
 
-                  {/* ── Multiple Choice ── */}
+                  {/* Multiple Choice */}
                   {currentQ.type === "multiple_choice" && (
                     <div className="d-flex flex-column gap-3">
                       {(currentQ.options || []).map((opt, oi) => {
                         const selected = answers[currentQ.id] === opt;
                         return (
-                          <button
-                            key={oi}
-                            onClick={() => setAnswer(currentQ.id, opt)}
+                          <button key={oi} onClick={() => setAnswer(currentQ.id, opt)}
                             className={`btn text-start p-3 rounded-3 border-2 fw-semibold ${
-                              selected
-                                ? "btn-primary border-primary"
-                                : "btn-outline-secondary"
-                            }`}
-                            style={{ transition: "all 0.15s" }}
-                          >
-                            <span
-                              className={`me-3 badge rounded-circle ${
-                                selected
-                                  ? "bg-white text-primary"
-                                  : "bg-secondary-subtle text-secondary"
-                              }`}
-                              style={{ width: 28, height: 28, lineHeight: "20px" }}
-                            >
+                              selected ? "btn-primary border-primary" : "btn-outline-secondary"
+                            }`} style={{ transition: "all 0.15s" }}>
+                            <span className={`me-3 badge rounded-circle ${
+                              selected ? "bg-white text-primary" : "bg-secondary-subtle text-secondary"
+                            }`} style={{ width: 28, height: 28, lineHeight: "20px" }}>
                               {String.fromCharCode(65 + oi)}
                             </span>
                             {opt}
@@ -385,23 +318,18 @@ const TakeExamPage = () => {
                     </div>
                   )}
 
-                  {/* ── True / False ── */}
+                  {/* True / False */}
                   {currentQ.type === "true_false" && (
                     <div className="d-flex gap-3">
                       {["True", "False"].map((val) => {
                         const selected = answers[currentQ.id] === val;
                         return (
-                          <button
-                            key={val}
-                            onClick={() => setAnswer(currentQ.id, val)}
+                          <button key={val} onClick={() => setAnswer(currentQ.id, val)}
                             className={`btn flex-grow-1 p-3 rounded-3 border-2 fw-bold fs-5 ${
                               selected
-                                ? val === "True"
-                                  ? "btn-success border-success"
-                                  : "btn-danger border-danger"
+                                ? val === "True" ? "btn-success border-success" : "btn-danger border-danger"
                                 : "btn-outline-secondary"
-                            }`}
-                          >
+                            }`}>
                             {val === "True"
                               ? <><i className="bi bi-check-circle me-2"></i>True</>
                               : <><i className="bi bi-x-circle me-2"></i>False</>}
@@ -411,11 +339,10 @@ const TakeExamPage = () => {
                     </div>
                   )}
 
-                  {/* ── Essay ── */}
+                  {/* Essay */}
                   {currentQ.type === "essay" && (
                     <div>
                       <textarea
-                        // ↓ Callback ref wires keystroke-dynamics monitoring
                         ref={(el) => essayCallbackRef(el, currentQ.id)}
                         className="form-control rounded-3 border-2"
                         rows={8}
@@ -428,42 +355,29 @@ const TakeExamPage = () => {
                         <div className="d-flex justify-content-between mt-2 small text-muted">
                           <span>Max: {currentQ.max_words} words</span>
                           <span>
-                            {(answers[currentQ.id] || "")
-                              .trim()
-                              .split(/\s+/)
-                              .filter(Boolean).length}{" "}
-                            words
+                            {(answers[currentQ.id] || "").trim().split(/\s+/).filter(Boolean).length} words
                           </span>
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* ── Navigation ── */}
+                  {/* Navigation */}
                   <div className="d-flex justify-content-between align-items-center mt-5 pt-3 border-top">
-                    <button
-                      className="btn btn-outline-secondary rounded-pill px-4"
-                      // ↓ Use handleQuestionChange instead of setCurrentIdx directly
+                    <button className="btn btn-outline-secondary rounded-pill px-4"
                       onClick={() => handleQuestionChange(Math.max(0, currentIdx - 1))}
-                      disabled={currentIdx === 0}
-                    >
+                      disabled={currentIdx === 0}>
                       <i className="bi bi-arrow-left me-2"></i>Previous
                     </button>
 
                     {currentIdx < questions.length - 1 ? (
-                      <button
-                        className="btn btn-primary rounded-pill px-4"
-                        // ↓ Use handleQuestionChange instead of setCurrentIdx directly
-                        onClick={() => handleQuestionChange(currentIdx + 1)}
-                      >
+                      <button className="btn btn-primary rounded-pill px-4"
+                        onClick={() => handleQuestionChange(currentIdx + 1)}>
                         Next<i className="bi bi-arrow-right ms-2"></i>
                       </button>
                     ) : (
-                      <button
-                        className="btn btn-success rounded-pill px-4"
-                        onClick={() => handleSubmit(false)}
-                        disabled={submitting}
-                      >
+                      <button className="btn btn-success rounded-pill px-4"
+                        onClick={() => handleSubmit(false)} disabled={submitting}>
                         <i className="bi bi-check2-circle me-2"></i>Submit Exam
                       </button>
                     )}

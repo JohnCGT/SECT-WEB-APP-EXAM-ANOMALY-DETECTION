@@ -1,85 +1,67 @@
 /**
- * SECT Anomaly Collector
- * ======================
- * Drop this module into your exam-taking frontend.
- * It silently monitors the four behaviours and posts events to the backend.
+ * SECT Anomaly Collector — Fixed
  *
- * Usage
- * ─────
- *   import { AnomalyCollector } from './anomalyCollector.js';
+ * Bug fixes applied vs original version:
  *
- *   const collector = new AnomalyCollector({
- *     examId:      42,
- *     apiBaseUrl:  '/api',
- *     csrfToken:   document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '',
- *     // called whenever the backend flags a medium/high severity event
- *     onWarning: (type, severity) => showToast(`Warning: suspicious activity detected`),
- *   });
+ *  BUG 1 — CSRF token read too early
+ *    The token was captured once at constructor time, before Laravel's
+ *    session cookie is set. Result: every XHR sent an empty X-XSRF-TOKEN
+ *    header → 419 CSRF mismatch → request rejected silently.
+ *    Fix: #getCsrf() reads document.cookie fresh on every POST.
  *
- *   // Call once the student starts the exam
- *   collector.start();
+ *  BUG 2 — Tab switch only posted on TAB RETURN, not on hide
+ *    The old code waited for the tab to come back before posting.
+ *    If the student switched tabs and never returned (submitted from
+ *    the other tab, or timer auto-submitted), the switch was never recorded.
+ *    Fix: post immediately on 'hidden' AND again on return with real duration.
  *
- *   // Call on each question the student is viewing
- *   collector.setCurrentQuestion(questionId);
+ *  BUG 3 — fetch() dropped session cookies in some Vite/SPA proxy setups
+ *    Raw fetch() with credentials:'include' can behave differently from
+ *    Axios depending on CORS/proxy config. XHR with withCredentials=true
+ *    is more reliable for same-origin Laravel Sanctum sessions.
+ *    Fix: replaced fetch() with XMLHttpRequest.
  *
- *   // Attach to your answer textarea / input  (keystroke dynamics)
- *   collector.attachToAnswerField(document.getElementById('answer-field'), questionId);
- *
- *   // When an answer is submitted, record the response time
- *   collector.recordResponseTime(questionId);
- *
- *   // Teardown on exam submit / unmount
- *   collector.stop();
+ *  BUG 4 — #post() fired after stop() was called
+ *    Async blur / visibility events queued after stop() could still post.
+ *    Fix: guard at the top of #post() returns early if !#active.
  */
 
 export class AnomalyCollector {
-  // ── Private state ────────────────────────────────────────────────────────
-  #examId       = null;
-  #apiBaseUrl   = '/api';
-  #csrfToken    = '';
-  #onWarning    = null;
-  #active       = false;
+  #examId      = null;
+  #apiBaseUrl  = '/api';
+  #onWarning   = null;
+  #active      = false;
 
-  // Tab-switch tracking
-  #tabHiddenAt  = null;
-
-  // Response-time tracking  { questionId → timestamp question was shown }
+  #tabHiddenAt        = null;
   #questionStartTimes = new Map();
   #currentQuestionId  = null;
+  #fieldListeners     = new Map();
 
-  // Keystroke dynamics per answer field  { fieldEl → state }
-  #fieldListeners = new Map();
-
-  // Bound listener references (needed for removeEventListener)
   #boundVisibilityChange = null;
   #boundKeydown          = null;
 
-  constructor({ examId, apiBaseUrl = '/api', csrfToken = '', onWarning = null }) {
+  // csrfToken param intentionally removed — always read fresh via #getCsrf()
+  constructor({ examId, apiBaseUrl = '/api', onWarning = null }) {
     this.#examId     = examId;
     this.#apiBaseUrl = apiBaseUrl.replace(/\/$/, '');
-    this.#csrfToken  = csrfToken;
     this.#onWarning  = onWarning;
   }
 
-  // ── Lifecycle ────────────────────────────────────────────────────────────
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
 
-  /** Attach all global listeners. Call once after the exam starts. */
   start() {
     if (this.#active) return;
     this.#active = true;
 
-    // 1. Tab-switch — Page Visibility API
     this.#boundVisibilityChange = this.#onVisibilityChange.bind(this);
     document.addEventListener('visibilitychange', this.#boundVisibilityChange);
 
-    // 2. Keyboard shortcuts — intercept on the document level
     this.#boundKeydown = this.#onKeydown.bind(this);
     document.addEventListener('keydown', this.#boundKeydown, { capture: true });
 
-    console.debug('[SECT] Anomaly collector started for exam', this.#examId);
+    console.debug('[SECT] Collector started — exam', this.#examId);
   }
 
-  /** Remove all listeners. Call on exam submit or component unmount. */
   stop() {
     if (!this.#active) return;
     this.#active = false;
@@ -87,25 +69,18 @@ export class AnomalyCollector {
     document.removeEventListener('visibilitychange', this.#boundVisibilityChange);
     document.removeEventListener('keydown', this.#boundKeydown, { capture: true });
 
-    // Detach all answer-field listeners
     for (const [el, state] of this.#fieldListeners) {
-      el.removeEventListener('keydown',  state.onKeydown);
-      el.removeEventListener('keyup',    state.onKeyup);
-      el.removeEventListener('blur',     state.onBlur);
+      el.removeEventListener('keydown', state.onKeydown);
+      el.removeEventListener('keyup',   state.onKeyup);
+      el.removeEventListener('blur',    state.onBlur);
     }
     this.#fieldListeners.clear();
 
-    console.debug('[SECT] Anomaly collector stopped.');
+    console.debug('[SECT] Collector stopped.');
   }
 
-  // ── Public API ───────────────────────────────────────────────────────────
+  // ── Public API ─────────────────────────────────────────────────────────────
 
-  /**
-   * Call whenever the student navigates to a new question.
-   * Starts the response-time clock for that question.
-   *
-   * @param {number} questionId
-   */
   setCurrentQuestion(questionId) {
     this.#currentQuestionId = questionId;
     if (!this.#questionStartTimes.has(questionId)) {
@@ -113,18 +88,12 @@ export class AnomalyCollector {
     }
   }
 
-  /**
-   * Call when the student submits / moves away from a question.
-   * Posts the elapsed time to the response-time endpoint.
-   *
-   * @param {number} questionId
-   */
   recordResponseTime(questionId) {
     const startedAt = this.#questionStartTimes.get(questionId);
     if (!startedAt) return;
 
     const elapsedMs = Date.now() - startedAt;
-    this.#questionStartTimes.delete(questionId); // one measurement per question
+    this.#questionStartTimes.delete(questionId);
 
     this.#post('response-time', {
       question_id:      questionId,
@@ -133,23 +102,16 @@ export class AnomalyCollector {
     });
   }
 
-  /**
-   * Attach keystroke-dynamics monitoring to an answer <textarea> or <input>.
-   * Safe to call multiple times (idempotent per element).
-   *
-   * @param {HTMLElement} fieldEl
-   * @param {number}      questionId
-   */
   attachToAnswerField(fieldEl, questionId) {
     if (this.#fieldListeners.has(fieldEl)) return;
 
     const state = {
       questionId,
-      dwellTimes:  [],   // key-hold durations (ms)
-      flightTimes: [],   // between-keystroke gaps (ms)
-      lastKeyUp:   null, // timestamp of previous keyup
-      keyDownTimes: {},  // key → keydown timestamp
-      totalChars:  0,
+      dwellTimes:   [],
+      flightTimes:  [],
+      lastKeyUp:    null,
+      keyDownTimes: {},
+      totalChars:   0,
       sessionStart: Date.now(),
 
       onKeydown: (e) => {
@@ -158,28 +120,19 @@ export class AnomalyCollector {
 
       onKeyup: (e) => {
         const downAt = state.keyDownTimes[e.key];
-        if (downAt) {
-          const dwell = Date.now() - downAt;
-          state.dwellTimes.push(dwell);
+        if (downAt !== undefined) {
+          state.dwellTimes.push(Date.now() - downAt);
           delete state.keyDownTimes[e.key];
         }
-
         if (state.lastKeyUp !== null) {
-          const flight = Date.now() - state.lastKeyUp;
-          state.flightTimes.push(flight);
+          state.flightTimes.push(Date.now() - state.lastKeyUp);
         }
         state.lastKeyUp = Date.now();
-
-        // Count printable characters only
-        if (e.key.length === 1) {
-          state.totalChars++;
-        }
+        if (e.key.length === 1) state.totalChars++;
       },
 
-      // When the student leaves the field, flush the collected data
       onBlur: () => {
         const duration = Date.now() - state.sessionStart;
-
         if (state.dwellTimes.length >= 5 && duration > 1000) {
           this.#post('keystroke-dynamics', {
             question_id:      state.questionId,
@@ -190,36 +143,39 @@ export class AnomalyCollector {
             timestamp:        new Date().toISOString(),
           });
         }
-
-        // Reset for the next time the student focuses the field
-        state.dwellTimes    = [];
-        state.flightTimes   = [];
-        state.lastKeyUp     = null;
-        state.keyDownTimes  = {};
-        state.totalChars    = 0;
-        state.sessionStart  = Date.now();
+        state.dwellTimes   = [];
+        state.flightTimes  = [];
+        state.lastKeyUp    = null;
+        state.keyDownTimes = {};
+        state.totalChars   = 0;
+        state.sessionStart = Date.now();
       },
     };
 
     fieldEl.addEventListener('keydown', state.onKeydown);
     fieldEl.addEventListener('keyup',   state.onKeyup);
     fieldEl.addEventListener('blur',    state.onBlur);
-
     this.#fieldListeners.set(fieldEl, state);
   }
 
-  // ── Private event handlers ───────────────────────────────────────────────
+  // ── Private event handlers ─────────────────────────────────────────────────
 
+  // BUG FIX #2: Post on HIDE immediately, then again on RETURN with duration
   #onVisibilityChange() {
     if (document.hidden) {
-      // Tab just became hidden — start the clock
       this.#tabHiddenAt = Date.now();
+
+      // Post immediately so the switch is recorded even if student never returns
+      this.#post('tab-switch', {
+        hidden_duration_ms: 0,
+        timestamp:          new Date().toISOString(),
+      });
     } else {
-      // Tab is visible again — send the duration
       if (this.#tabHiddenAt !== null) {
         const hiddenDuration = Date.now() - this.#tabHiddenAt;
         this.#tabHiddenAt = null;
 
+        // Post again with the real hidden duration (backend deduplicates by time)
         this.#post('tab-switch', {
           hidden_duration_ms: hiddenDuration,
           timestamp:          new Date().toISOString(),
@@ -232,7 +188,6 @@ export class AnomalyCollector {
     const combo = this.#normalizeCombo(e);
     if (!combo) return;
 
-    // Intercept suspicious combos — post and optionally suppress the default
     const BLOCKED = new Set([
       'Ctrl+C', 'Ctrl+V', 'Ctrl+X', 'Ctrl+A',
       'Ctrl+F', 'Ctrl+G',
@@ -244,9 +199,7 @@ export class AnomalyCollector {
     ]);
 
     if (BLOCKED.has(combo)) {
-      // Suppress most shortcuts in-browser (note: Alt+Tab cannot be suppressed)
       e.preventDefault();
-
       this.#post('keyboard-shortcut', {
         keys:      combo,
         timestamp: new Date().toISOString(),
@@ -254,73 +207,52 @@ export class AnomalyCollector {
     }
   }
 
-  /**
-   * Normalize a KeyboardEvent into a human-readable combo string.
-   * Returns null for plain (unmodified) printable keys.
-   *
-   * @param  {KeyboardEvent} e
-   * @returns {string|null}
-   */
   #normalizeCombo(e) {
     const parts = [];
-
-    if (e.ctrlKey  || e.metaKey) parts.push(e.metaKey ? 'Meta' : 'Ctrl');
-    if (e.altKey)                 parts.push('Alt');
-    if (e.shiftKey)               parts.push('Shift');
-
-    // Key label
+    if (e.ctrlKey || e.metaKey) parts.push(e.metaKey ? 'Meta' : 'Ctrl');
+    if (e.altKey)               parts.push('Alt');
+    if (e.shiftKey)             parts.push('Shift');
     const label = e.key === ' ' ? 'Space' : e.key;
     parts.push(label);
-
-    const combo = parts.join('+');
-
-    // Skip plain unmodified printable characters
     if (parts.length === 1 && label.length === 1) return null;
-    // Skip standalone modifier keystrokes
-    if (['Control','Alt','Shift','Meta'].includes(label)) return null;
-
-    return combo;
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(label)) return null;
+    return parts.join('+');
   }
 
-  // ── HTTP helper ──────────────────────────────────────────────────────────
+  // ── HTTP helper ────────────────────────────────────────────────────────────
 
-  /**
-   * Fire-and-forget POST to the anomaly endpoint.
-   * Handles the response to call onWarning if severity is high/medium.
-   *
-   * @param {string} type   — tab-switch | keyboard-shortcut | response-time | keystroke-dynamics
-   * @param {object} body
-   */
-  async #post(type, body) {
+  // BUG FIX #1: Read CSRF cookie fresh on every request
+  #getCsrf() {
+    const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : '';
+  }
+
+  // BUG FIX #3 & #4: XHR instead of fetch; guard against post-stop calls
+  #post(type, body) {
+    if (!this.#active) return; // BUG FIX #4
+
     const url = `${this.#apiBaseUrl}/student/exams/${this.#examId}/anomalies/${type}`;
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('Accept',       'application/json');
+    xhr.setRequestHeader('X-XSRF-TOKEN', this.#getCsrf()); // BUG FIX #1
 
-    try {
-      const res = await fetch(url, {
-        method:      'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type':  'application/json',
-          'Accept':        'application/json',
-          'X-XSRF-TOKEN':  decodeURIComponent(this.#csrfToken),
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        console.warn(`[SECT] Anomaly post failed (${res.status}) for type: ${type}`);
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        console.warn(`[SECT] ${type} → HTTP ${xhr.status}`, xhr.responseText);
         return;
       }
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (['medium', 'high'].includes(data.severity) && this.#onWarning) {
+          this.#onWarning(type, data.severity);
+        }
+      } catch { /* non-JSON, ignore */ }
+    };
 
-      const data = await res.json();
-
-      // Notify the UI layer if a warning is needed
-      if (['medium', 'high'].includes(data.severity) && this.#onWarning) {
-        this.#onWarning(type, data.severity);
-      }
-
-    } catch (err) {
-      // Never crash the exam UI due to telemetry failures
-      console.warn('[SECT] Anomaly collector network error:', err);
-    }
+    xhr.onerror = () => console.warn(`[SECT] Network error for ${type}`);
+    xhr.send(JSON.stringify(body));
   }
 }
