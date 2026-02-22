@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 class StudentExamController extends Controller
 {
-    // ── Private helper: resolve authenticated student ────────────────────────
+    // ── Private helper: resolve authenticated student  ───────────────────────
     private function getStudent(Request $request)
     {
         $student = $request->user();
