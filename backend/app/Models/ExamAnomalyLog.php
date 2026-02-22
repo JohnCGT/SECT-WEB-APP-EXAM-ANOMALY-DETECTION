@@ -8,41 +8,60 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * ExamAnomalyLog
  *
- * Represents a single anomaly event captured during an exam session.
+ * One row per anomaly event captured during an exam session.
+ * Severity is stored as 'low' by default — the Python Flask service
+ * will compute real severity using the appropriate algorithm per type:
  *
- * metadata JSON structure per type
- * ──────────────────────────────────────────────────────────────────────────
+ *   tab_switch         → Isolation Forest
+ *   keyboard_shortcut  → One-Class SVM
+ *   response_time      → Z-Score Method
+ *   keystroke_dynamics → Hidden Markov Model
+ *
+ * Raw feature data is stored in the metadata JSON column so Flask
+ * can perform feature extraction without re-querying the DB.
+ *
+ * metadata structure per type:
+ * ─────────────────────────────────────────────────────────────────────
  *
  * tab_switch:
  * {
- *   "count_in_session": 3,          // cumulative switches so far
- *   "hidden_duration_ms": 4200,     // how long the tab was hidden (ms)
- *   "timestamp": "2025-01-01T10:05:00Z"
+ *   "cumulative_switches": 3,
+ *   "hidden_duration_ms": 4200,
+ *   "client_timestamp": "2025-01-01T10:05:00Z"
  * }
  *
  * keyboard_shortcut:
  * {
- *   "keys": "Ctrl+C",               // the key combo pressed
- *   "timestamp": "2025-01-01T10:06:00Z"
+ *   "keys": "Ctrl+C",
+ *   "cumulative_count": 2,
+ *   "is_paste": false,
+ *   "pasted_char_count": 0,
+ *   "paste_index": null,
+ *   "client_timestamp": "2025-01-01T10:06:00Z"
  * }
  *
  * response_time:
  * {
  *   "question_id": 42,
- *   "response_time_ms": 850,        // time from question display to answer
- *   "z_score": 2.9,                 // deviation from student's mean response time
- *   "mean_ms": 12000,
- *   "std_ms": 3800
+ *   "response_time_ms": 850,
+ *   "question_position": 3,
+ *   "previous_times_ms": [12000, 8000, 15000],
+ *   "client_timestamp": "2025-01-01T10:07:00Z"
  * }
  *
  * keystroke_dynamics:
  * {
  *   "question_id": 42,
- *   "avg_dwell_ms": 95,             // average key-hold duration
- *   "avg_flight_ms": 210,           // average between-key gap
- *   "wpm": 145,                     // calculated words-per-minute
- *   "z_score": 3.1,
- *   "baseline_wpm": 62              // student's established baseline
+ *   "dwell_times_ms": [95, 110, 88],
+ *   "flight_times_ms": [210, 190, 230],
+ *   "avg_dwell_ms": 97.67,
+ *   "avg_flight_ms": 210.0,
+ *   "wpm": 145.0,
+ *   "total_chars": 120,
+ *   "paste_count": 0,
+ *   "duration_ms": 48000,
+ *   "keystroke_count": 3,
+ *   "client_timestamp": "2025-01-01T10:08:00Z"
  * }
  */
 class ExamAnomalyLog extends Model
@@ -65,8 +84,6 @@ class ExamAnomalyLog extends Model
         'reviewed'    => 'boolean',
         'occurred_at' => 'datetime',
     ];
-
-    // ── Relationships ──────────────────────────────────────────────────────
 
     public function submission(): BelongsTo
     {

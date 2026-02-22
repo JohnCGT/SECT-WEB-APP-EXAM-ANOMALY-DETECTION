@@ -16,6 +16,7 @@ class ExamSubmission extends Model
         'score',
         'total_points',
         'status',
+        'answers', 
     ];
 
     protected $casts = [

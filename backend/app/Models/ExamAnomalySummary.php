@@ -8,11 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * ExamAnomalySummary
  *
- * A live risk profile for one exam submission.
- * Updated incrementally each time a new anomaly event is logged,
- * so instructors can query a single row instead of aggregating logs.
+ * One row per submission. Stores running counts and a risk score
+ * so instructors can see a live overview without scanning every log.
  *
- * Risk score formula (0–100):
+ * Risk score is a placeholder computation until Flask returns real scores.
+ * Formula (0–100):
  *   base = tab_switch_count        * 5
  *        + keyboard_shortcut_count * 8
  *        + response_time_count     * 6
@@ -20,9 +20,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *   clamped to 100
  *
  * Flag thresholds:
- *   none    → risk_score  0–19
- *   warning → risk_score 20–49
- *   flagged → risk_score 50+
+ *   none    → 0–19
+ *   warning → 20–49
+ *   flagged → 50+
  */
 class ExamAnomalySummary extends Model
 {
@@ -43,8 +43,6 @@ class ExamAnomalySummary extends Model
         'last_anomaly_at' => 'datetime',
     ];
 
-    // ── Relationships ──────────────────────────────────────────────────────
-
     public function submission(): BelongsTo
     {
         return $this->belongsTo(ExamSubmission::class, 'submission_id');
@@ -60,22 +58,21 @@ class ExamAnomalySummary extends Model
         return $this->belongsTo(User::class, 'student_id');
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────
-
     /**
-     * Recalculate and persist risk_score + flag_status from current counts.
-     * Call after incrementing any counter column.
+     * Recalculate risk_score and flag_status from current counts.
+     * Called after every new anomaly event is logged.
+     * Will be replaced by Flask ML scores in a future update.
      */
     public function recalculate(): void
     {
         $score = min(100,
-            ($this->tab_switch_count        * 5)  +
-            ($this->keyboard_shortcut_count * 8)  +
-            ($this->response_time_anomaly_count * 6) +
-            ($this->keystroke_anomaly_count * 7)
+            ($this->tab_switch_count             * 5) +
+            ($this->keyboard_shortcut_count      * 8) +
+            ($this->response_time_anomaly_count  * 6) +
+            ($this->keystroke_anomaly_count      * 7)
         );
 
-        $flag = match(true) {
+        $flag = match (true) {
             $score >= 50 => 'flagged',
             $score >= 20 => 'warning',
             default      => 'none',
