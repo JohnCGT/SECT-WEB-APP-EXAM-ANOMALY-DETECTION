@@ -1,7 +1,5 @@
 import axios from 'axios';
 
-// Use environment variable so this never breaks when Vite changes ports.
-// Add VITE_API_URL=http://localhost:8000 to your frontend .env file.
 const BASE_URL = import.meta.env.VITE_API_URL || 'https://sectexam.app';
 
 const API = axios.create({
@@ -10,7 +8,7 @@ const API = axios.create({
         'Content-Type': 'application/json',
         'Accept': 'application/json',
     },
-    withCredentials: true, // Required: sends session cookies cross-origin
+    withCredentials: true,
 });
 
 /**
@@ -44,13 +42,33 @@ API.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Handle global auth errors
+// Track retry state to prevent infinite loops
+let isRetryingCsrf = false;
+
+// Handle global errors
 API.interceptors.response.use(
     (response) => response,
-    (error) => {
+    async (error) => {
+        // ── 419: CSRF token missing/expired — refresh and retry once ─────────
+        if (error.response?.status === 419 && !isRetryingCsrf) {
+            isRetryingCsrf = true;
+            try {
+                await fetchCsrfToken();
+                const token = getXsrfToken();
+                const config = error.config;
+                if (token) {
+                    config.headers['X-XSRF-TOKEN'] = token;
+                }
+                return await API.request(config);
+            } catch (retryError) {
+                return Promise.reject(retryError);
+            } finally {
+                isRetryingCsrf = false;
+            }
+        }
+
+        // ── 401: Unauthenticated ──────────────────────────────────────────────
         if (error.response?.status === 401) {
-            // Do NOT redirect if the 401 came from login/register themselves —
-            // that would cause a redirect loop on bad credentials
             const isAuthRoute =
                 error.config?.url?.includes('/login') ||
                 error.config?.url?.includes('/register');
@@ -60,6 +78,7 @@ API.interceptors.response.use(
                 window.location.href = '/';
             }
         }
+
         return Promise.reject(error);
     }
 );
