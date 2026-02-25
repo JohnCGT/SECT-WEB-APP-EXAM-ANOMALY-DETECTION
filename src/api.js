@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Use environment variable so this never breaks when Vite changes ports.
 // Add VITE_API_URL=http://localhost:8000 to your frontend .env file.
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://sectexam.app';
 
 const API = axios.create({
     baseURL: `${BASE_URL}/api`,
