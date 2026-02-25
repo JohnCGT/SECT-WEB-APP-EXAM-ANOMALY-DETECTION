@@ -1,5 +1,7 @@
 <?php
 
+// backend/app/Models/User.php
+
 namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -15,6 +17,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'status',   // ← added: 'active' | 'suspended'
     ];
 
     protected $hidden = [
@@ -28,6 +31,10 @@ class User extends Authenticatable
     public function isInstructor() { return $this->role === 'instructor'; }
     public function isStudent()    { return $this->role === 'student'; }
 
+    /* ── Status helpers ── */
+    public function isActive()     { return ($this->status ?? 'active') === 'active'; }
+    public function isSuspended()  { return $this->status === 'suspended'; }
+
     /* ── Instructor: courses they teach ── */
     public function courses()
     {
@@ -39,9 +46,9 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(
             Course::class,
-            'course_students', // pivot table
-            'student_id',      // FK for this model (User)
-            'course_id'        // FK for related model (Course)
+            'course_students',
+            'student_id',
+            'course_id'
         )
         ->withPivot('enrolled_at')
         ->withTimestamps();

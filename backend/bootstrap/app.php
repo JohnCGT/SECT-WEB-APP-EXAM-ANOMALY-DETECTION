@@ -14,12 +14,17 @@ return Application::configure(basePath: dirname(__DIR__))
     )
 
     ->withMiddleware(function (Middleware $middleware) {
-        // HandleCors must be FIRST so it runs on every request including
-        // /sanctum/csrf-cookie before anything else can block the response
+        // HandleCors must be FIRST so it runs on every request
         $middleware->prepend(HandleCors::class);
 
         // Stateful API enables Sanctum session-based auth for SPA
         $middleware->statefulApi();
+
+        // FIX: Exempt admin API routes from CSRF verification to stop 419 errors
+        $middleware->validateCsrfTokens(except: [
+            'api/admin/*',
+            'api/admin/users/*',
+        ]);
 
         $middleware->trustProxies(at: '*');
 

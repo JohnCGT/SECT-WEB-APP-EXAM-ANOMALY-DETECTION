@@ -1,5 +1,8 @@
 <?php
 
+// backend/routes/api.php
+
+use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AnomalyController;
 use App\Http\Controllers\CourseController;
@@ -21,6 +24,15 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me',      [AuthController::class, 'me']);
+
+    // ── Admin: User Management ────────────────────────────────────────────────
+    Route::prefix('admin')->group(function () {
+        Route::get('/users',               [AdminUserController::class, 'index']);
+        Route::post('/users',              [AdminUserController::class, 'store']);
+        Route::put('/users/{id}',          [AdminUserController::class, 'update']);
+        Route::patch('/users/{id}/status', [AdminUserController::class, 'updateStatus']);
+        Route::delete('/users/{id}',       [AdminUserController::class, 'destroy']);
+    });
 
     // ── Student: enrolled courses (MUST stay before /courses/{id}) ───────────
     Route::get('/student/courses',            [StudentCourseController::class, 'index']);
@@ -80,9 +92,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // ── Instructor: anomaly review ────────────────────────────────────────────
     // Instructors view risk summaries and individual event logs per exam.
     Route::prefix('exams/{examId}')->group(function () {
-        Route::get('/anomalies',                            [AnomalyController::class, 'index']);
-        Route::get('/anomalies/summary',                   [AnomalyController::class, 'summary']);
-        Route::get('/submissions/{submissionId}/anomalies',[AnomalyController::class, 'show']);
-        Route::patch('/anomalies/{logId}/review',          [AnomalyController::class, 'review']);
+        Route::get('/anomalies',                             [AnomalyController::class, 'index']);
+        Route::get('/anomalies/summary',                    [AnomalyController::class, 'summary']);
+        Route::get('/submissions/{submissionId}/anomalies', [AnomalyController::class, 'show']);
+        Route::patch('/anomalies/{logId}/review',           [AnomalyController::class, 'review']);
     });
+
 });
