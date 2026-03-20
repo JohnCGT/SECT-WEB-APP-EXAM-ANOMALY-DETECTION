@@ -38,10 +38,6 @@ use Illuminate\Support\Facades\DB;
  */
 class AnomalyDetectionService
 {
-    // ── Tab switch thresholds ──────────────────────────────────────────────
-    private const TAB_MEDIUM = 3;
-    private const TAB_HIGH   = 6;
-
     // ── Monitored keyboard shortcuts (One-Class SVM) ───────────────────────
     private const BLOCKED_SHORTCUTS = [
         'Ctrl+C', 'Ctrl+V', 'Ctrl+X',
@@ -59,12 +55,6 @@ class AnomalyDetectionService
     ];
 
     private const PASTE_COMBOS = ['Ctrl+V', 'Meta+V', 'Paste'];
-
-    // ── Z-score / keystroke thresholds ────────────────────────────────────
-    private const RESPONSE_TIME_Z_THRESHOLD = 2.5;
-    private const RESPONSE_TIME_MIN_SAMPLES = 3;
-    private const KEYSTROKE_Z_THRESHOLD     = 2.5;
-    private const KEYSTROKE_MAX_WPM         = 120;
 
     // ══════════════════════════════════════════════════════════════════════
     // PUBLIC API
@@ -86,9 +76,9 @@ class AnomalyDetectionService
                 'student_id'          => $submission->student_id,
                 'cumulative_switches' => TabSwitchLog::where('submission_id', $submission->id)
                                             ->where('is_return_event', true)
-                                            ->count(), // current count — not incrementing
+                                            ->count(),
                 'hidden_duration_ms'  => 0,
-                'is_return_event'     => false, // this is the hide ping
+                'is_return_event'     => false,
                 'client_timestamp'    => $payload['timestamp'] ?? null,
                 'severity'            => 'low',
                 'occurred_at'         => now(),
@@ -100,12 +90,6 @@ class AnomalyDetectionService
         $summary  = $this->getOrCreateSummary($submission);
         $newCount = $summary->tab_switch_count + 1;
 
-        $severity = match (true) {
-            $newCount >= self::TAB_HIGH   => 'high',
-            $newCount >= self::TAB_MEDIUM => 'medium',
-            default                       => 'low',
-        };
-
         $log = TabSwitchLog::create([
             'submission_id'       => $submission->id,
             'exam_id'             => $submission->exam_id,
@@ -114,7 +98,7 @@ class AnomalyDetectionService
             'hidden_duration_ms'  => $hiddenDurationMs,
             'is_return_event'     => true,
             'client_timestamp'    => $payload['timestamp'] ?? null,
-            'severity'            => $severity,
+            'severity'            => 'low',
             'occurred_at'         => now(),
         ]);
 
@@ -172,49 +156,7 @@ class AnomalyDetectionService
             return null;
         }
 
-        // BUG FIX #6 — Exclude baseline_building rows from prior-times so they
-        // don't pollute the z-score with circular data.
-        $priorTimes = ResponseTimeLog::where('submission_id', $submission->id)
-            ->where('is_baseline', false)
-            ->orderBy('question_position')
-            ->pluck('response_time_ms')
-            ->values()
-            ->toArray();
-
         $position = ResponseTimeLog::where('submission_id', $submission->id)->count() + 1;
-
-        // Not enough real samples yet — store as baseline, don't flag
-        if (count($priorTimes) < self::RESPONSE_TIME_MIN_SAMPLES) {
-            return ResponseTimeLog::create([
-                'submission_id'     => $submission->id,
-                'exam_id'           => $submission->exam_id,
-                'student_id'        => $submission->student_id,
-                'question_id'       => $questionId,
-                'response_time_ms'  => $responseTimeMs,
-                'question_position' => $position,
-                'previous_times_ms' => $priorTimes,
-                'is_baseline'       => true,  // excluded from future z-score queries
-                'z_score'           => null,
-                'client_timestamp'  => $payload['timestamp'] ?? null,
-                'severity'          => 'low',
-                'occurred_at'       => now(),
-            ]);
-            // No summary increment for baseline rows
-        }
-
-        [$mean, $std] = $this->meanStd($priorTimes);
-
-        if ($std < 1) {
-            return null;
-        }
-
-        $zScore = abs($responseTimeMs - $mean) / $std;
-
-        if ($zScore < self::RESPONSE_TIME_Z_THRESHOLD) {
-            return null;
-        }
-
-        $severity = $zScore >= 4.0 ? 'high' : 'medium';
 
         $log = ResponseTimeLog::create([
             'submission_id'     => $submission->id,
@@ -223,12 +165,10 @@ class AnomalyDetectionService
             'question_id'       => $questionId,
             'response_time_ms'  => $responseTimeMs,
             'question_position' => $position,
-            'previous_times_ms' => $priorTimes,
             'is_baseline'       => false,
-            'z_score'           => round($zScore, 3),
-            'direction'         => $responseTimeMs < $mean ? 'too_fast' : 'too_slow',
+            'z_score'           => null,
             'client_timestamp'  => $payload['timestamp'] ?? null,
-            'severity'          => $severity,
+            'severity'          => 'low',
             'occurred_at'       => now(),
         ]);
 
@@ -257,104 +197,26 @@ class AnomalyDetectionService
             : 0;
         $wpm = ($totalChars / 5) / ($durationMs / 60000);
 
-        // Rule 1: Impossibly fast typing — flag immediately, no baseline needed
-        if ($wpm > self::KEYSTROKE_MAX_WPM) {
-            $log = KeystrokeDynamicsLog::create([
-                'submission_id'   => $submission->id,
-                'exam_id'         => $submission->exam_id,
-                'student_id'      => $submission->student_id,
-                'question_id'     => $questionId,
-                'dwell_times_ms'  => $dwellTimes,
-                'flight_times_ms' => $flightTimes,
-                'avg_dwell_ms'    => round($avgDwell, 2),
-                'avg_flight_ms'   => round($avgFlight, 2),
-                'wpm'             => round($wpm, 2),
-                'total_chars'     => $totalChars,
-                'paste_count'     => $payload['paste_count'] ?? 0,
-                'duration_ms'     => $durationMs,
-                'keystroke_count' => count($dwellTimes),
-                'is_baseline'     => false,
-                'hmm_log_prob'    => null,
-                'reason'          => 'impossible_speed',
-                'client_timestamp' => $payload['timestamp'] ?? null,
-                'severity'        => 'high',
-                'occurred_at'     => now(),
-            ]);
-
-            $this->upsertSummary($submission, 'keystroke_anomaly_count');
-
-            return $log;
-        }
-
-        // Rule 2: Z-score vs session baseline
-        // BUG FIX #6 applied — exclude baseline rows from prior wpm query
-        $priorWpms = KeystrokeDynamicsLog::where('submission_id', $submission->id)
-            ->where('is_baseline', false)
-            ->pluck('wpm')
-            ->values()
-            ->toArray();
-
-        // Not enough real samples yet — store as baseline, don't flag
-        if (count($priorWpms) < self::RESPONSE_TIME_MIN_SAMPLES) {
-            return KeystrokeDynamicsLog::create([
-                'submission_id'   => $submission->id,
-                'exam_id'         => $submission->exam_id,
-                'student_id'      => $submission->student_id,
-                'question_id'     => $questionId,
-                'dwell_times_ms'  => $dwellTimes,
-                'flight_times_ms' => $flightTimes,
-                'avg_dwell_ms'    => round($avgDwell, 2),
-                'avg_flight_ms'   => round($avgFlight, 2),
-                'wpm'             => round($wpm, 2),
-                'total_chars'     => $totalChars,
-                'paste_count'     => $payload['paste_count'] ?? 0,
-                'duration_ms'     => $durationMs,
-                'keystroke_count' => count($dwellTimes),
-                'is_baseline'     => true,
-                'hmm_log_prob'    => null,
-                'reason'          => 'baseline_building',
-                'client_timestamp' => $payload['timestamp'] ?? null,
-                'severity'        => 'low',
-                'occurred_at'     => now(),
-            ]);
-            // No summary increment for baseline rows
-        }
-
-        [$meanWpm, $stdWpm] = $this->meanStd($priorWpms);
-
-        if ($stdWpm < 1) {
-            return null;
-        }
-
-        $zScore = abs($wpm - $meanWpm) / $stdWpm;
-
-        if ($zScore < self::KEYSTROKE_Z_THRESHOLD) {
-            return null;
-        }
-
-        $severity = $zScore >= 4.0 ? 'high' : 'medium';
-
         $log = KeystrokeDynamicsLog::create([
-            'submission_id'   => $submission->id,
-            'exam_id'         => $submission->exam_id,
-            'student_id'      => $submission->student_id,
-            'question_id'     => $questionId,
-            'dwell_times_ms'  => $dwellTimes,
-            'flight_times_ms' => $flightTimes,
-            'avg_dwell_ms'    => round($avgDwell, 2),
-            'avg_flight_ms'   => round($avgFlight, 2),
-            'wpm'             => round($wpm, 2),
-            'total_chars'     => $totalChars,
-            'paste_count'     => $payload['paste_count'] ?? 0,
-            'duration_ms'     => $durationMs,
-            'keystroke_count' => count($dwellTimes),
-            'is_baseline'     => false,
-            'z_score'         => round($zScore, 3),
-            'hmm_log_prob'    => null,
-            'reason'          => 'statistical_deviation',
+            'submission_id'    => $submission->id,
+            'exam_id'          => $submission->exam_id,
+            'student_id'       => $submission->student_id,
+            'question_id'      => $questionId,
+            'dwell_times_ms'   => $dwellTimes,
+            'flight_times_ms'  => $flightTimes,
+            'avg_dwell_ms'     => round($avgDwell, 2),
+            'avg_flight_ms'    => round($avgFlight, 2),
+            'wpm'              => round($wpm, 2),
+            'total_chars'      => $totalChars,
+            'paste_count'      => $payload['paste_count'] ?? 0,
+            'duration_ms'      => $durationMs,
+            'keystroke_count'  => count($dwellTimes),
+            'is_baseline'      => false,
+            'hmm_log_prob'     => null,
+            'reason'           => null,
             'client_timestamp' => $payload['timestamp'] ?? null,
-            'severity'        => $severity,
-            'occurred_at'     => now(),
+            'severity'         => 'low',
+            'occurred_at'      => now(),
         ]);
 
         $this->upsertSummary($submission, 'keystroke_anomaly_count');
@@ -404,14 +266,5 @@ class AnomalyDetectionService
         ExamAnomalySummary::where('submission_id', $submission->id)
             ->firstOrFail()
             ->recalculate();
-    }
-
-    private function meanStd(array $values): array
-    {
-        $n        = count($values);
-        $mean     = array_sum($values) / $n;
-        $variance = array_sum(array_map(fn ($v) => ($v - $mean) ** 2, $values)) / $n;
-
-        return [$mean, sqrt($variance)];
     }
 }
