@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Schema;
  *   keyboard_shortcut_logs   → One-Class SVM
  *   response_time_logs       → Z-Score Method
  *   keystroke_dynamics_logs  → Hidden Markov Model
- *   exam_anomaly_summaries   → one row per submission (unchanged schema)
+ *   exam_results             → one row per submission (Flask backfills CPI + per-algorithm scores)
  *
  * Extra columns vs the first draft:
  *   tab_switch_logs         : is_return_event  (bool) — distinguishes hide ping from real event
@@ -170,31 +170,46 @@ return new class extends Migration
             $table->index(['submission_id', 'is_baseline']); // fast exclusion of baseline rows
         });
 
-        // ── 5. Summary (unchanged schema) ─────────────────────────────────────
-        Schema::create('exam_anomaly_summaries', function (Blueprint $table) {
+        // ── 5. Exam Results (replaces exam_anomaly_summaries) ─────────────────
+        // Populated/backfilled by Flask after running all four ML algorithms.
+        // One row per submission; CPI score and per-algorithm flags/scores
+        // are written here once Flask completes scoring.
+        Schema::create('exam_results', function (Blueprint $table) {
             $table->id();
             $table->foreignId('submission_id')->unique()->constrained('exam_submissions')->onDelete('cascade');
             $table->foreignId('exam_id')->constrained('exams')->onDelete('cascade');
             $table->foreignId('student_id')->constrained('users')->onDelete('cascade');
 
-            $table->unsignedInteger('tab_switch_count')->default(0);
-            $table->unsignedInteger('keyboard_shortcut_count')->default(0);
-            $table->unsignedInteger('response_time_anomaly_count')->default(0);
-            $table->unsignedInteger('keystroke_anomaly_count')->default(0);
+            // Overall cheating probability index
+            $table->boolean('is_flagged')->default(false);
+            $table->float('cpi_score')->default(0);
+            $table->string('cpi_label', 20)->default('Unlikely');
 
-            $table->unsignedTinyInteger('risk_score')->default(0);
-            $table->enum('flag_status', ['none', 'warning', 'flagged'])->default('none');
-            $table->timestamp('last_anomaly_at')->nullable();
+            // Per-algorithm flags (set by Flask)
+            $table->boolean('iso_tab_flagged')->default(false); // Isolation Forest
+            $table->boolean('svm_flagged')->default(false);     // One-Class SVM
+            $table->boolean('rt_flagged')->default(false);      // Z-Score / Response Time
+            $table->boolean('hmm_flagged')->default(false);     // Hidden Markov Model
+
+            // Per-algorithm raw scores (nullable until Flask processes)
+            $table->float('iso_tab_score')->nullable();
+            $table->float('svm_score')->nullable();
+            $table->float('rt_score')->nullable();
+            $table->float('hmm_score')->nullable();
+
+            $table->timestamp('processed_at')->useCurrent();
             $table->timestamps();
 
-            $table->index(['exam_id', 'flag_status']);
-            $table->index(['exam_id', 'risk_score']);
+            $table->index('exam_id');
+            $table->index('student_id');
+            $table->index('is_flagged');
+            $table->index('cpi_score');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('exam_anomaly_summaries');
+        Schema::dropIfExists('exam_results');
         Schema::dropIfExists('keystroke_dynamics_logs');
         Schema::dropIfExists('response_time_logs');
         Schema::dropIfExists('keyboard_shortcut_logs');
