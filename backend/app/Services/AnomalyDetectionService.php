@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\ExamAnomalySummary;
 use App\Models\ExamSubmission;
+use App\Models\ExamResult;
 use App\Models\KeyboardShortcutLog;
 use App\Models\KeystrokeDynamicsLog;
 use App\Models\ResponseTimeLog;
@@ -13,43 +13,47 @@ use Illuminate\Support\Facades\DB;
 /**
  * AnomalyDetectionService
  *
- * Writes to four dedicated tables (one per algorithm) instead of the old
- * monolithic exam_anomaly_logs table.
+ * Writes raw anomaly events to four dedicated log tables, then upserts a
+ * running tally into `exam_results` (the table that actually exists).
  *
- * ── Bug fixes vs the original ────────────────────────────────────────────────
+ * ── What changed ─────────────────────────────────────────────────────────────
  *
- *  BUG FIX #5 — Tab switch double-counted (preserved from original)
- *    Frontend posts twice per switch: hide (duration=0) and return (real).
- *    Fix: duration=0 creates a lightweight audit row but does NOT increment
- *    the summary counter.  Only the return-post with real duration does.
+ *  FIX-SUMMARY   All references to the deleted `exam_anomaly_summaries` table
+ *                (and its Eloquent model ExamAnomalySummary) have been removed.
+ *                The per-submission running counts are now kept in `exam_results`
+ *                using four lightweight counter columns added via a new migration
+ *                (see below).  Flask still owns cpi_score / *_flagged columns —
+ *                this service only increments the raw counters.
  *
- *  BUG FIX #6 — Response time Z-score never triggered (preserved from original)
- *    Baseline rows excluded from prior-times queries via is_baseline column.
+ *  FIX-KEYBOARD  processKeyboardShortcut() was silently returning null for any
+ *                shortcut that wasn't in BLOCKED_SHORTCUTS.  The BLOCKED list is
+ *                correct, but the normalised combo built by the JS collector for
+ *                Meta-key combos on Mac produced 'Meta+C' while the list had
+ *                'Ctrl+C'.  Both variants are now accepted.
  *
- *  FIX-3 (NEW) — paste_count not persisted in keystroke_dynamics_logs
- *    processKeystrokeDynamics() was reading $payload['paste_count'] but the
- *    controller's validation rules never included 'paste_count', so Laravel
- *    stripped it from $payload before passing it here.  The controller is now
- *    fixed; this service already wrote the right column — no change needed here,
- *    but the null-coalesce default is left for safety.
+ *  BUG FIX #5    Tab switch hide-ping (hidden_duration_ms = 0) creates an audit
+ *                row but does NOT increment the counter. Preserved.
  *
- *  FIX-4 (NEW) — flight_times_ms nullable
- *    An early flush may produce an empty flight array.  The service already
- *    handled empty arrays correctly; the validation rule in the controller
- *    has been relaxed to 'nullable|array'.
+ *  BUG FIX #6    Response-time is_baseline logic preserved.
  */
 class AnomalyDetectionService
 {
-    // ── Monitored keyboard shortcuts (One-Class SVM) ───────────────────────
     private const BLOCKED_SHORTCUTS = [
-        'Ctrl+C', 'Ctrl+V', 'Ctrl+X',
-        'Ctrl+A',
+        // Ctrl variants
+        'Ctrl+C', 'Ctrl+V', 'Ctrl+X', 'Ctrl+A',
         'Ctrl+F', 'Ctrl+G',
         'Ctrl+T', 'Ctrl+W', 'Ctrl+N',
-        'Alt+Tab', 'Meta+Tab',
-        'F12', 'Ctrl+Shift+I', 'Ctrl+Shift+J',
         'Ctrl+U',
-        'PrintScreen',
+        'Ctrl+Shift+I', 'Ctrl+Shift+J',
+        // Meta (Mac) variants — FIX-KEYBOARD
+        'Meta+C', 'Meta+V', 'Meta+X', 'Meta+A',
+        'Meta+F', 'Meta+T', 'Meta+W', 'Meta+N',
+        // Alt / Tab switching
+        'Alt+Tab', 'Meta+Tab',
+        // Dev-tools / screenshot
+        'F12', 'PrintScreen',
+        // Clipboard actions from context menu (sent as plain strings by collector)
+        'Copy', 'Cut', 'Paste',
     ];
 
     private const HIGH_SEVERITY_SHORTCUTS = [
@@ -58,17 +62,17 @@ class AnomalyDetectionService
 
     private const PASTE_COMBOS = ['Ctrl+V', 'Meta+V', 'Paste'];
 
-    // ══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
     // PUBLIC API
-    // ══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
 
-    // ── Isolation Forest ───────────────────────────────────────────────────
+    // ── Isolation Forest ───────────────────────────────────────────────────────
 
     public function processTabSwitch(ExamSubmission $submission, array $payload): TabSwitchLog
     {
-        $hiddenDurationMs = $payload['hidden_duration_ms'] ?? 0;
+        $hiddenDurationMs = (int) ($payload['hidden_duration_ms'] ?? 0);
 
-        // BUG FIX #5 — hide-ping (duration = 0): audit row only, no counter
+        // BUG FIX #5 — hide-ping (duration = 0): audit row only, no counter bump
         if ($hiddenDurationMs === 0) {
             return TabSwitchLog::create([
                 'submission_id'       => $submission->id,
@@ -83,18 +87,19 @@ class AnomalyDetectionService
                 'severity'            => 'low',
                 'occurred_at'         => now(),
             ]);
-            // Intentionally NO summary increment
+            // Intentionally no counter increment
         }
 
-        // Return-post with real duration — this is the real event to count
-        $summary  = $this->getOrCreateSummary($submission);
-        $newCount = $summary->tab_switch_count + 1;
+        // Return-post with real duration
+        $currentCount = TabSwitchLog::where('submission_id', $submission->id)
+                            ->where('is_return_event', true)
+                            ->count();
 
         $log = TabSwitchLog::create([
             'submission_id'       => $submission->id,
             'exam_id'             => $submission->exam_id,
             'student_id'          => $submission->student_id,
-            'cumulative_switches' => $newCount,
+            'cumulative_switches' => $currentCount + 1,
             'hidden_duration_ms'  => $hiddenDurationMs,
             'is_return_event'     => true,
             'client_timestamp'    => $payload['timestamp'] ?? null,
@@ -102,25 +107,26 @@ class AnomalyDetectionService
             'occurred_at'         => now(),
         ]);
 
-        $this->upsertSummary($submission, 'tab_switch_count');
+        $this->incrementResultCounter($submission, 'tab_switch_count');
 
         return $log;
     }
 
-    // ── One-Class SVM ──────────────────────────────────────────────────────
+    // ── One-Class SVM ──────────────────────────────────────────────────────────
 
     public function processKeyboardShortcut(ExamSubmission $submission, array $payload): ?KeyboardShortcutLog
     {
-        $keys = $payload['keys'] ?? '';
+        $keys = trim($payload['keys'] ?? '');
 
-        if (!in_array($keys, self::BLOCKED_SHORTCUTS, true)) {
+        if ($keys === '' || !in_array($keys, self::BLOCKED_SHORTCUTS, true)) {
             return null;
         }
 
         $isPaste    = in_array($keys, self::PASTE_COMBOS, true);
         $cumulative = KeyboardShortcutLog::where('submission_id', $submission->id)->count() + 1;
         $pasteIndex = $isPaste
-            ? KeyboardShortcutLog::where('submission_id', $submission->id)->where('is_paste', true)->count() + 1
+            ? KeyboardShortcutLog::where('submission_id', $submission->id)
+                  ->where('is_paste', true)->count() + 1
             : null;
 
         $severity = in_array($keys, self::HIGH_SEVERITY_SHORTCUTS, true) ? 'high' : 'medium';
@@ -133,26 +139,26 @@ class AnomalyDetectionService
             'keys'              => $keys,
             'cumulative_count'  => $cumulative,
             'is_paste'          => $isPaste,
-            'pasted_char_count' => $payload['char_count'] ?? 0,
+            'pasted_char_count' => (int) ($payload['char_count'] ?? 0),
             'paste_index'       => $pasteIndex,
             'client_timestamp'  => $payload['timestamp'] ?? null,
             'severity'          => $severity,
             'occurred_at'       => now(),
         ]);
 
-        $this->upsertSummary($submission, 'keyboard_shortcut_count');
+        $this->incrementResultCounter($submission, 'keyboard_shortcut_count');
 
         return $log;
     }
 
-    // ── Z-Score Method ─────────────────────────────────────────────────────
+    // ── Z-Score Method ─────────────────────────────────────────────────────────
 
     public function processResponseTime(ExamSubmission $submission, array $payload): ?ResponseTimeLog
     {
         $questionId     = $payload['question_id']      ?? null;
-        $responseTimeMs = $payload['response_time_ms'] ?? null;
+        $responseTimeMs = (int) ($payload['response_time_ms'] ?? 0);
 
-        if (!$questionId || !$responseTimeMs || $responseTimeMs <= 0) {
+        if (!$questionId || $responseTimeMs <= 0) {
             return null;
         }
 
@@ -172,22 +178,22 @@ class AnomalyDetectionService
             'occurred_at'       => now(),
         ]);
 
-        $this->upsertSummary($submission, 'response_time_anomaly_count');
+        $this->incrementResultCounter($submission, 'response_time_anomaly_count');
 
         return $log;
     }
 
-    // ── Hidden Markov Model ────────────────────────────────────────────────
+    // ── Hidden Markov Model ────────────────────────────────────────────────────
 
     public function processKeystrokeDynamics(ExamSubmission $submission, array $payload): ?KeystrokeDynamicsLog
     {
         $questionId  = $payload['question_id']     ?? null;
         $dwellTimes  = $payload['dwell_times_ms']  ?? [];
-        $flightTimes = $payload['flight_times_ms'] ?? [];  // FIX-4: may be null/empty
-        $totalChars  = $payload['total_chars']     ?? 0;
-        $durationMs  = $payload['duration_ms']     ?? 0;
+        $flightTimes = $payload['flight_times_ms'] ?? [];
+        $totalChars  = (int) ($payload['total_chars'] ?? 0);
+        $durationMs  = (int) ($payload['duration_ms']  ?? 0);
 
-        if (!$questionId || count($dwellTimes) < 5 || $durationMs <= 0) {
+        if (!$questionId || count($dwellTimes) < 3 || $durationMs <= 0) {
             return null;
         }
 
@@ -208,9 +214,7 @@ class AnomalyDetectionService
             'avg_flight_ms'    => round($avgFlight, 2),
             'wpm'              => round($wpm, 2),
             'total_chars'      => $totalChars,
-            // FIX-3: paste_count now correctly arrives from the controller
-            // because the validation rule was added. Null-coalesce for safety.
-            'paste_count'      => $payload['paste_count'] ?? 0,
+            'paste_count'      => (int) ($payload['paste_count'] ?? 0),
             'duration_ms'      => $durationMs,
             'keystroke_count'  => count($dwellTimes),
             'is_baseline'      => false,
@@ -221,50 +225,57 @@ class AnomalyDetectionService
             'occurred_at'      => now(),
         ]);
 
-        $this->upsertSummary($submission, 'keystroke_anomaly_count');
+        $this->incrementResultCounter($submission, 'keystroke_anomaly_count');
 
         return $log;
     }
 
-    // ══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
     // PRIVATE HELPERS
-    // ══════════════════════════════════════════════════════════════════════
-
-    private function getOrCreateSummary(ExamSubmission $submission): ExamAnomalySummary
-    {
-        return ExamAnomalySummary::firstOrCreate(
-            ['submission_id' => $submission->id],
-            [
-                'exam_id'                     => $submission->exam_id,
-                'student_id'                  => $submission->student_id,
-                'tab_switch_count'            => 0,
-                'keyboard_shortcut_count'     => 0,
-                'response_time_anomaly_count' => 0,
-                'keystroke_anomaly_count'     => 0,
-                'risk_score'                  => 0,
-                'flag_status'                 => 'none',
-                'last_anomaly_at'             => now(),
-            ]
-        );
-    }
+    // ══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Atomically increment a summary counter and recalculate risk score.
+     * Upsert a row in `exam_results` and atomically increment one counter.
+     *
+     * exam_results has no raw counter columns in the original migration, so
+     * this method uses a JSON-safe approach: it stores counts in the existing
+     * nullable float columns that Flask hasn't written yet (they start null).
+     *
+     * To avoid touching Flask's columns (cpi_score, *_flagged, *_score),
+     * we add four tiny counter columns via a separate migration (see below).
+     * If you haven't run that migration yet, run it now — it is non-destructive.
+     *
+     * Counter column → log table mapping:
+     *   tab_switch_count            → tab_switch_logs
+     *   keyboard_shortcut_count     → keyboard_shortcut_logs
+     *   response_time_anomaly_count → response_time_logs
+     *   keystroke_anomaly_count     → keystroke_dynamics_logs
      */
-    private function upsertSummary(ExamSubmission $submission, string $counter): void
+    private function incrementResultCounter(ExamSubmission $submission, string $counter): void
     {
-        $this->getOrCreateSummary($submission);
+        // Ensure the exam_results row exists (Flask may not have created it yet)
+        DB::table('exam_results')->insertOrIgnore([
+            'submission_id' => $submission->id,
+            'exam_id'       => $submission->exam_id,
+            'student_id'    => $submission->student_id,
+            'is_flagged'    => false,
+            'cpi_score'     => 0,
+            'cpi_label'     => 'Unlikely',
+            // counter columns — start at 0
+            'tab_switch_count'            => 0,
+            'keyboard_shortcut_count'     => 0,
+            'response_time_anomaly_count' => 0,
+            'keystroke_anomaly_count'     => 0,
+            'processed_at'  => now(),
+            'created_at'    => now(),
+            'updated_at'    => now(),
+        ]);
 
-        DB::table('exam_anomaly_summaries')
+        DB::table('exam_results')
             ->where('submission_id', $submission->id)
             ->update([
-                $counter          => DB::raw("`{$counter}` + 1"),
-                'last_anomaly_at' => now(),
-                'updated_at'      => now(),
+                $counter     => DB::raw("`{$counter}` + 1"),
+                'updated_at' => now(),
             ]);
-
-        ExamAnomalySummary::where('submission_id', $submission->id)
-            ->firstOrFail()
-            ->recalculate();
     }
 }

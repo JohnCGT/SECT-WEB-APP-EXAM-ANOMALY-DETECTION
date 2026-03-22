@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ExamAnomalySummary;
+use App\Models\ExamResult;
 use App\Models\ExamSubmission;
 use App\Models\KeyboardShortcutLog;
 use App\Models\KeystrokeDynamicsLog;
@@ -15,7 +15,7 @@ use Illuminate\Http\Request;
 /**
  * AnomalyController
  *
- * Student endpoints (called silently by the frontend collector):
+ * Student endpoints:
  *   POST /student/exams/{examId}/anomalies/tab-switch
  *   POST /student/exams/{examId}/anomalies/keyboard-shortcut
  *   POST /student/exams/{examId}/anomalies/response-time
@@ -27,33 +27,28 @@ use Illuminate\Http\Request;
  *   GET   /exams/{examId}/submissions/{submissionId}/anomalies
  *   PATCH /exams/{examId}/anomalies/{logId}/review
  *
- * ── Bug fixes vs the original ────────────────────────────────────────────────
+ * ── Changes ──────────────────────────────────────────────────────────────────
  *
- *  FIX-1  XHR 422 on tab-switch / response-time / keystroke-dynamics
- *         'timestamp' was validated as 'required|string' but the frontend
- *         sometimes omits it (collector sends it as nullable).
- *         Fixed: every 'timestamp' rule is now 'nullable|string'.
+ *  FIX-SUMMARY   Removed every reference to ExamAnomalySummary /
+ *                exam_anomaly_summaries.  Summary data now lives in exam_results.
  *
- *  FIX-2  tab_switch: 'hidden_duration_ms' was 'required' in the old controller.
- *         The hide-ping post intentionally sends duration=0 and the return-post
- *         sends the real value; both need to succeed.
- *         Fixed: rule is now 'nullable|integer|min:0'.
+ *  FIX-KEYBOARD  keyboard_analysis check: treat null as TRUE so exams that were
+ *                created before the flag existed still record shortcuts.
+ *                Also removed the 'required' on timestamp everywhere → nullable.
  *
- *  FIX-3  keystroke-dynamics: 'paste_count' was not in the validation rules at
- *         all, so it was silently stripped before reaching the service.
- *         Fixed: added 'paste_count' => 'nullable|integer|min:0'.
- *
- *  FIX-4  keystroke-dynamics: 'flight_times_ms' was 'required' but the first
- *         flush of a session (only one key pressed so far) may have an empty
- *         array.  Changed to 'nullable|array'.
+ *  FIX-VALIDATION
+ *                hidden_duration_ms  nullable (hide-ping sends 0, not absent)
+ *                timestamp           nullable on all four endpoints
+ *                flight_times_ms     nullable (early flush may have empty array)
+ *                paste_count         added to keystroke-dynamics rules
  */
 class AnomalyController extends Controller
 {
     public function __construct(private AnomalyDetectionService $service) {}
 
-    // ══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
     // STUDENT — event ingestion
-    // ══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
 
     public function tabSwitch(Request $request, int $examId)
     {
@@ -61,18 +56,17 @@ class AnomalyController extends Controller
         if (!$submission) {
             return response()->json(['message' => 'No active submission found.'], 404);
         }
-        if (!$submission->exam->tab_switching_monitor) {
-            return response()->json(['message' => 'Tab-switch monitoring is disabled for this exam.'], 200);
+
+        // FIX-KEYBOARD: treat null as enabled (backwards-compatible default)
+        if ($submission->exam->tab_switching_monitor === false) {
+            return response()->json(['message' => 'Tab-switch monitoring is disabled.'], 200);
         }
 
-        // FIX-1, FIX-2 — both fields are nullable; the hide-ping sends
-        // hidden_duration_ms = 0 and that must also succeed validation.
         $payload = $request->validate([
-            'hidden_duration_ms' => 'nullable|integer|min:0',  // FIX-2
-            'timestamp'          => 'nullable|string',         // FIX-1
+            'hidden_duration_ms' => 'nullable|integer|min:0',
+            'timestamp'          => 'nullable|string',
         ]);
 
-        // Default to 0 when the field is absent (extra safety)
         $payload['hidden_duration_ms'] = $payload['hidden_duration_ms'] ?? 0;
 
         $log = $this->service->processTabSwitch($submission, $payload);
@@ -90,21 +84,25 @@ class AnomalyController extends Controller
         if (!$submission) {
             return response()->json(['message' => 'No active submission found.'], 404);
         }
-        if (!$submission->exam->keyboard_analysis) {
-            return response()->json(['message' => 'Keyboard analysis is disabled for this exam.'], 200);
+
+        // FIX-KEYBOARD: treat null as enabled
+        if ($submission->exam->keyboard_analysis === false) {
+            return response()->json(['message' => 'Keyboard analysis is disabled.'], 200);
         }
 
         $payload = $request->validate([
             'keys'        => 'required|string|max:100',
-            'timestamp'   => 'nullable|string',          // FIX-1
+            'timestamp'   => 'nullable|string',
             'char_count'  => 'nullable|integer|min:0',
+            'paste_index' => 'nullable|integer|min:1',
             'question_id' => 'nullable|integer|exists:questions,id',
         ]);
 
         $log = $this->service->processKeyboardShortcut($submission, $payload);
 
         if (!$log) {
-            return response()->json(['message' => 'Shortcut is not monitored.'], 200);
+            // Shortcut not in the monitored list — not an error, just ignore
+            return response()->json(['message' => 'Shortcut not monitored.'], 200);
         }
 
         return response()->json([
@@ -124,10 +122,14 @@ class AnomalyController extends Controller
         $payload = $request->validate([
             'question_id'      => 'required|integer|exists:questions,id',
             'response_time_ms' => 'required|integer|min:1',
-            'timestamp'        => 'nullable|string',     // FIX-1
+            'timestamp'        => 'nullable|string',
         ]);
 
         $log = $this->service->processResponseTime($submission, $payload);
+
+        if (!$log) {
+            return response()->json(['message' => 'Response time not recorded (invalid data).'], 422);
+        }
 
         return response()->json([
             'message'  => 'Response time recorded.',
@@ -142,23 +144,29 @@ class AnomalyController extends Controller
         if (!$submission) {
             return response()->json(['message' => 'No active submission found.'], 404);
         }
-        if (!$submission->exam->keyboard_analysis) {
-            return response()->json(['message' => 'Keyboard analysis is disabled for this exam.'], 200);
+
+        // FIX-KEYBOARD: treat null as enabled
+        if ($submission->exam->keyboard_analysis === false) {
+            return response()->json(['message' => 'Keyboard analysis is disabled.'], 200);
         }
 
         $payload = $request->validate([
             'question_id'       => 'required|integer|exists:questions,id',
             'dwell_times_ms'    => 'required|array|min:1',
             'dwell_times_ms.*'  => 'integer|min:0',
-            'flight_times_ms'   => 'nullable|array',       // FIX-4 (was required)
+            'flight_times_ms'   => 'nullable|array',        // nullable — early flush
             'flight_times_ms.*' => 'integer|min:0',
             'total_chars'       => 'required|integer|min:1',
             'duration_ms'       => 'required|integer|min:1',
-            'paste_count'       => 'nullable|integer|min:0', // FIX-3 (was missing)
-            'timestamp'         => 'nullable|string',        // FIX-1
+            'paste_count'       => 'nullable|integer|min:0', // was missing entirely
+            'timestamp'         => 'nullable|string',
         ]);
 
         $log = $this->service->processKeystrokeDynamics($submission, $payload);
+
+        if (!$log) {
+            return response()->json(['message' => 'Not enough data to record.'], 200);
+        }
 
         return response()->json([
             'message'  => 'Keystroke dynamics recorded.',
@@ -167,13 +175,10 @@ class AnomalyController extends Controller
         ], 201);
     }
 
-    // ══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
     // INSTRUCTOR — review endpoints
-    // ══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
 
-    /**
-     * GET /exams/{examId}/anomalies?type=tab_switch&severity=high
-     */
     public function index(Request $request, int $examId)
     {
         $this->verifyInstructorOwnsExam($examId, $request->user()->id);
@@ -209,38 +214,47 @@ class AnomalyController extends Controller
                 'keystroke_dynamics' => KeystrokeDynamicsLog::where('exam_id', $examId)->count(),
             ],
             'recent' => [
-                'tab_switch'         => TabSwitchLog::where('exam_id', $examId)->with('student:id,name,email')->latest('occurred_at')->limit(20)->get(),
-                'keyboard_shortcut'  => KeyboardShortcutLog::where('exam_id', $examId)->with(['student:id,name,email', 'question:id,question_text,order'])->latest('occurred_at')->limit(20)->get(),
-                'response_time'      => ResponseTimeLog::where('exam_id', $examId)->with(['student:id,name,email', 'question:id,question_text,order'])->latest('occurred_at')->limit(20)->get(),
-                'keystroke_dynamics' => KeystrokeDynamicsLog::where('exam_id', $examId)->with(['student:id,name,email', 'question:id,question_text,order'])->latest('occurred_at')->limit(20)->get(),
+                'tab_switch'         => TabSwitchLog::where('exam_id', $examId)
+                                            ->with('student:id,name,email')
+                                            ->latest('occurred_at')->limit(20)->get(),
+                'keyboard_shortcut'  => KeyboardShortcutLog::where('exam_id', $examId)
+                                            ->with(['student:id,name,email', 'question:id,question_text,order'])
+                                            ->latest('occurred_at')->limit(20)->get(),
+                'response_time'      => ResponseTimeLog::where('exam_id', $examId)
+                                            ->with(['student:id,name,email', 'question:id,question_text,order'])
+                                            ->latest('occurred_at')->limit(20)->get(),
+                'keystroke_dynamics' => KeystrokeDynamicsLog::where('exam_id', $examId)
+                                            ->with(['student:id,name,email', 'question:id,question_text,order'])
+                                            ->latest('occurred_at')->limit(20)->get(),
             ],
         ]);
     }
 
     /**
      * GET /exams/{examId}/anomalies/summary
+     * Returns per-student risk data from exam_results (replaces anomaly_summaries).
      */
     public function summary(Request $request, int $examId)
     {
         $this->verifyInstructorOwnsExam($examId, $request->user()->id);
 
-        $summaries = ExamAnomalySummary::where('exam_id', $examId)
+        $results = ExamResult::where('exam_id', $examId)
             ->with('student:id,name,email')
-            ->orderBy('risk_score', 'desc')
+            ->orderByDesc('cpi_score')
             ->get()
-            ->map(fn($s) => [
-                'student'                     => $s->student,
-                'submission_id'               => $s->submission_id,
-                'risk_score'                  => $s->risk_score,
-                'flag_status'                 => $s->flag_status,
-                'tab_switch_count'            => $s->tab_switch_count,
-                'keyboard_shortcut_count'     => $s->keyboard_shortcut_count,
-                'response_time_anomaly_count' => $s->response_time_anomaly_count,
-                'keystroke_anomaly_count'     => $s->keystroke_anomaly_count,
-                'last_anomaly_at'             => $s->last_anomaly_at,
+            ->map(fn($r) => [
+                'student'                     => $r->student,
+                'submission_id'               => $r->submission_id,
+                'cpi_score'                   => $r->cpi_score,
+                'cpi_label'                   => $r->cpi_label,
+                'is_flagged'                  => $r->is_flagged,
+                'tab_switch_count'            => $r->tab_switch_count            ?? 0,
+                'keyboard_shortcut_count'     => $r->keyboard_shortcut_count     ?? 0,
+                'response_time_anomaly_count' => $r->response_time_anomaly_count ?? 0,
+                'keystroke_anomaly_count'     => $r->keystroke_anomaly_count     ?? 0,
             ]);
 
-        return response()->json(['summaries' => $summaries]);
+        return response()->json(['summaries' => $results]);
     }
 
     /**
@@ -265,12 +279,20 @@ class AnomalyController extends Controller
                 'score'        => $submission->score,
                 'total_points' => $submission->total_points,
             ],
-            'summary' => ExamAnomalySummary::where('submission_id', $submissionId)->first(),
+            // FIX-SUMMARY: read from exam_results instead of exam_anomaly_summaries
+            'summary' => ExamResult::where('submission_id', $submissionId)->first(),
             'logs'    => [
-                'tab_switch'         => TabSwitchLog::where('submission_id', $submissionId)->orderBy('occurred_at')->get(),
-                'keyboard_shortcut'  => KeyboardShortcutLog::where('submission_id', $submissionId)->with('question:id,question_text,order')->orderBy('occurred_at')->get(),
-                'response_time'      => ResponseTimeLog::where('submission_id', $submissionId)->with('question:id,question_text,order')->orderBy('occurred_at')->get(),
-                'keystroke_dynamics' => KeystrokeDynamicsLog::where('submission_id', $submissionId)->with('question:id,question_text,order')->orderBy('occurred_at')->get(),
+                'tab_switch'         => TabSwitchLog::where('submission_id', $submissionId)
+                                            ->orderBy('occurred_at')->get(),
+                'keyboard_shortcut'  => KeyboardShortcutLog::where('submission_id', $submissionId)
+                                            ->with('question:id,question_text,order')
+                                            ->orderBy('occurred_at')->get(),
+                'response_time'      => ResponseTimeLog::where('submission_id', $submissionId)
+                                            ->with('question:id,question_text,order')
+                                            ->orderBy('occurred_at')->get(),
+                'keystroke_dynamics' => KeystrokeDynamicsLog::where('submission_id', $submissionId)
+                                            ->with('question:id,question_text,order')
+                                            ->orderBy('occurred_at')->get(),
             ],
         ]);
     }
@@ -304,7 +326,7 @@ class AnomalyController extends Controller
         return response()->json(['message' => 'Review saved.', 'log' => $log]);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private function getActiveSubmission(int $examId, int $studentId): ?ExamSubmission
     {

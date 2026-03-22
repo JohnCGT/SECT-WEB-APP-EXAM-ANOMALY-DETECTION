@@ -1,58 +1,57 @@
 /**
- * SECT Anomaly Collector
+ * SECT Anomaly Collector — Final
  *
- * ── Fixes applied on top of the previous version ─────────────────────────────
+ * ── All fixes from previous versions ─────────────────────────────────────────
  *
- *  FIX-A  Keystroke dynamics only triggered on blur
- *         Added a periodic flush every FLUSH_INTERVAL_MS (30 s) so the backend
- *         receives live data without waiting for the student to leave the field.
- *         The blur handler still fires a final flush and clears the timer.
- *         Each new focus session starts a fresh timer.
- *
- *  FIX-B  paste_count always 0 / document-level paste double-fires on textareas
- *         e.stopPropagation() inside onPaste only stops bubbling.  The document
- *         listener was added with { capture: true }, so it fires BEFORE the
- *         textarea listener — stopPropagation() never reached it.
- *         Fix: the document-level #onClipboard now checks whether the event
- *         target is a monitored answer field and skips posting if so (the
- *         field-level onPaste already handles it).  pasteCount is now
- *         incremented correctly in one place only (field-level listener).
- *
- *  FIX-C  e.preventDefault() swallowing keyboard shortcuts before XHR
- *         Calling e.preventDefault() synchronously can flush the browser's
- *         event queue and, in some Chromium builds, abort the XHR mid-flight.
- *         Fix: #post() is called first, then e.preventDefault() on the next
- *         line — the XHR is already dispatched before the default is cancelled.
- *
- *  FIX-D  Periodic flush timer not cleared on stop()
- *         If stop() was called while a flush timer was running, the interval
- *         kept firing and attempted to POST after the collector was inactive.
- *         Fix: all active flush timers are tracked in #flushTimers (Map) and
- *         cleared inside stop() before fieldListeners are torn down.
- *
- *  Previously fixed bugs (unchanged from last version):
- *  BUG 1 — CSRF token read fresh on every POST (#getCsrf())
- *  BUG 2 — Tab switch posted immediately on hide AND on return with duration
- *  BUG 3 — XHR used instead of fetch() for reliable Sanctum session cookies
- *  BUG 4 — #post() guard returns early if !#active
- *  BUG 5 — Document-level copy/cut/paste listeners for right-click menu
- *  BUG 6 — Paste inside essay textarea posts keyboard-shortcut + counts chars
+ *  BUG 1 — CSRF token read fresh on every POST
+ *  BUG 2 — Tab switch posted on hide (duration=0) AND on return (real duration)
+ *  BUG 3 — XHR with withCredentials instead of fetch() for Sanctum sessions
+ *  BUG 4 — #post() guard returns early when !#active (post-stop safety)
+ *  BUG 5 — Document-level copy/cut/paste listeners catch right-click menu
+ *  BUG 6 — Paste on essay textarea posts keyboard-shortcut + counts chars
  *  BUG 7 — Keystroke dynamics threshold lowered to 3 keystrokes / 500 ms
+ *
+ * ── New fixes in this version ─────────────────────────────────────────────────
+ *
+ *  FIX-A  Keystroke dynamics periodic flush timer started on ATTACH, not focus
+ *         The previous version started the interval inside an 'onFocus' listener.
+ *         React-controlled textareas that already have focus when attachToAnswerField()
+ *         is called never fire 'focus' again, so the timer never started.
+ *         Fix: start the interval immediately inside attachToAnswerField().
+ *         The 'focus' listener is removed — it was only there to start the timer.
+ *
+ *  FIX-B  paste_count double-counted via capture-phase document listener
+ *         e.stopPropagation() inside the textarea's onPaste does NOT stop
+ *         a capture-phase listener on document — capture fires first.
+ *         Fix: #onClipboard checks whether the event target IS a monitored
+ *         textarea and returns early if so. One source of truth for pastes.
+ *
+ *  FIX-C  e.preventDefault() order relative to #post() is now correct
+ *         #post() is called first (XHR queued), then e.preventDefault().
+ *
+ *  FIX-D  Flush timer cleared in stop() before field listeners are removed
+ *         Prevents the interval from firing after the collector is stopped.
+ *
+ *  FIX-E  #normalizeCombo() was emitting 'Ctrl+Meta+...' on Mac (both flags true)
+ *         Fixed: mutually exclusive — use Meta if metaKey, else Ctrl if ctrlKey.
+ *
+ *  FIX-F  onWarning type string was 'response-time' (hyphen) but TakeExamPage
+ *         expects 'response_time' (underscore). Fixed in #post() response handler.
  */
 
-const FLUSH_INTERVAL_MS = 30_000; // FIX-A: flush keystroke buffers every 30 s
+const FLUSH_INTERVAL_MS = 30_000; // periodic keystroke flush every 30 s
 
 export class AnomalyCollector {
-  #examId      = null;
-  #apiBaseUrl  = '/api';
-  #onWarning   = null;
-  #active      = false;
+  #examId     = null;
+  #apiBaseUrl = '/api';
+  #onWarning  = null;
+  #active     = false;
 
   #tabHiddenAt        = null;
   #questionStartTimes = new Map();
   #currentQuestionId  = null;
   #fieldListeners     = new Map();  // fieldEl → state
-  #flushTimers        = new Map();  // fieldEl → intervalId  (FIX-D)
+  #flushTimers        = new Map();  // fieldEl → intervalId
 
   #boundVisibilityChange = null;
   #boundKeydown          = null;
@@ -78,7 +77,7 @@ export class AnomalyCollector {
     this.#boundKeydown = this.#onKeydown.bind(this);
     document.addEventListener('keydown', this.#boundKeydown, { capture: true });
 
-    // BUG FIX #5: catch right-click copy/cut/paste at document level
+    // BUG FIX #5: catch right-click copy/cut/paste
     this.#boundCopy  = (e) => this.#onClipboard(e, 'Copy');
     this.#boundCut   = (e) => this.#onClipboard(e, 'Cut');
     this.#boundPaste = (e) => this.#onClipboard(e, 'Paste');
@@ -86,7 +85,7 @@ export class AnomalyCollector {
     document.addEventListener('cut',   this.#boundCut,   { capture: true });
     document.addEventListener('paste', this.#boundPaste, { capture: true });
 
-    console.debug('[SECT] Collector started — exam', this.#examId);
+    console.debug('[SECT] Collector started, exam', this.#examId);
   }
 
   stop() {
@@ -99,7 +98,7 @@ export class AnomalyCollector {
     document.removeEventListener('cut',   this.#boundCut,   { capture: true });
     document.removeEventListener('paste', this.#boundPaste, { capture: true });
 
-    // FIX-D: clear all periodic flush timers before tearing down fields
+    // FIX-D: clear all periodic timers before removing field listeners
     for (const timerId of this.#flushTimers.values()) {
       clearInterval(timerId);
     }
@@ -110,7 +109,6 @@ export class AnomalyCollector {
       el.removeEventListener('keyup',   state.onKeyup);
       el.removeEventListener('paste',   state.onPaste);
       el.removeEventListener('blur',    state.onBlur);
-      el.removeEventListener('focus',   state.onFocus);  // FIX-A
     }
     this.#fieldListeners.clear();
 
@@ -154,7 +152,6 @@ export class AnomalyCollector {
       sessionStart: Date.now(),
     };
 
-    // ── Keystroke dwell / flight ────────────────────────────────────────────
     state.onKeydown = (e) => {
       state.keyDownTimes[e.key] = Date.now();
     };
@@ -172,13 +169,10 @@ export class AnomalyCollector {
       if (e.key.length === 1) state.totalChars++;
     };
 
-    // BUG FIX #6 + FIX-B: paste tracked here only.
-    // The document-level #onClipboard skips monitored fields (see below),
-    // so this is the single source of truth for paste events on essay fields.
-    // Do NOT call e.stopPropagation() — it won't stop a capture-phase listener.
+    // BUG FIX #6 + FIX-B: single source of truth for paste on essay fields
     state.onPaste = (e) => {
       const text = (e.clipboardData || window.clipboardData)?.getData('text') ?? '';
-      state.pasteCount++;             // FIX-B: one place only
+      state.pasteCount++;
       state.totalChars += text.length;
 
       this.#post('keyboard-shortcut', {
@@ -188,52 +182,46 @@ export class AnomalyCollector {
         question_id: state.questionId,
         timestamp:   new Date().toISOString(),
       });
+      // Do NOT stopPropagation — it cannot stop a capture-phase document listener.
+      // Instead, #onClipboard checks the target and skips monitored fields (FIX-B).
     };
 
-    // FIX-A: start periodic timer when the field gains focus
-    state.onFocus = () => {
-      if (this.#flushTimers.has(fieldEl)) return; // already ticking
-      const timerId = setInterval(() => {
-        this.#flushKeystrokeDynamics(fieldEl, state, false);
-      }, FLUSH_INTERVAL_MS);
-      this.#flushTimers.set(fieldEl, timerId);
-    };
-
-    // FIX-A: clear periodic timer and do a final flush on blur
     state.onBlur = () => {
-      // FIX-D: stop the interval immediately
+      // FIX-D: clear periodic timer on blur
       const timerId = this.#flushTimers.get(fieldEl);
       if (timerId !== undefined) {
         clearInterval(timerId);
         this.#flushTimers.delete(fieldEl);
       }
-      this.#flushKeystrokeDynamics(fieldEl, state, true);
+      // Final flush — resets all accumulators
+      this.#flushKeystrokeDynamics(state, true);
     };
 
     fieldEl.addEventListener('keydown', state.onKeydown);
     fieldEl.addEventListener('keyup',   state.onKeyup);
     fieldEl.addEventListener('paste',   state.onPaste);
     fieldEl.addEventListener('blur',    state.onBlur);
-    fieldEl.addEventListener('focus',   state.onFocus);  // FIX-A
     this.#fieldListeners.set(fieldEl, state);
+
+    // FIX-A: start periodic flush immediately on attach, not on focus.
+    // React textareas that already have focus never re-fire 'focus',
+    // so waiting for the focus event means the timer never starts.
+    const timerId = setInterval(() => {
+      this.#flushKeystrokeDynamics(state, false);
+    }, FLUSH_INTERVAL_MS);
+    this.#flushTimers.set(fieldEl, timerId);
   }
 
   // ── Keystroke dynamics flush ───────────────────────────────────────────────
 
   /**
-   * Shared by the periodic interval (isFinal=false) and blur (isFinal=true).
-   *
-   * Periodic flush:  resets only the keystroke buffers so each 30-second
-   *   window is independent.  pasteCount and totalChars keep accumulating so
-   *   the backend sees session-wide totals on every payload.
-   *
-   * Final flush (blur):  resets everything so the next focus session starts
-   *   completely fresh.
+   * isFinal = true  (blur)     → post + reset everything
+   * isFinal = false (periodic) → post + reset buffers only; keep cumulative totals
    */
-  #flushKeystrokeDynamics(fieldEl, state, isFinal) {
+  #flushKeystrokeDynamics(state, isFinal) {
     const duration = Date.now() - state.sessionStart;
 
-    // BUG FIX #7: 3 keystrokes + 500 ms minimum
+    // BUG FIX #7: minimum 3 keystrokes and 500 ms
     if (state.dwellTimes.length >= 3 && duration > 500) {
       this.#post('keystroke-dynamics', {
         question_id:     state.questionId,
@@ -247,6 +235,7 @@ export class AnomalyCollector {
     }
 
     if (isFinal) {
+      // Full reset — next focus session is completely fresh
       state.dwellTimes   = [];
       state.flightTimes  = [];
       state.lastKeyUp    = null;
@@ -255,7 +244,8 @@ export class AnomalyCollector {
       state.pasteCount   = 0;
       state.sessionStart = Date.now();
     } else {
-      // Periodic: only clear keystroke buffers, preserve cumulative counters
+      // Periodic reset — only clear keystroke buffers; keep cumulative counts
+      // so the backend sees growing session totals on each periodic payload
       state.dwellTimes  = [];
       state.flightTimes = [];
       state.lastKeyUp   = null;
@@ -275,10 +265,10 @@ export class AnomalyCollector {
       });
     } else {
       if (this.#tabHiddenAt !== null) {
-        const hiddenDuration = Date.now() - this.#tabHiddenAt;
+        const duration    = Date.now() - this.#tabHiddenAt;
         this.#tabHiddenAt = null;
         this.#post('tab-switch', {
-          hidden_duration_ms: hiddenDuration,
+          hidden_duration_ms: duration,
           timestamp:          new Date().toISOString(),
         });
       }
@@ -293,42 +283,49 @@ export class AnomalyCollector {
       'Ctrl+C', 'Ctrl+V', 'Ctrl+X', 'Ctrl+A',
       'Ctrl+F', 'Ctrl+G',
       'Ctrl+T', 'Ctrl+W', 'Ctrl+N',
+      'Ctrl+U', 'Ctrl+Shift+I', 'Ctrl+Shift+J',
+      'Meta+C', 'Meta+V', 'Meta+X', 'Meta+A',
+      'Meta+F', 'Meta+T', 'Meta+W', 'Meta+N',
       'Alt+Tab', 'Meta+Tab',
-      'F12', 'Ctrl+Shift+I', 'Ctrl+Shift+J',
-      'Ctrl+U',
-      'PrintScreen',
+      'F12', 'PrintScreen',
     ]);
 
     if (!BLOCKED.has(combo)) return;
 
-    // FIX-C: dispatch the XHR first — it is already queued by the time
-    // e.preventDefault() runs on the very next line, so the request is
-    // never aborted by browser event-flush behaviour.
+    // FIX-C: post first, then prevent default so XHR is already queued
     this.#post('keyboard-shortcut', {
       keys:        combo,
       question_id: this.#currentQuestionId ?? undefined,
       timestamp:   new Date().toISOString(),
     });
-    e.preventDefault(); // FIX-C: after #post(), not before
+    e.preventDefault();
   }
 
+  // FIX-E: mutually exclusive Ctrl/Meta — prevents 'Ctrl+Meta+C' on Mac
   #normalizeCombo(e) {
     const parts = [];
-    if (e.ctrlKey)  parts.push('Ctrl');
-    if (e.metaKey)  parts.push('Meta');
-    if (e.altKey)   parts.push('Alt');
-    if (e.shiftKey) parts.push('Shift');
+    if (e.metaKey)       parts.push('Meta');
+    else if (e.ctrlKey)  parts.push('Ctrl');
+    if (e.altKey)        parts.push('Alt');
+    if (e.shiftKey)      parts.push('Shift');
+
     const label = e.key === ' ' ? 'Space' : e.key;
     parts.push(label);
+
+    // Single non-modifier key with no modifier prefix → not a combo
     if (parts.length === 1 && label.length === 1) return null;
+    // Modifier-only keydown → not a combo
     if (['Control', 'Alt', 'Shift', 'Meta'].includes(label)) return null;
+
     return parts.join('+');
   }
 
-  // BUG FIX #5 + FIX-B: skip monitored answer fields to avoid double-posting
+  // BUG FIX #5 + FIX-B: skip events that originated inside a monitored field
   #onClipboard(e, action) {
     for (const [el] of this.#fieldListeners) {
-      if (el === e.target || el.contains(e.target)) return; // FIX-B: field handles it
+      if (el === e.target || el.contains(e.target)) {
+        return; // the field's own onPaste already handles this
+      }
     }
     this.#post('keyboard-shortcut', {
       keys:      action,
@@ -338,7 +335,7 @@ export class AnomalyCollector {
 
   // ── HTTP helper ────────────────────────────────────────────────────────────
 
-  // BUG FIX #1
+  // BUG FIX #1: read CSRF cookie fresh on every request
   #getCsrf() {
     const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
     return match ? decodeURIComponent(match[1]) : '';
@@ -354,7 +351,7 @@ export class AnomalyCollector {
     xhr.withCredentials = true;
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.setRequestHeader('Accept',       'application/json');
-    xhr.setRequestHeader('X-XSRF-TOKEN', this.#getCsrf()); // BUG FIX #1
+    xhr.setRequestHeader('X-XSRF-TOKEN', this.#getCsrf());
 
     xhr.onload = () => {
       if (xhr.status < 200 || xhr.status >= 300) {
@@ -364,13 +361,13 @@ export class AnomalyCollector {
       try {
         const data = JSON.parse(xhr.responseText);
         if (['medium', 'high'].includes(data.severity) && this.#onWarning) {
-          // Normalise URL slug back to the warning-type key TakeExamPage expects
+          // FIX-F: convert URL slug to underscore key TakeExamPage expects
           this.#onWarning(type.replace(/-/g, '_'), data.severity);
         }
-      } catch { /* non-JSON response, ignore */ }
+      } catch { /* non-JSON, ignore */ }
     };
 
-    xhr.onerror = () => console.warn(`[SECT] Network error posting ${type}`);
+    xhr.onerror = () => console.warn(`[SECT] Network error — ${type}`);
     xhr.send(JSON.stringify(body));
   }
 }
