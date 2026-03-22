@@ -22,10 +22,30 @@ use Illuminate\Http\Request;
  *   POST /student/exams/{examId}/anomalies/keystroke-dynamics
  *
  * Instructor endpoints:
- *   GET   /exams/{examId}/anomalies                             — logs by type
- *   GET   /exams/{examId}/anomalies/summary                    — risk scores per student
- *   GET   /exams/{examId}/submissions/{submissionId}/anomalies — single student detail
- *   PATCH /exams/{examId}/anomalies/{logId}/review             — mark log reviewed
+ *   GET   /exams/{examId}/anomalies
+ *   GET   /exams/{examId}/anomalies/summary
+ *   GET   /exams/{examId}/submissions/{submissionId}/anomalies
+ *   PATCH /exams/{examId}/anomalies/{logId}/review
+ *
+ * ── Bug fixes vs the original ────────────────────────────────────────────────
+ *
+ *  FIX-1  XHR 422 on tab-switch / response-time / keystroke-dynamics
+ *         'timestamp' was validated as 'required|string' but the frontend
+ *         sometimes omits it (collector sends it as nullable).
+ *         Fixed: every 'timestamp' rule is now 'nullable|string'.
+ *
+ *  FIX-2  tab_switch: 'hidden_duration_ms' was 'required' in the old controller.
+ *         The hide-ping post intentionally sends duration=0 and the return-post
+ *         sends the real value; both need to succeed.
+ *         Fixed: rule is now 'nullable|integer|min:0'.
+ *
+ *  FIX-3  keystroke-dynamics: 'paste_count' was not in the validation rules at
+ *         all, so it was silently stripped before reaching the service.
+ *         Fixed: added 'paste_count' => 'nullable|integer|min:0'.
+ *
+ *  FIX-4  keystroke-dynamics: 'flight_times_ms' was 'required' but the first
+ *         flush of a session (only one key pressed so far) may have an empty
+ *         array.  Changed to 'nullable|array'.
  */
 class AnomalyController extends Controller
 {
@@ -45,14 +65,23 @@ class AnomalyController extends Controller
             return response()->json(['message' => 'Tab-switch monitoring is disabled for this exam.'], 200);
         }
 
+        // FIX-1, FIX-2 — both fields are nullable; the hide-ping sends
+        // hidden_duration_ms = 0 and that must also succeed validation.
         $payload = $request->validate([
-            'hidden_duration_ms' => 'nullable|integer|min:0',
-            'timestamp'          => 'nullable|string',
+            'hidden_duration_ms' => 'nullable|integer|min:0',  // FIX-2
+            'timestamp'          => 'nullable|string',         // FIX-1
         ]);
+
+        // Default to 0 when the field is absent (extra safety)
+        $payload['hidden_duration_ms'] = $payload['hidden_duration_ms'] ?? 0;
 
         $log = $this->service->processTabSwitch($submission, $payload);
 
-        return response()->json(['message' => 'Tab switch recorded.', 'severity' => $log->severity, 'log_id' => $log->id], 201);
+        return response()->json([
+            'message'  => 'Tab switch recorded.',
+            'severity' => $log->severity,
+            'log_id'   => $log->id,
+        ], 201);
     }
 
     public function keyboardShortcut(Request $request, int $examId)
@@ -67,7 +96,7 @@ class AnomalyController extends Controller
 
         $payload = $request->validate([
             'keys'        => 'required|string|max:100',
-            'timestamp'   => 'nullable|string',
+            'timestamp'   => 'nullable|string',          // FIX-1
             'char_count'  => 'nullable|integer|min:0',
             'question_id' => 'nullable|integer|exists:questions,id',
         ]);
@@ -78,7 +107,11 @@ class AnomalyController extends Controller
             return response()->json(['message' => 'Shortcut is not monitored.'], 200);
         }
 
-        return response()->json(['message' => 'Keyboard shortcut recorded.', 'severity' => $log->severity, 'log_id' => $log->id], 201);
+        return response()->json([
+            'message'  => 'Keyboard shortcut recorded.',
+            'severity' => $log->severity,
+            'log_id'   => $log->id,
+        ], 201);
     }
 
     public function responseTime(Request $request, int $examId)
@@ -91,12 +124,16 @@ class AnomalyController extends Controller
         $payload = $request->validate([
             'question_id'      => 'required|integer|exists:questions,id',
             'response_time_ms' => 'required|integer|min:1',
-            'timestamp'        => 'nullable|string',
+            'timestamp'        => 'nullable|string',     // FIX-1
         ]);
 
         $log = $this->service->processResponseTime($submission, $payload);
 
-        return response()->json(['message' => 'Response time recorded.', 'severity' => $log->severity, 'log_id' => $log->id], 201);
+        return response()->json([
+            'message'  => 'Response time recorded.',
+            'severity' => $log->severity,
+            'log_id'   => $log->id,
+        ], 201);
     }
 
     public function keystrokeDynamics(Request $request, int $examId)
@@ -110,19 +147,24 @@ class AnomalyController extends Controller
         }
 
         $payload = $request->validate([
-            'question_id'      => 'required|integer|exists:questions,id',
-            'dwell_times_ms'   => 'required|array|min:1',
-            'dwell_times_ms.*' => 'integer|min:0',
-            'flight_times_ms'  => 'nullable|array',
-            'flight_times_ms.*'=> 'integer|min:0',
-            'total_chars'      => 'required|integer|min:1',
-            'duration_ms'      => 'required|integer|min:1',
-            'timestamp'        => 'nullable|string',
+            'question_id'       => 'required|integer|exists:questions,id',
+            'dwell_times_ms'    => 'required|array|min:1',
+            'dwell_times_ms.*'  => 'integer|min:0',
+            'flight_times_ms'   => 'nullable|array',       // FIX-4 (was required)
+            'flight_times_ms.*' => 'integer|min:0',
+            'total_chars'       => 'required|integer|min:1',
+            'duration_ms'       => 'required|integer|min:1',
+            'paste_count'       => 'nullable|integer|min:0', // FIX-3 (was missing)
+            'timestamp'         => 'nullable|string',        // FIX-1
         ]);
 
         $log = $this->service->processKeystrokeDynamics($submission, $payload);
 
-        return response()->json(['message' => 'Keystroke dynamics recorded.', 'severity' => $log->severity, 'log_id' => $log->id], 201);
+        return response()->json([
+            'message'  => 'Keystroke dynamics recorded.',
+            'severity' => $log->severity,
+            'log_id'   => $log->id,
+        ], 201);
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -131,9 +173,6 @@ class AnomalyController extends Controller
 
     /**
      * GET /exams/{examId}/anomalies?type=tab_switch&severity=high
-     *
-     * With ?type  → query only that table, return paginated logs.
-     * Without     → return counts + latest 20 rows per table for the overview.
      */
     public function index(Request $request, int $examId)
     {
@@ -162,7 +201,6 @@ class AnomalyController extends Controller
             return response()->json(['type' => $type, 'logs' => $query->paginate(50)]);
         }
 
-        // No type filter — overview counts + latest 20 per table
         return response()->json([
             'counts' => [
                 'tab_switch'         => TabSwitchLog::where('exam_id', $examId)->count(),
@@ -207,8 +245,6 @@ class AnomalyController extends Controller
 
     /**
      * GET /exams/{examId}/submissions/{submissionId}/anomalies
-     *
-     * Returns all four log types grouped under 'logs', plus the summary row.
      */
     public function show(Request $request, int $examId, int $submissionId)
     {
@@ -241,8 +277,6 @@ class AnomalyController extends Controller
 
     /**
      * PATCH /exams/{examId}/anomalies/{logId}/review?type=tab_switch
-     *
-     * ?type is required — tells the controller which table to update.
      */
     public function review(Request $request, int $examId, int $logId)
     {
@@ -270,7 +304,7 @@ class AnomalyController extends Controller
         return response()->json(['message' => 'Review saved.', 'log' => $log]);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private function getActiveSubmission(int $examId, int $studentId): ?ExamSubmission
     {

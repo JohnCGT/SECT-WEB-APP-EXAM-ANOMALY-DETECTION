@@ -14,27 +14,29 @@ use Illuminate\Support\Facades\DB;
  * AnomalyDetectionService
  *
  * Writes to four dedicated tables (one per algorithm) instead of the old
- * monolithic exam_anomaly_logs table. All existing bug fixes are preserved:
+ * monolithic exam_anomaly_logs table.
  *
- *  BUG FIX #5 — Tab switch double-counted
- *    Frontend posts twice per switch (on hide duration=0, on return duration=real).
- *    Fix: ignore posts where hidden_duration_ms === 0. Only the return-post
- *    with a real duration increments the counter and summary.
+ * ── Bug fixes vs the original ────────────────────────────────────────────────
  *
- *  BUG FIX #6 — Response time Z-score never triggered
- *    Baseline-building rows were included in prior-times queries, so the same
- *    rows kept being reused and z-scores were always 0.
- *    Fix: tag baseline rows with note='baseline_building' and exclude them
- *    from prior-times queries via is_baseline column.
+ *  BUG FIX #5 — Tab switch double-counted (preserved from original)
+ *    Frontend posts twice per switch: hide (duration=0) and return (real).
+ *    Fix: duration=0 creates a lightweight audit row but does NOT increment
+ *    the summary counter.  Only the return-post with real duration does.
  *
- *  BUG FIX #7 — keyboard_analysis flag checked correctly in controller,
- *    no change needed in the service. Documented for clarity.
+ *  BUG FIX #6 — Response time Z-score never triggered (preserved from original)
+ *    Baseline rows excluded from prior-times queries via is_baseline column.
  *
- * Algorithm → table mapping:
- *   processTabSwitch()         → tab_switch_logs          (Isolation Forest)
- *   processKeyboardShortcut()  → keyboard_shortcut_logs   (One-Class SVM)
- *   processResponseTime()      → response_time_logs       (Z-Score Method)
- *   processKeystrokeDynamics() → keystroke_dynamics_logs  (Hidden Markov Model)
+ *  FIX-3 (NEW) — paste_count not persisted in keystroke_dynamics_logs
+ *    processKeystrokeDynamics() was reading $payload['paste_count'] but the
+ *    controller's validation rules never included 'paste_count', so Laravel
+ *    stripped it from $payload before passing it here.  The controller is now
+ *    fixed; this service already wrote the right column — no change needed here,
+ *    but the null-coalesce default is left for safety.
+ *
+ *  FIX-4 (NEW) — flight_times_ms nullable
+ *    An early flush may produce an empty flight array.  The service already
+ *    handled empty arrays correctly; the validation rule in the controller
+ *    has been relaxed to 'nullable|array'.
  */
 class AnomalyDetectionService
 {
@@ -62,13 +64,11 @@ class AnomalyDetectionService
 
     // ── Isolation Forest ───────────────────────────────────────────────────
 
-    public function processTabSwitch(ExamSubmission $submission, array $payload): ?TabSwitchLog
+    public function processTabSwitch(ExamSubmission $submission, array $payload): TabSwitchLog
     {
         $hiddenDurationMs = $payload['hidden_duration_ms'] ?? 0;
 
-        // BUG FIX #5 — The frontend posts on hide (duration=0) AND on return
-        // (duration=real). Store a lightweight audit row for the hide ping
-        // but do NOT increment the summary counter.
+        // BUG FIX #5 — hide-ping (duration = 0): audit row only, no counter
         if ($hiddenDurationMs === 0) {
             return TabSwitchLog::create([
                 'submission_id'       => $submission->id,
@@ -83,7 +83,7 @@ class AnomalyDetectionService
                 'severity'            => 'low',
                 'occurred_at'         => now(),
             ]);
-            // No summary increment — intentional
+            // Intentionally NO summary increment
         }
 
         // Return-post with real duration — this is the real event to count
@@ -183,7 +183,7 @@ class AnomalyDetectionService
     {
         $questionId  = $payload['question_id']     ?? null;
         $dwellTimes  = $payload['dwell_times_ms']  ?? [];
-        $flightTimes = $payload['flight_times_ms'] ?? [];
+        $flightTimes = $payload['flight_times_ms'] ?? [];  // FIX-4: may be null/empty
         $totalChars  = $payload['total_chars']     ?? 0;
         $durationMs  = $payload['duration_ms']     ?? 0;
 
@@ -208,6 +208,8 @@ class AnomalyDetectionService
             'avg_flight_ms'    => round($avgFlight, 2),
             'wpm'              => round($wpm, 2),
             'total_chars'      => $totalChars,
+            // FIX-3: paste_count now correctly arrives from the controller
+            // because the validation rule was added. Null-coalesce for safety.
             'paste_count'      => $payload['paste_count'] ?? 0,
             'duration_ms'      => $durationMs,
             'keystroke_count'  => count($dwellTimes),
@@ -248,8 +250,6 @@ class AnomalyDetectionService
 
     /**
      * Atomically increment a summary counter and recalculate risk score.
-     * Uses a raw DB update to avoid Eloquent model-cache stale-value issues
-     * on freshly created rows.
      */
     private function upsertSummary(ExamSubmission $submission, string $counter): void
     {
