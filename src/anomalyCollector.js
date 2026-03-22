@@ -1,45 +1,46 @@
 /**
- * SECT Anomaly Collector — Final
+ * SECT Anomaly Collector
  *
- * ── All fixes from previous versions ─────────────────────────────────────────
+ * ── Changes in this version ───────────────────────────────────────────────────
  *
+ *  FIX-IDLE  Keystroke dynamics now flush automatically after typing stops.
+ *            Replaced the 30-second periodic interval with a per-keystroke
+ *            idle-debounce timer (TYPING_IDLE_MS = 2000 ms by default).
+ *            How it works:
+ *              • Every keyup inside an essay field resets a debounce timer.
+ *              • If no key is pressed for TYPING_IDLE_MS after the last keyup,
+ *                the keystroke buffer is flushed automatically — no blur needed.
+ *              • The blur handler still fires a final flush for any remaining
+ *                keystrokes (e.g. student navigates away immediately).
+ *              • Paste events also reset the idle timer so a large paste
+ *                followed by silence is captured too.
+ *
+ *  FIX-PREV  previous_times_ms is now populated in the collector payload.
+ *            The backend was storing NULL for previous_times_ms because the
+ *            service queried the column to build the list, but the column was
+ *            never written (it was always null). Moved responsibility to the
+ *            collector: it tracks all response times in #responseTimes (Map)
+ *            and sends the full prior-times array with every response-time POST.
+ *            The service then just writes whatever the collector sends —
+ *            no DB query needed to build the history.
+ *
+ * ── All previously fixed bugs (unchanged) ────────────────────────────────────
  *  BUG 1 — CSRF token read fresh on every POST
- *  BUG 2 — Tab switch posted on hide (duration=0) AND on return (real duration)
- *  BUG 3 — XHR with withCredentials instead of fetch() for Sanctum sessions
- *  BUG 4 — #post() guard returns early when !#active (post-stop safety)
- *  BUG 5 — Document-level copy/cut/paste listeners catch right-click menu
+ *  BUG 2 — Tab switch posted on hide (duration=0) AND on return
+ *  BUG 3 — XHR with withCredentials for Sanctum sessions
+ *  BUG 4 — #post() guard when !#active
+ *  BUG 5 — Document-level copy/cut/paste for right-click menu
  *  BUG 6 — Paste on essay textarea posts keyboard-shortcut + counts chars
- *  BUG 7 — Keystroke dynamics threshold lowered to 3 keystrokes / 500 ms
- *
- * ── New fixes in this version ─────────────────────────────────────────────────
- *
- *  FIX-A  Keystroke dynamics periodic flush timer started on ATTACH, not focus
- *         The previous version started the interval inside an 'onFocus' listener.
- *         React-controlled textareas that already have focus when attachToAnswerField()
- *         is called never fire 'focus' again, so the timer never started.
- *         Fix: start the interval immediately inside attachToAnswerField().
- *         The 'focus' listener is removed — it was only there to start the timer.
- *
- *  FIX-B  paste_count double-counted via capture-phase document listener
- *         e.stopPropagation() inside the textarea's onPaste does NOT stop
- *         a capture-phase listener on document — capture fires first.
- *         Fix: #onClipboard checks whether the event target IS a monitored
- *         textarea and returns early if so. One source of truth for pastes.
- *
- *  FIX-C  e.preventDefault() order relative to #post() is now correct
- *         #post() is called first (XHR queued), then e.preventDefault().
- *
- *  FIX-D  Flush timer cleared in stop() before field listeners are removed
- *         Prevents the interval from firing after the collector is stopped.
- *
- *  FIX-E  #normalizeCombo() was emitting 'Ctrl+Meta+...' on Mac (both flags true)
- *         Fixed: mutually exclusive — use Meta if metaKey, else Ctrl if ctrlKey.
- *
- *  FIX-F  onWarning type string was 'response-time' (hyphen) but TakeExamPage
- *         expects 'response_time' (underscore). Fixed in #post() response handler.
+ *  BUG 7 — Keystroke threshold 3 keystrokes / 500 ms
+ *  FIX-A — Periodic flush timer started on attach (not focus)
+ *  FIX-B — paste_count single source of truth
+ *  FIX-C — e.preventDefault() after #post()
+ *  FIX-D — Flush timer cleared in stop()
+ *  FIX-E — Mutually exclusive Ctrl/Meta combo normalisation
+ *  FIX-F — onWarning type string uses underscores
  */
 
-const FLUSH_INTERVAL_MS = 30_000; // periodic keystroke flush every 30 s
+const TYPING_IDLE_MS = 2_000; // flush keystroke buffer this long after last keyup
 
 export class AnomalyCollector {
   #examId     = null;
@@ -51,7 +52,10 @@ export class AnomalyCollector {
   #questionStartTimes = new Map();
   #currentQuestionId  = null;
   #fieldListeners     = new Map();  // fieldEl → state
-  #flushTimers        = new Map();  // fieldEl → intervalId
+  #idleTimers         = new Map();  // fieldEl → debounce timeoutId  (FIX-IDLE)
+
+  // FIX-PREV: track all recorded response times per question for previous_times_ms
+  #responseTimes = [];  // array of ms values in recording order
 
   #boundVisibilityChange = null;
   #boundKeydown          = null;
@@ -77,7 +81,7 @@ export class AnomalyCollector {
     this.#boundKeydown = this.#onKeydown.bind(this);
     document.addEventListener('keydown', this.#boundKeydown, { capture: true });
 
-    // BUG FIX #5: catch right-click copy/cut/paste
+    // BUG FIX #5
     this.#boundCopy  = (e) => this.#onClipboard(e, 'Copy');
     this.#boundCut   = (e) => this.#onClipboard(e, 'Cut');
     this.#boundPaste = (e) => this.#onClipboard(e, 'Paste');
@@ -98,11 +102,11 @@ export class AnomalyCollector {
     document.removeEventListener('cut',   this.#boundCut,   { capture: true });
     document.removeEventListener('paste', this.#boundPaste, { capture: true });
 
-    // FIX-D: clear all periodic timers before removing field listeners
-    for (const timerId of this.#flushTimers.values()) {
-      clearInterval(timerId);
+    // FIX-D: clear all idle timers before tearing down fields
+    for (const timerId of this.#idleTimers.values()) {
+      clearTimeout(timerId);
     }
-    this.#flushTimers.clear();
+    this.#idleTimers.clear();
 
     for (const [el, state] of this.#fieldListeners) {
       el.removeEventListener('keydown', state.onKeydown);
@@ -131,10 +135,15 @@ export class AnomalyCollector {
     const elapsedMs = Date.now() - startedAt;
     this.#questionStartTimes.delete(questionId);
 
+    // FIX-PREV: snapshot prior times BEFORE pushing the new one
+    const previousTimes = [...this.#responseTimes];
+    this.#responseTimes.push(elapsedMs);
+
     this.#post('response-time', {
-      question_id:      questionId,
-      response_time_ms: elapsedMs,
-      timestamp:        new Date().toISOString(),
+      question_id:       questionId,
+      response_time_ms:  elapsedMs,
+      previous_times_ms: previousTimes,   // FIX-PREV: full history from collector
+      timestamp:         new Date().toISOString(),
     });
   }
 
@@ -167,9 +176,12 @@ export class AnomalyCollector {
       }
       state.lastKeyUp = Date.now();
       if (e.key.length === 1) state.totalChars++;
+
+      // FIX-IDLE: reset the idle debounce on every keyup
+      this.#resetIdleTimer(fieldEl, state);
     };
 
-    // BUG FIX #6 + FIX-B: single source of truth for paste on essay fields
+    // BUG FIX #6 + FIX-B
     state.onPaste = (e) => {
       const text = (e.clipboardData || window.clipboardData)?.getData('text') ?? '';
       state.pasteCount++;
@@ -182,18 +194,19 @@ export class AnomalyCollector {
         question_id: state.questionId,
         timestamp:   new Date().toISOString(),
       });
-      // Do NOT stopPropagation — it cannot stop a capture-phase document listener.
-      // Instead, #onClipboard checks the target and skips monitored fields (FIX-B).
+
+      // FIX-IDLE: a large paste followed by silence should also flush
+      this.#resetIdleTimer(fieldEl, state);
     };
 
     state.onBlur = () => {
-      // FIX-D: clear periodic timer on blur
-      const timerId = this.#flushTimers.get(fieldEl);
+      // Cancel the pending idle timer — we're flushing right now
+      const timerId = this.#idleTimers.get(fieldEl);
       if (timerId !== undefined) {
-        clearInterval(timerId);
-        this.#flushTimers.delete(fieldEl);
+        clearTimeout(timerId);
+        this.#idleTimers.delete(fieldEl);
       }
-      // Final flush — resets all accumulators
+      // Final flush on blur
       this.#flushKeystrokeDynamics(state, true);
     };
 
@@ -202,21 +215,30 @@ export class AnomalyCollector {
     fieldEl.addEventListener('paste',   state.onPaste);
     fieldEl.addEventListener('blur',    state.onBlur);
     this.#fieldListeners.set(fieldEl, state);
+  }
 
-    // FIX-A: start periodic flush immediately on attach, not on focus.
-    // React textareas that already have focus never re-fire 'focus',
-    // so waiting for the focus event means the timer never starts.
-    const timerId = setInterval(() => {
+  // ── Idle debounce (FIX-IDLE) ───────────────────────────────────────────────
+
+  #resetIdleTimer(fieldEl, state) {
+    // Cancel any existing idle countdown
+    const existing = this.#idleTimers.get(fieldEl);
+    if (existing !== undefined) clearTimeout(existing);
+
+    // Start a fresh countdown — fires once after TYPING_IDLE_MS of silence
+    const timerId = setTimeout(() => {
+      this.#idleTimers.delete(fieldEl);
+      // Non-final flush: resets keystroke buffers, keeps cumulative counters
       this.#flushKeystrokeDynamics(state, false);
-    }, FLUSH_INTERVAL_MS);
-    this.#flushTimers.set(fieldEl, timerId);
+    }, TYPING_IDLE_MS);
+
+    this.#idleTimers.set(fieldEl, timerId);
   }
 
   // ── Keystroke dynamics flush ───────────────────────────────────────────────
 
   /**
-   * isFinal = true  (blur)     → post + reset everything
-   * isFinal = false (periodic) → post + reset buffers only; keep cumulative totals
+   * isFinal = true  (blur)       → post + reset everything
+   * isFinal = false (idle timer) → post + reset buffers only; keep cumulative totals
    */
   #flushKeystrokeDynamics(state, isFinal) {
     const duration = Date.now() - state.sessionStart;
@@ -235,7 +257,6 @@ export class AnomalyCollector {
     }
 
     if (isFinal) {
-      // Full reset — next focus session is completely fresh
       state.dwellTimes   = [];
       state.flightTimes  = [];
       state.lastKeyUp    = null;
@@ -244,12 +265,11 @@ export class AnomalyCollector {
       state.pasteCount   = 0;
       state.sessionStart = Date.now();
     } else {
-      // Periodic reset — only clear keystroke buffers; keep cumulative counts
-      // so the backend sees growing session totals on each periodic payload
+      // Idle flush: clear keystroke buffers only, preserve cumulative counters
       state.dwellTimes  = [];
       state.flightTimes = [];
       state.lastKeyUp   = null;
-      // sessionStart intentionally kept — duration grows across windows
+      // sessionStart kept so duration grows across windows
     }
   }
 
@@ -292,7 +312,7 @@ export class AnomalyCollector {
 
     if (!BLOCKED.has(combo)) return;
 
-    // FIX-C: post first, then prevent default so XHR is already queued
+    // FIX-C: post first, prevent default after
     this.#post('keyboard-shortcut', {
       keys:        combo,
       question_id: this.#currentQuestionId ?? undefined,
@@ -301,31 +321,26 @@ export class AnomalyCollector {
     e.preventDefault();
   }
 
-  // FIX-E: mutually exclusive Ctrl/Meta — prevents 'Ctrl+Meta+C' on Mac
+  // FIX-E: mutually exclusive Ctrl/Meta
   #normalizeCombo(e) {
     const parts = [];
-    if (e.metaKey)       parts.push('Meta');
-    else if (e.ctrlKey)  parts.push('Ctrl');
-    if (e.altKey)        parts.push('Alt');
-    if (e.shiftKey)      parts.push('Shift');
+    if (e.metaKey)      parts.push('Meta');
+    else if (e.ctrlKey) parts.push('Ctrl');
+    if (e.altKey)       parts.push('Alt');
+    if (e.shiftKey)     parts.push('Shift');
 
     const label = e.key === ' ' ? 'Space' : e.key;
     parts.push(label);
 
-    // Single non-modifier key with no modifier prefix → not a combo
     if (parts.length === 1 && label.length === 1) return null;
-    // Modifier-only keydown → not a combo
     if (['Control', 'Alt', 'Shift', 'Meta'].includes(label)) return null;
-
     return parts.join('+');
   }
 
-  // BUG FIX #5 + FIX-B: skip events that originated inside a monitored field
+  // BUG FIX #5 + FIX-B
   #onClipboard(e, action) {
     for (const [el] of this.#fieldListeners) {
-      if (el === e.target || el.contains(e.target)) {
-        return; // the field's own onPaste already handles this
-      }
+      if (el === e.target || el.contains(e.target)) return;
     }
     this.#post('keyboard-shortcut', {
       keys:      action,
@@ -335,7 +350,7 @@ export class AnomalyCollector {
 
   // ── HTTP helper ────────────────────────────────────────────────────────────
 
-  // BUG FIX #1: read CSRF cookie fresh on every request
+  // BUG FIX #1
   #getCsrf() {
     const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
     return match ? decodeURIComponent(match[1]) : '';
@@ -343,7 +358,7 @@ export class AnomalyCollector {
 
   // BUG FIX #3 + #4
   #post(type, body) {
-    if (!this.#active) return; // BUG FIX #4
+    if (!this.#active) return;
 
     const url = `${this.#apiBaseUrl}/student/exams/${this.#examId}/anomalies/${type}`;
     const xhr = new XMLHttpRequest();
@@ -361,7 +376,7 @@ export class AnomalyCollector {
       try {
         const data = JSON.parse(xhr.responseText);
         if (['medium', 'high'].includes(data.severity) && this.#onWarning) {
-          // FIX-F: convert URL slug to underscore key TakeExamPage expects
+          // FIX-F: URL slug → underscore key for TakeExamPage
           this.#onWarning(type.replace(/-/g, '_'), data.severity);
         }
       } catch { /* non-JSON, ignore */ }

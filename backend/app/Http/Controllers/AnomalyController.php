@@ -120,9 +120,12 @@ class AnomalyController extends Controller
         }
 
         $payload = $request->validate([
-            'question_id'      => 'required|integer|exists:questions,id',
-            'response_time_ms' => 'required|integer|min:1',
-            'timestamp'        => 'nullable|string',
+            'question_id'       => 'required|integer|exists:questions,id',
+            'response_time_ms'  => 'required|integer|min:1',
+            // FIX-PREV: collector sends the full prior-times history
+            'previous_times_ms'   => 'nullable|array',
+            'previous_times_ms.*' => 'integer|min:0',
+            'timestamp'           => 'nullable|string',
         ]);
 
         $log = $this->service->processResponseTime($submission, $payload);

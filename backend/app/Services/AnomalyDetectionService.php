@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\ExamSubmission;
-use App\Models\ExamResult;
 use App\Models\KeyboardShortcutLog;
 use App\Models\KeystrokeDynamicsLog;
 use App\Models\ResponseTimeLog;
@@ -13,46 +12,36 @@ use Illuminate\Support\Facades\DB;
 /**
  * AnomalyDetectionService
  *
- * Writes raw anomaly events to four dedicated log tables, then upserts a
- * running tally into `exam_results` (the table that actually exists).
+ * ── Changes in this version ───────────────────────────────────────────────────
  *
- * ── What changed ─────────────────────────────────────────────────────────────
+ *  FIX-PREV  previous_times_ms is now written from $payload['previous_times_ms']
+ *            instead of being built by querying response_time_logs.
  *
- *  FIX-SUMMARY   All references to the deleted `exam_anomaly_summaries` table
- *                (and its Eloquent model ExamAnomalySummary) have been removed.
- *                The per-submission running counts are now kept in `exam_results`
- *                using four lightweight counter columns added via a new migration
- *                (see below).  Flask still owns cpi_score / *_flagged columns —
- *                this service only increments the raw counters.
+ *            The old approach queried the column to build the history list,
+ *            but the column was never actually written (always null), so the
+ *            query always returned an empty array — a circular dependency.
  *
- *  FIX-KEYBOARD  processKeyboardShortcut() was silently returning null for any
- *                shortcut that wasn't in BLOCKED_SHORTCUTS.  The BLOCKED list is
- *                correct, but the normalised combo built by the JS collector for
- *                Meta-key combos on Mac produced 'Meta+C' while the list had
- *                'Ctrl+C'.  Both variants are now accepted.
+ *            The collector now tracks all prior response times in memory and
+ *            sends them with every response-time POST. The service just writes
+ *            whatever it receives. No DB round-trip needed.
  *
- *  BUG FIX #5    Tab switch hide-ping (hidden_duration_ms = 0) creates an audit
- *                row but does NOT increment the counter. Preserved.
- *
- *  BUG FIX #6    Response-time is_baseline logic preserved.
+ * ── All previous fixes unchanged ─────────────────────────────────────────────
+ *  BUG FIX #5 — Tab hide-ping (duration=0) creates audit row but no counter
+ *  BUG FIX #6 — Response-time is_baseline column preserved
+ *  FIX-SUMMARY — Uses exam_results (not deleted exam_anomaly_summaries)
+ *  FIX-KEYBOARD — Meta+* variants in BLOCKED list; keyboard_analysis null = enabled
  */
 class AnomalyDetectionService
 {
     private const BLOCKED_SHORTCUTS = [
-        // Ctrl variants
         'Ctrl+C', 'Ctrl+V', 'Ctrl+X', 'Ctrl+A',
         'Ctrl+F', 'Ctrl+G',
         'Ctrl+T', 'Ctrl+W', 'Ctrl+N',
-        'Ctrl+U',
-        'Ctrl+Shift+I', 'Ctrl+Shift+J',
-        // Meta (Mac) variants — FIX-KEYBOARD
+        'Ctrl+U', 'Ctrl+Shift+I', 'Ctrl+Shift+J',
         'Meta+C', 'Meta+V', 'Meta+X', 'Meta+A',
         'Meta+F', 'Meta+T', 'Meta+W', 'Meta+N',
-        // Alt / Tab switching
         'Alt+Tab', 'Meta+Tab',
-        // Dev-tools / screenshot
         'F12', 'PrintScreen',
-        // Clipboard actions from context menu (sent as plain strings by collector)
         'Copy', 'Cut', 'Paste',
     ];
 
@@ -66,34 +55,28 @@ class AnomalyDetectionService
     // PUBLIC API
     // ══════════════════════════════════════════════════════════════════════════
 
-    // ── Isolation Forest ───────────────────────────────────────────────────────
-
     public function processTabSwitch(ExamSubmission $submission, array $payload): TabSwitchLog
     {
         $hiddenDurationMs = (int) ($payload['hidden_duration_ms'] ?? 0);
 
-        // BUG FIX #5 — hide-ping (duration = 0): audit row only, no counter bump
+        // BUG FIX #5 — hide-ping: audit row only, no counter increment
         if ($hiddenDurationMs === 0) {
             return TabSwitchLog::create([
                 'submission_id'       => $submission->id,
                 'exam_id'             => $submission->exam_id,
                 'student_id'          => $submission->student_id,
                 'cumulative_switches' => TabSwitchLog::where('submission_id', $submission->id)
-                                            ->where('is_return_event', true)
-                                            ->count(),
+                                            ->where('is_return_event', true)->count(),
                 'hidden_duration_ms'  => 0,
                 'is_return_event'     => false,
                 'client_timestamp'    => $payload['timestamp'] ?? null,
                 'severity'            => 'low',
                 'occurred_at'         => now(),
             ]);
-            // Intentionally no counter increment
         }
 
-        // Return-post with real duration
         $currentCount = TabSwitchLog::where('submission_id', $submission->id)
-                            ->where('is_return_event', true)
-                            ->count();
+                            ->where('is_return_event', true)->count();
 
         $log = TabSwitchLog::create([
             'submission_id'       => $submission->id,
@@ -111,8 +94,6 @@ class AnomalyDetectionService
 
         return $log;
     }
-
-    // ── One-Class SVM ──────────────────────────────────────────────────────────
 
     public function processKeyboardShortcut(ExamSubmission $submission, array $payload): ?KeyboardShortcutLog
     {
@@ -151,8 +132,6 @@ class AnomalyDetectionService
         return $log;
     }
 
-    // ── Z-Score Method ─────────────────────────────────────────────────────────
-
     public function processResponseTime(ExamSubmission $submission, array $payload): ?ResponseTimeLog
     {
         $questionId     = $payload['question_id']      ?? null;
@@ -164,6 +143,11 @@ class AnomalyDetectionService
 
         $position = ResponseTimeLog::where('submission_id', $submission->id)->count() + 1;
 
+        // FIX-PREV: write previous_times_ms directly from the collector payload.
+        // The collector maintains the full history in memory and sends it here,
+        // so we no longer need to query the DB to rebuild the list.
+        $previousTimes = $payload['previous_times_ms'] ?? [];
+
         $log = ResponseTimeLog::create([
             'submission_id'     => $submission->id,
             'exam_id'           => $submission->exam_id,
@@ -171,6 +155,7 @@ class AnomalyDetectionService
             'question_id'       => $questionId,
             'response_time_ms'  => $responseTimeMs,
             'question_position' => $position,
+            'previous_times_ms' => $previousTimes,   // FIX-PREV: now correctly populated
             'is_baseline'       => false,
             'z_score'           => null,
             'client_timestamp'  => $payload['timestamp'] ?? null,
@@ -182,8 +167,6 @@ class AnomalyDetectionService
 
         return $log;
     }
-
-    // ── Hidden Markov Model ────────────────────────────────────────────────────
 
     public function processKeystrokeDynamics(ExamSubmission $submission, array $payload): ?KeystrokeDynamicsLog
     {
@@ -230,45 +213,24 @@ class AnomalyDetectionService
         return $log;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // PRIVATE HELPERS
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── Private helpers ────────────────────────────────────────────────────────
 
-    /**
-     * Upsert a row in `exam_results` and atomically increment one counter.
-     *
-     * exam_results has no raw counter columns in the original migration, so
-     * this method uses a JSON-safe approach: it stores counts in the existing
-     * nullable float columns that Flask hasn't written yet (they start null).
-     *
-     * To avoid touching Flask's columns (cpi_score, *_flagged, *_score),
-     * we add four tiny counter columns via a separate migration (see below).
-     * If you haven't run that migration yet, run it now — it is non-destructive.
-     *
-     * Counter column → log table mapping:
-     *   tab_switch_count            → tab_switch_logs
-     *   keyboard_shortcut_count     → keyboard_shortcut_logs
-     *   response_time_anomaly_count → response_time_logs
-     *   keystroke_anomaly_count     → keystroke_dynamics_logs
-     */
     private function incrementResultCounter(ExamSubmission $submission, string $counter): void
     {
-        // Ensure the exam_results row exists (Flask may not have created it yet)
         DB::table('exam_results')->insertOrIgnore([
-            'submission_id' => $submission->id,
-            'exam_id'       => $submission->exam_id,
-            'student_id'    => $submission->student_id,
-            'is_flagged'    => false,
-            'cpi_score'     => 0,
-            'cpi_label'     => 'Unlikely',
-            // counter columns — start at 0
+            'submission_id'               => $submission->id,
+            'exam_id'                     => $submission->exam_id,
+            'student_id'                  => $submission->student_id,
+            'is_flagged'                  => false,
+            'cpi_score'                   => 0,
+            'cpi_label'                   => 'Unlikely',
             'tab_switch_count'            => 0,
             'keyboard_shortcut_count'     => 0,
             'response_time_anomaly_count' => 0,
             'keystroke_anomaly_count'     => 0,
-            'processed_at'  => now(),
-            'created_at'    => now(),
-            'updated_at'    => now(),
+            'processed_at'                => now(),
+            'created_at'                  => now(),
+            'updated_at'                  => now(),
         ]);
 
         DB::table('exam_results')
