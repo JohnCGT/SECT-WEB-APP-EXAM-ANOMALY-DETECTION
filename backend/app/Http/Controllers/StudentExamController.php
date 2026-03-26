@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Exam;
 use App\Models\ExamSubmission;
 use Illuminate\Http\Request;
+use App\Jobs\ProcessExamML;
+use Carbon\Carbon;
 
 class StudentExamController extends Controller
 {
@@ -212,6 +214,21 @@ class StudentExamController extends Controller
             'score'        => $score,
             'answers'      => $gradedAnswers,
         ]);
+
+        // ── Trigger ML processing in the background ───────────────────────────
+        $rawStart = $submission->getRawOriginal('started_at');
+        $rawEnd   = $submission->getRawOriginal('submitted_at');
+
+        $examStart = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $rawStart, 'Asia/Manila')
+                        ->utc()
+                        ->toIso8601String();
+
+        $examEnd = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $rawEnd, 'Asia/Manila')
+                        ->utc()
+                        ->toIso8601String();
+
+        ProcessExamML::dispatch($submission->id, $examStart, $examEnd);
+        // ─────────────────────────────────────────────────────────────────────
 
         return response()->json([
             'message'    => 'Exam submitted successfully.',
