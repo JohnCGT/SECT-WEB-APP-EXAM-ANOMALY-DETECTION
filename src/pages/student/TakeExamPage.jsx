@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import API from "../../api";
 import Swal from "sweetalert2";
 import { AnomalyCollector } from "../../anomalyCollector";
+import TypingTest from "./TypingTest";
 
 const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
@@ -148,52 +149,22 @@ const TakeExamPage = () => {
   const { examId } = useParams();
   const navigate   = useNavigate();
 
-  const [loading, setLoading]       = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [exam, setExam]             = useState(null);
-  const [questions, setQuestions]   = useState([]);
-  const [answers, setAnswers]       = useState({});
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [timeLeft, setTimeLeft]     = useState(null);
-  const [showNav, setShowNav]       = useState(false);
+  const [loading, setLoading]                     = useState(true);
+  const [submitting, setSubmitting]               = useState(false);
+  const [exam, setExam]                           = useState(null);
+  const [questions, setQuestions]                 = useState([]);
+  const [answers, setAnswers]                     = useState({});
+  const [currentIdx, setCurrentIdx]               = useState(0);
+  const [timeLeft, setTimeLeft]                   = useState(null);
+  const [showNav, setShowNav]                     = useState(false);
+  const [isTypingTestRequired, setIsTypingTestRequired] = useState(false); 
 
   const timerRef     = useRef(null);
   const collectorRef = useRef(null);
   const essayRefs    = useRef({});
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await API.post(`/student/exams/${examId}/start`);
-        const { exam: examData, questions: qs, submission } = res.data;
-        setExam(examData);
-        setQuestions(qs);
-
-        const startedAt  = new Date(submission.started_at).getTime();
-        const durationMs = examData.duration_minutes * 60 * 1000;
-        const hardEnd    = Math.min(startedAt + durationMs, new Date(examData.end_time).getTime());
-        setTimeLeft(Math.max(0, Math.floor((hardEnd - Date.now()) / 1000)));
-
-        collectorRef.current = new AnomalyCollector({ examId:parseInt(examId), apiBaseUrl:"/api", onWarning:handleAnomalyWarning });
-        collectorRef.current.start();
-        if (qs.length > 0) collectorRef.current.setCurrentQuestion(qs[0].id);
-        for (const [qId, el] of Object.entries(essayRefs.current)) {
-          if (el) collectorRef.current.attachToAnswerField(el, parseInt(qId));
-        }
-      } catch (err) {
-        await Swal.fire("Cannot Start Exam", err.response?.data?.message || "Failed to start exam.", "error");
-        navigate(-1);
-      } finally {
-        setLoading(false);
-      }
-    })();
-    return () => { clearInterval(timerRef.current); collectorRef.current?.stop(); };
-  }, [examId]);
-
   const handleAnomalyWarning = useCallback((type, severity) => {
-    // keyboard_shortcut (copy/paste/cut) is recorded silently — no toast shown to student
     if (type === "keyboard_shortcut") return;
-
     const labels = {
       tab_switch:         "Tab switching detected",
       response_time:      "Unusual response time",
@@ -202,6 +173,60 @@ const TakeExamPage = () => {
     Swal.mixin({ toast:true, position:"top-end", showConfirmButton:false, timer:4000, timerProgressBar:true })
       .fire({ icon:severity==="high"?"error":"warning", title:labels[type]??"Suspicious activity detected", text:"This has been logged and will be reviewed." });
   }, []);
+
+  // Extracted into a reusable fetchExamData so it can be re-called after baseline is saved
+  const fetchExamData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await API.post(`/student/exams/${examId}/start`);
+      const { exam: examData, questions: qs, submission } = res.data;
+
+      setExam(examData);
+      setQuestions(qs);
+
+      const startedAt  = new Date(submission.started_at).getTime();
+      const durationMs = examData.duration_minutes * 60 * 1000;
+      const hardEnd    = Math.min(startedAt + durationMs, new Date(examData.end_time).getTime());
+      setTimeLeft(Math.max(0, Math.floor((hardEnd - Date.now()) / 1000)));
+
+      collectorRef.current = new AnomalyCollector({ examId:parseInt(examId), apiBaseUrl:"/api", onWarning:handleAnomalyWarning });
+      collectorRef.current.start();
+      if (qs.length > 0) collectorRef.current.setCurrentQuestion(qs[0].id);
+      for (const [qId, el] of Object.entries(essayRefs.current)) {
+        if (el) collectorRef.current.attachToAnswerField(el, parseInt(qId));
+      }
+
+      setIsTypingTestRequired(false); // Ensure test gate is hidden on success
+    } catch (err) {
+      // Gatekeeper: backend blocked start because no typing baseline exists yet
+      if (err.response?.status === 403 && err.response.data?.requires_typing_test) {
+        setIsTypingTestRequired(true);
+      } else {
+        await Swal.fire("Cannot Start Exam", err.response?.data?.message || "Failed to start exam.", "error");
+        navigate(-1);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [examId, navigate, handleAnomalyWarning]);
+
+  useEffect(() => {
+    fetchExamData();
+    return () => { clearInterval(timerRef.current); collectorRef.current?.stop(); };
+  }, [fetchExamData]);
+
+  // Called by TypingTest component once the student finishes the baseline
+  const handleBaselineComplete = async (ikis) => {
+    try {
+      setLoading(true);
+      await API.post("/student/typing-baseline", { flight_times_ms: ikis });
+      // Baseline saved — retry starting the exam
+      fetchExamData();
+    } catch (err) {
+      Swal.fire("Error", "Failed to save typing baseline.", "error");
+      setLoading(false);
+    }
+  };
 
   const handleQuestionChange = useCallback((newIdx) => {
     const leaving  = questions[currentIdx];
@@ -267,12 +292,24 @@ const TakeExamPage = () => {
     }
   }, [answers, questions, submitting, examId, navigate, currentIdx, answeredCount]);
 
+  // ── Render: loading spinner ──
   if (loading) return (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh", background:"#f0f4fb", flexDirection:"column", gap:14 }}>
       <div className="spinner-border text-primary" role="status" />
       <p style={{ margin:0, fontSize:13, color:"#94a3b8", fontFamily:"'DM Sans',sans-serif" }}>Preparing your exam…</p>
     </div>
   );
+
+  // ── Render: typing test gate ──
+  if (isTypingTestRequired) {
+    return (
+      <div style={{ background:"#f0f4fb", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+        <div style={{ maxWidth:600, width:"100%" }}>
+          <TypingTest onComplete={handleBaselineComplete} />
+        </div>
+      </div>
+    );
+  }
 
   const currentQ = questions[currentIdx];
   const pctDone  = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;

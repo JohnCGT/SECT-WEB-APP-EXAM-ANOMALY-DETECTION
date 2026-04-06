@@ -18,6 +18,7 @@ class ExamSubmission extends Model
     protected $casts = [
         'started_at'   => 'datetime',
         'submitted_at' => 'datetime',
+        'answers'      => 'array',   // ← ADDED: ensures answers JSON is auto-decoded to PHP array
     ];
 
     public function exam(): BelongsTo    { return $this->belongsTo(Exam::class); }

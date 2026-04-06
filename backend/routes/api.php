@@ -11,6 +11,7 @@ use App\Http\Controllers\ExamController;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\StudentCourseController;
 use App\Http\Controllers\StudentExamController;
+use App\Http\Controllers\TypingBaselineController;
 use Illuminate\Support\Facades\Route;
 
 // ── Public ────────────────────────────────────────────────────────────────────
@@ -43,6 +44,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/student/exams/{examId}/start',    [StudentExamController::class, 'start']);
     Route::post('/student/exams/{examId}/submit',   [StudentExamController::class, 'submit']);
     Route::get('/student/exams/{examId}/results',   [StudentExamController::class, 'results']);
+
+    // ── Student: typing baseline ──────────────────────────────────────────────
+    Route::get('/student/typing-baseline/status', [TypingBaselineController::class, 'status']);
+    Route::post('/student/typing-baseline',        [TypingBaselineController::class, 'store']);
 
     // ── Student: anomaly event ingestion ──────────────────────────────────────
     // Called silently by AnomalyCollector during an active exam session.
