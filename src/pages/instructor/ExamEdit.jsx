@@ -17,12 +17,6 @@ const ExamEdit = () => {
     end_time: '',
     duration_minutes: 60,
     status: 'draft',
-    face_detection: true,
-    tab_switching_monitor: true,
-    mouse_tracking: true,
-    keyboard_analysis: true,
-    screen_recording: false,
-    isolation_forest: true,
   });
 
   useEffect(() => {
@@ -49,12 +43,6 @@ const ExamEdit = () => {
         end_time: formatDateTimeLocal(exam.end_time),
         duration_minutes: exam.duration_minutes,
         status: exam.status,
-        face_detection: exam.face_detection,
-        tab_switching_monitor: exam.tab_switching_monitor,
-        mouse_tracking: exam.mouse_tracking,
-        keyboard_analysis: exam.keyboard_analysis,
-        screen_recording: exam.screen_recording,
-        isolation_forest: exam.isolation_forest,
       });
     } catch (err) {
       console.error('Failed to fetch exam:', err);
@@ -216,73 +204,6 @@ const ExamEdit = () => {
                   required
                 />
               </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="card mb-4">
-          <div className="card-header">
-            <h5>Monitoring Settings</h5>
-          </div>
-          <div className="card-body">
-            <div className="form-check form-switch mb-3">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                checked={formData.face_detection}
-                onChange={(e) => setFormData({ ...formData, face_detection: e.target.checked })}
-              />
-              <label className="form-check-label">Face Detection</label>
-            </div>
-
-            <div className="form-check form-switch mb-3">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                checked={formData.tab_switching_monitor}
-                onChange={(e) => setFormData({ ...formData, tab_switching_monitor: e.target.checked })}
-              />
-              <label className="form-check-label">Tab Switching Monitoring</label>
-            </div>
-
-            <div className="form-check form-switch mb-3">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                checked={formData.mouse_tracking}
-                onChange={(e) => setFormData({ ...formData, mouse_tracking: e.target.checked })}
-              />
-              <label className="form-check-label">Mouse Activity Tracking</label>
-            </div>
-
-            <div className="form-check form-switch mb-3">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                checked={formData.keyboard_analysis}
-                onChange={(e) => setFormData({ ...formData, keyboard_analysis: e.target.checked })}
-              />
-              <label className="form-check-label">Keyboard Pattern Analysis</label>
-            </div>
-
-            <div className="form-check form-switch mb-3">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                checked={formData.screen_recording}
-                onChange={(e) => setFormData({ ...formData, screen_recording: e.target.checked })}
-              />
-              <label className="form-check-label">Screen Recording</label>
-            </div>
-
-            <div className="form-check form-switch">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                checked={formData.isolation_forest}
-                onChange={(e) => setFormData({ ...formData, isolation_forest: e.target.checked })}
-              />
-              <label className="form-check-label">Isolation Forest Algorithm</label>
             </div>
           </div>
         </div>
