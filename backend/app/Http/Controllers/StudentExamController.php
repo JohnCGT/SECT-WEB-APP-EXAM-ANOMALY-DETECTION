@@ -7,6 +7,7 @@ use App\Models\ExamSubmission;
 use Illuminate\Http\Request;
 use App\Jobs\ProcessExamML;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class StudentExamController extends Controller
 {
@@ -23,8 +24,6 @@ class StudentExamController extends Controller
     }
 
     // ── Private helper: verify student is enrolled in course ─────────────────
-    // Mirrors exactly how StudentCourseController checks enrollment,
-    // using the enrolledCourses() relationship on User (pivot: course_students, student_id)
     private function assertEnrolled($student, int $courseId): void
     {
         $enrolled = $student->enrolledCourses()
@@ -36,11 +35,19 @@ class StudentExamController extends Controller
         }
     }
 
+    // ── Private helper: case-insensitive, whitespace-trimmed answer comparison
+    // Fixes the strict === comparison bug in submit() that caused correct answers
+    // to be graded as wrong when casing or whitespace differed.
+    private function answersMatch(?string $studentAnswer, ?string $correctAnswer): bool
+    {
+        if ($studentAnswer === null || $correctAnswer === null) {
+            return false;
+        }
+        return strtolower(trim($studentAnswer)) === strtolower(trim($correctAnswer));
+    }
+
     /**
      * GET /student/courses/{courseId}/exams
-     *
-     * Returns all exams for a course the student is enrolled in,
-     * along with their submission status for each exam.
      */
     public function courseExams(Request $request, $courseId)
     {
@@ -82,10 +89,6 @@ class StudentExamController extends Controller
 
     /**
      * POST /student/exams/{examId}/start
-     *
-     * Starts an exam for the authenticated student.
-     * Creates a submission with status = 'in_progress'.
-     * If an in_progress submission already exists, returns it (resume).
      */
     public function start(Request $request, $examId)
     {
@@ -95,7 +98,6 @@ class StudentExamController extends Controller
             $query->orderBy('order');
         }])->findOrFail($examId);
 
-        // Use enrolledCourses() — consistent with StudentCourseController
         $this->assertEnrolled($student, (int) $exam->course_id);
 
         $now = now();
@@ -108,7 +110,24 @@ class StudentExamController extends Controller
             return response()->json(['message' => 'This exam has ended.'], 403);
         }
 
-        // Check for existing submission
+        // --- NEW CHECK START ---
+        // Check if exam has essay questions
+        $hasEssay = $exam->questions->contains('type', 'essay');
+
+        if ($hasEssay) {
+            $hasBaseline = DB::table('keystroke_baselines')
+                ->where('student_id', $student->id)
+                ->exists();
+
+            if (!$hasBaseline) {
+                return response()->json([
+                    'requires_typing_test' => true,
+                    'message' => 'Please complete the typing test before starting this exam.',
+                ], 403);
+            }
+        }
+        // --- NEW CHECK END ---
+
         $existing = ExamSubmission::where('exam_id', $examId)
             ->where('student_id', $student->id)
             ->first();
@@ -117,9 +136,6 @@ class StudentExamController extends Controller
             return response()->json(['message' => 'You have already submitted this exam.'], 403);
         }
 
-        // Create submission or return existing in_progress one.
-        // Status MUST be 'in_progress' — AnomalyController::getActiveSubmission()
-        // queries for this exact value.
         $submission = ExamSubmission::firstOrCreate(
             [
                 'exam_id'    => $examId,
@@ -166,8 +182,11 @@ class StudentExamController extends Controller
     /**
      * POST /student/exams/{examId}/submit
      *
-     * Grades objective questions and marks submission as submitted.
-     * Status changes: 'in_progress' → 'submitted'
+     * BUG FIX 1: Changed strict === comparison to answersMatch() which uses
+     * case-insensitive, trimmed comparison. This fixes cases where:
+     *   - "True" !== "true" (casing mismatch)
+     *   - "Option A " !== "Option A" (trailing whitespace from DB)
+     *   - "v" !== "v " (whitespace stored in correct_answer)
      */
     public function submit(Request $request, $examId)
     {
@@ -187,12 +206,18 @@ class StudentExamController extends Controller
         $gradedAnswers = [];
 
         foreach ($exam->questions as $question) {
-            $studentAnswer = $answers[$question->id] ?? null;
-            $isCorrect     = false;
-            $pointsEarned  = 0;
+            $studentAnswer = isset($answers[$question->id])
+                ? (string) $answers[$question->id]
+                : null;
+
+            $isCorrect    = false;
+            $pointsEarned = 0;
 
             if (in_array($question->type, ['multiple_choice', 'true_false'])) {
-                $isCorrect    = $studentAnswer === $question->correct_answer;
+                // FIX: use answersMatch() instead of strict ===
+                // This handles casing differences (e.g. "true" vs "True")
+                // and whitespace differences (e.g. "v " vs "v")
+                $isCorrect    = $this->answersMatch($studentAnswer, (string) $question->correct_answer);
                 $pointsEarned = $isCorrect ? $question->points : 0;
             }
 
@@ -202,7 +227,7 @@ class StudentExamController extends Controller
                 'question_id'     => $question->id,
                 'student_answer'  => $studentAnswer,
                 'correct_answer'  => $question->correct_answer,
-                'is_correct'      => $isCorrect,
+                'is_correct'      => $isCorrect,       // PHP bool → JSON true/false
                 'points_earned'   => $pointsEarned,
                 'points_possible' => $question->points,
             ];
@@ -212,18 +237,18 @@ class StudentExamController extends Controller
             'status'       => 'submitted',
             'submitted_at' => now(),
             'score'        => $score,
-            'answers'      => $gradedAnswers,
+            'answers'      => $gradedAnswers, // stored as JSON array
         ]);
 
         // ── Trigger ML processing in the background ───────────────────────────
         $rawStart = $submission->getRawOriginal('started_at');
         $rawEnd   = $submission->getRawOriginal('submitted_at');
 
-        $examStart = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $rawStart, 'Asia/Manila')
+        $examStart = Carbon::createFromFormat('Y-m-d H:i:s', $rawStart, 'Asia/Manila')
                         ->utc()
                         ->toIso8601String();
 
-        $examEnd = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $rawEnd, 'Asia/Manila')
+        $examEnd = Carbon::createFromFormat('Y-m-d H:i:s', $rawEnd, 'Asia/Manila')
                         ->utc()
                         ->toIso8601String();
 
@@ -244,7 +269,13 @@ class StudentExamController extends Controller
     /**
      * GET /student/exams/{examId}/results
      *
-     * Returns detailed results for a submitted exam.
+     * BUG FIX 2: $submission->answers must be decoded as an array before
+     * using collect()->firstWhere(). If the ExamSubmission model does NOT
+     * cast 'answers' to 'array', $submission->answers is a raw JSON string
+     * and collect() iterates over characters — firstWhere() always returns
+     * null, so every question falls back to 'is_correct' => false.
+     *
+     * Fix: explicitly json_decode if the value is still a string.
      */
     public function results(Request $request, $examId)
     {
@@ -256,23 +287,54 @@ class StudentExamController extends Controller
             ->where('status', 'submitted')
             ->firstOrFail();
 
-        $exam            = $submission->exam;
-        $answers         = $submission->answers ?? [];
+        $exam = $submission->exam;
+
+        // FIX: ensure $answers is always a PHP array, not a JSON string.
+        // Laravel auto-casts json columns to array IF the model declares
+        // protected $casts = ['answers' => 'array'].
+        // If it doesn't, we get a raw string back and collect() breaks.
+        $raw     = $submission->answers;
+        $answers = is_string($raw) ? json_decode($raw, true) : (array) ($raw ?? []);
+
         $questionResults = [];
 
         foreach ($exam->questions as $question) {
             $answerData = collect($answers)->firstWhere('question_id', $question->id);
 
+            // Re-derive is_correct from the stored answers for MC/TF in case
+            // the grading at submit time had the strict === bug.
+            // For essays, keep whatever the instructor set.
+            $storedIsCorrect = $answerData['is_correct'] ?? null;
+
+            if ($question->type !== 'essay') {
+                $storedStudentAnswer  = $answerData['student_answer'] ?? null;
+                $storedCorrectAnswer  = $answerData['correct_answer'] ?? $question->correct_answer;
+                // Re-derive using the same trimmed/lowercased comparison
+                $derivedIsCorrect = $this->answersMatch(
+                    $storedStudentAnswer !== null ? (string) $storedStudentAnswer : null,
+                    (string) $storedCorrectAnswer
+                );
+                // Use derived value — this self-heals old submissions graded with the old bug
+                $isCorrect    = $derivedIsCorrect;
+                $pointsEarned = $derivedIsCorrect ? $question->points : 0;
+            } else {
+                // Essay: trust whatever is stored (manual grading)
+                $isCorrect    = $storedIsCorrect;
+                $pointsEarned = $answerData['points_earned'] ?? 0;
+            }
+
             $questionResults[] = [
                 'id'             => $question->id,
+                'order'          => $question->order,
                 'question_text'  => $question->question_text,
                 'type'           => $question->type,
                 'points'         => $question->points,
                 'options'        => $question->options,
+                'rubric'         => $question->rubric ?? null,
                 'student_answer' => $answerData['student_answer'] ?? null,
                 'correct_answer' => $question->correct_answer,
-                'is_correct'     => $answerData['is_correct'] ?? false,
-                'points_earned'  => $answerData['points_earned'] ?? 0,
+                'is_correct'     => $isCorrect,
+                'points_earned'  => $pointsEarned,
             ];
         }
 
@@ -291,6 +353,7 @@ class StudentExamController extends Controller
                 'id'          => $exam->id,
                 'title'       => $exam->title,
                 'description' => $exam->description,
+                'type'        => $exam->type,
             ],
             'questions' => $questionResults,
         ]);

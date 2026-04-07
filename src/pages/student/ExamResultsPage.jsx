@@ -132,11 +132,45 @@ const ExamResultsPage = () => {
   const passed  = pct >= 75;
   const grade   = gradeLabel(pct);
 
-  const correctCount = questions.filter(q => q.is_correct === true).length;
-  const wrongCount   = questions.filter(q => q.is_correct === false).length;
-  const essayCount   = questions.filter(q => q.type === "essay").length;
+  // ── Normalize is_correct ──────────────────────────────────────────────────
+  // The backend may return wrong values for is_correct (e.g. always false/0,
+  // or null). For MC and TF questions we can derive correctness ourselves by
+  // comparing student_answer to correct_answer — this is always reliable.
+  // For essays we leave it as-is since they need manual grading.
+  const norm = (v) => String(v ?? "").trim().toLowerCase();
 
-  const filtered = questions.filter(q => {
+  const deriveIsCorrect = (q) => {
+    // Essays are always manually graded — don't override
+    if (q.type === "essay") {
+      if (q.is_correct === true  || q.is_correct === 1 || q.is_correct === "1") return true;
+      if (q.is_correct === false || q.is_correct === 0 || q.is_correct === "0") return false;
+      return null; // pending
+    }
+
+    // For MC and TF: if both student_answer and correct_answer exist, derive from comparison
+    if (q.student_answer != null && q.correct_answer != null) {
+      return norm(q.student_answer) === norm(q.correct_answer);
+    }
+
+    // If student didn't answer (null/empty string), it's wrong
+    if (q.student_answer == null || norm(q.student_answer) === "") return false;
+
+    // Fallback: trust backend value, coerced to boolean
+    if (q.is_correct === true  || q.is_correct === 1 || q.is_correct === "1") return true;
+    if (q.is_correct === false || q.is_correct === 0 || q.is_correct === "0") return false;
+    return null;
+  };
+
+  const normalizedQuestions = questions.map(q => ({
+    ...q,
+    is_correct: deriveIsCorrect(q),
+  }));
+
+  const correctCount = normalizedQuestions.filter(q => q.is_correct === true).length;
+  const wrongCount   = normalizedQuestions.filter(q => q.is_correct === false).length;
+  const essayCount   = normalizedQuestions.filter(q => q.type === "essay").length;
+
+  const filtered = normalizedQuestions.filter(q => {
     if (filter === "correct") return q.is_correct === true;
     if (filter === "wrong")   return q.is_correct === false;
     if (filter === "essay")   return q.type === "essay";
@@ -311,16 +345,16 @@ const ExamResultsPage = () => {
                         fontSize:12, fontWeight:700, flexShrink:0,
                         color: isCorrect === true ? "#22c55e" : isCorrect === false ? "#ef4444" : "#94a3b8"
                       }}>
-                        {/* points_earned from API; fall back to full points if is_correct is true, 0 if false */}
+                        {/* Use derived isCorrect (from answer comparison) for points display */}
                         {(() => {
                           const earned =
-                            q.points_earned != null
-                              ? q.points_earned
-                              : q.is_correct === true
-                                ? q.points
-                                : q.is_correct === false
-                                  ? 0
-                                  : "—";
+                            q.points_earned != null && q.points_earned > 0
+                              ? q.points_earned   // trust backend if it gave a positive value
+                              : isCorrect === true
+                                ? q.points          // derived correct → full points
+                                : isCorrect === false
+                                  ? 0               // derived wrong → 0
+                                  : "—";            // essay pending
                           return <>{earned}/{q.points} pts</>;
                         })()}
                       </span>
@@ -333,10 +367,9 @@ const ExamResultsPage = () => {
                     {q.type === "multiple_choice" && q.options && (
                       <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:16 }}>
                         {q.options.map((opt, oi) => {
-                          // Normalize: trim + lowercase so "Option A" === "option a " still matches
-                          const norm    = (v) => String(v ?? "").trim().toLowerCase();
-                          const isSA    = norm(q.student_answer) === norm(opt);
-                          const isCA    = norm(q.correct_answer) === norm(opt);
+                          // Use top-level norm() for consistent normalization
+                          const isSA = norm(q.student_answer) === norm(opt);
+                          const isCA = norm(q.correct_answer) === norm(opt);
 
                           // Style priority: correct answer always green, wrong student pick red, others neutral
                           let rowBg = "#f8faff", rowBorder = "#e2e8f0", textColor = "#64748b", badgeBg = "#f1f5f9", badgeColor = "#94a3b8";
@@ -394,10 +427,9 @@ const ExamResultsPage = () => {
                       <div style={{ marginBottom:16 }}>
                         <div style={{ display:"flex", gap:10 }}>
                           {["True","False"].map(val => {
-                            // Normalize both sides: API may return "true"/"false", "1"/"0", or "True"/"False"
-                            const norm   = (v) => String(v ?? "").trim().toLowerCase();
-                            const isSA   = norm(q.student_answer) === norm(val);
-                            const isCA   = norm(q.correct_answer) === norm(val);
+                            // Use top-level norm() — handles "true"/"false", "1"/"0", "True"/"False"
+                            const isSA = norm(q.student_answer) === norm(val);
+                            const isCA = norm(q.correct_answer) === norm(val);
 
                             let bg="#f8faff", border="#e2e8f0", color="#94a3b8", fontW=500;
                             if (isCA)          { bg="#f0fdf4"; border="#86efac"; color="#22c55e"; fontW=700; }

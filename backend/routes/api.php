@@ -3,6 +3,7 @@
 // backend/routes/api.php
 
 use App\Http\Controllers\AdminUserController;
+use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AnomalyController;
 use App\Http\Controllers\CourseController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\ExamController;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\StudentCourseController;
 use App\Http\Controllers\StudentExamController;
+use App\Http\Controllers\TypingBaselineController;
 use Illuminate\Support\Facades\Route;
 
 // ── Public ────────────────────────────────────────────────────────────────────
@@ -27,11 +29,30 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // ── Admin: User Management ────────────────────────────────────────────────
     Route::prefix('admin')->group(function () {
+
+        // User Management (existing)
         Route::get('/users',               [AdminUserController::class, 'index']);
         Route::post('/users',              [AdminUserController::class, 'store']);
         Route::put('/users/{id}',          [AdminUserController::class, 'update']);
         Route::patch('/users/{id}/status', [AdminUserController::class, 'updateStatus']);
         Route::delete('/users/{id}',       [AdminUserController::class, 'destroy']);
+
+        // Dashboard overview stats + recent CPI results
+        Route::get('/dashboard', [AdminDashboardController::class, 'dashboard']);
+
+        // Exam Management (admin-wide — sees all instructors' exams)
+        Route::get('/exams',                      [AdminDashboardController::class, 'exams']);
+        Route::patch('/exams/{id}/status',        [AdminDashboardController::class, 'updateExamStatus']);
+        Route::delete('/exams/{id}/sessions',     [AdminDashboardController::class, 'resetSessions']);
+
+        // Anomaly Reports (admin-wide feed — merges all four anomaly log tables)
+        Route::get('/anomalies', [AdminDashboardController::class, 'anomalies']);
+
+        // System Logs
+        // Requires spatie/laravel-activitylog: composer require spatie/laravel-activitylog
+        // Then publish & migrate: php artisan vendor:publish --provider="Spatie\Activitylog\ActivitylogServiceProvider"
+        //                          php artisan migrate
+        Route::get('/logs', [AdminDashboardController::class, 'logs']);
     });
 
     // ── Student: enrolled courses (MUST stay before /courses/{id}) ───────────
@@ -43,6 +64,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/student/exams/{examId}/start',    [StudentExamController::class, 'start']);
     Route::post('/student/exams/{examId}/submit',   [StudentExamController::class, 'submit']);
     Route::get('/student/exams/{examId}/results',   [StudentExamController::class, 'results']);
+
+    // ── Student: typing baseline ──────────────────────────────────────────────
+    Route::get('/student/typing-baseline/status', [TypingBaselineController::class, 'status']);
+    Route::post('/student/typing-baseline',        [TypingBaselineController::class, 'store']);
 
     // ── Student: anomaly event ingestion ──────────────────────────────────────
     // Called silently by AnomalyCollector during an active exam session.
