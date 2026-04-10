@@ -2,6 +2,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Models\KeystrokeBaseline;
 use App\Jobs\TrainHMMBaseline;
 
@@ -11,11 +12,13 @@ class TypingBaselineController extends Controller
     // Returns whether the student already has a saved baseline
     public function status(Request $request)
     {
-        $student = $request->user();
-        $baseline = KeystrokeBaseline::where('student_id', $student->id)->first();
+        $baseline = DB::table('keystroke_baselines')
+            ->where('student_id', $request->user()->id)
+            ->first();
+
         return response()->json([
-            'has_baseline' => !is_null($baseline),
-            'recorded_at'  => $baseline?->recorded_at,
+            'has_baseline' => !!$baseline,
+            'recorded_at'  => $baseline ? $baseline->recorded_at : null,
         ]);
     }
 

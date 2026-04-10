@@ -37,14 +37,13 @@ const BottomNav = ({ active }) => (
 
 /* ─────────────────────────────────────────────
    ACTIVITY HEATMAP
-   52 weeks × 7 days grid, random demo data
 ───────────────────────────────────────────── */
 const ActivityHeatmap = () => {
-  const weeks = 26; // ~6 months
+  const weeks = 26;
   const days  = 7;
   const levels = ["#e8f0fe", "#93bbfd", "#4d90fe", "#1a65e0", "#0056b3"];
 
-  const cells = Array.from({ length: weeks * days }, (_, i) => {
+  const cells = Array.from({ length: weeks * days }, () => {
     const rand = Math.random();
     if (rand < 0.35) return 0;
     if (rand < 0.55) return 1;
@@ -58,7 +57,6 @@ const ActivityHeatmap = () => {
   return (
     <div style={{ overflowX: "auto" }}>
       <div style={{ display: "flex", gap: 2, alignItems: "flex-start", minWidth: "fit-content" }}>
-        {/* Day labels */}
         <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 0 }}>
           {dayLabels.map((d, i) => (
             <div key={i} style={{
@@ -67,7 +65,6 @@ const ActivityHeatmap = () => {
             }}>{d}</div>
           ))}
         </div>
-        {/* Grid */}
         {Array.from({ length: weeks }, (_, w) => (
           <div key={w} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {Array.from({ length: days }, (_, d) => {
@@ -100,7 +97,7 @@ const ActivityHeatmap = () => {
 };
 
 /* ─────────────────────────────────────────────
-   MICRO SPARKLINE (inline SVG)
+   MICRO SPARKLINE
 ───────────────────────────────────────────── */
 const Sparkline = ({ data, color = "#0056b3", height = 36 }) => {
   const w = 80, h = height;
@@ -130,6 +127,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [time, setTime] = useState(new Date());
   const [user, setUser] = useState(null);
+  const [baselineInfo, setBaselineInfo] = useState(null); // { has_baseline, recorded_at }
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -139,7 +137,14 @@ const Dashboard = () => {
   useEffect(() => {
     API.get("/me")
       .then(res => setUser(res.data.user))
-      .catch(() => {}); // fail silently — page still renders
+      .catch(() => {});
+  }, []);
+
+  // Fetch typing baseline status for the Security & Biometrics widget
+  useEffect(() => {
+    API.get("/student/typing-baseline/status")
+      .then(res => setBaselineInfo(res.data))
+      .catch(() => setBaselineInfo({ has_baseline: false, recorded_at: null }));
   }, []);
 
   const handleLogout = async () => {
@@ -171,7 +176,6 @@ const Dashboard = () => {
 
   return (
     <>
-      {/* ── Google Fonts + global styles ── */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
 
@@ -210,7 +214,6 @@ const Dashboard = () => {
           transform: translateY(-1px);
         }
 
-        /* Glassmorphism sidebar */
         .glass-sidebar {
           background: rgba(255,255,255,0.60);
           backdrop-filter: blur(20px) saturate(180%);
@@ -230,7 +233,6 @@ const Dashboard = () => {
         .nav-pill.active { background: var(--blue); color: #fff; box-shadow: 0 4px 14px rgba(0,86,179,.35); }
         .nav-pill i { font-size: 18px; }
 
-        /* Stat chip */
         .stat-chip {
           background: var(--card-bg);
           border-radius: 14px;
@@ -241,7 +243,6 @@ const Dashboard = () => {
         }
         .stat-chip:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,86,179,.12); }
 
-        /* Progress bar */
         .prog-track {
           height: 6px; border-radius: 99px;
           background: #eef2ff; overflow: hidden;
@@ -251,7 +252,6 @@ const Dashboard = () => {
           transition: width 1s cubic-bezier(.4,0,.2,1);
         }
 
-        /* Course row hover */
         .course-row {
           padding: 14px 0;
           border-bottom: 1px solid #f1f5f9;
@@ -259,7 +259,6 @@ const Dashboard = () => {
         }
         .course-row:last-child { border-bottom: none; }
 
-        /* Deadline pill */
         .dl-row {
           display: flex; align-items: center; gap: 12px;
           padding: 12px 16px; border-radius: 12px;
@@ -268,7 +267,6 @@ const Dashboard = () => {
         }
         .dl-row:hover { background: #f8faff; }
 
-        /* Live clock */
         .live-clock {
           font-family: 'DM Mono', monospace;
           font-size: 28px; font-weight: 500;
@@ -276,7 +274,6 @@ const Dashboard = () => {
           line-height: 1;
         }
 
-        /* Bento grid */
         .bento {
           display: grid;
           gap: 16px;
@@ -296,7 +293,6 @@ const Dashboard = () => {
           .bento-span2, .bento-span3 { grid-column: span 1; }
         }
 
-        /* Fade-in animation */
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(12px); }
           to   { opacity: 1; transform: translateY(0); }
@@ -310,7 +306,6 @@ const Dashboard = () => {
         .fade-up:nth-child(6) { animation-delay: .30s; }
         .fade-up:nth-child(7) { animation-delay: .35s; }
 
-        /* Topbar */
         .topbar {
           background: rgba(255,255,255,0.80);
           backdrop-filter: blur(16px);
@@ -320,7 +315,6 @@ const Dashboard = () => {
           height: 56px;
         }
 
-        /* Avatar */
         .avatar {
           width: 34px; height: 34px; border-radius: 50%;
           background: var(--blue); color: #fff;
@@ -328,7 +322,6 @@ const Dashboard = () => {
           font-size: 14px; font-weight: 700; flex-shrink: 0;
         }
 
-        /* Search input */
         .search-input {
           border: 1px solid rgba(0,86,179,.15); border-radius: 10px;
           background: #f8faff; padding: 7px 14px 7px 36px;
@@ -341,31 +334,40 @@ const Dashboard = () => {
           background: #fff;
         }
 
-        /* Tag badge */
         .tag {
           display: inline-flex; align-items: center;
           padding: 2px 9px; border-radius: 99px;
           font-size: 11px; font-weight: 600; letter-spacing: .02em;
         }
+
+        /* Biometrics widget button */
+        .bio-btn {
+          display: flex; align-items: center; gap: 8px;
+          background: #0056b3; color: #fff; border: none;
+          border-radius: 10px; padding: 9px 16px;
+          font-size: 12px; font-weight: 700; cursor: pointer;
+          font-family: 'DM Sans', sans-serif;
+          transition: opacity .15s;
+          width: 100%; justify-content: center;
+          margin-top: 14px;
+        }
+        .bio-btn:hover { opacity: .85; }
       `}</style>
 
       <div className="bg-light" style={{ background: "#f0f4fb", minHeight: "100vh" }}>
 
         {/* ── Topbar ── */}
         <div className="topbar d-flex align-items-center px-3 px-lg-4 gap-3">
-          {/* Brand */}
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 15, color: "#0056b3", letterSpacing: "-.3px", flexShrink: 0 }}>
             SECT Portal
           </span>
 
-          {/* Search (desktop) */}
           <div className="d-none d-md-flex align-items-center ms-4 position-relative">
             <i className="bi bi-search" style={{ position: "absolute", left: 12, color: "#94a3b8", fontSize: 13 }}></i>
             <input className="search-input" placeholder="Search subjects, exams…" />
           </div>
 
           <div className="ms-auto d-flex align-items-center gap-2">
-            {/* Notification bell */}
             <button style={{ background: "transparent", border: "none", position: "relative", padding: "4px 8px", cursor: "pointer" }}>
               <i className="bi bi-bell" style={{ fontSize: 18, color: "#64748b" }}></i>
               <span style={{
@@ -374,7 +376,6 @@ const Dashboard = () => {
               }}></span>
             </button>
 
-            {/* Avatar dropdown */}
             <div className="dropdown">
               <button className="d-flex align-items-center gap-2 dropdown-toggle"
                 style={{ background: "transparent", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: 10 }}
@@ -396,10 +397,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* ── Body: sidebar + content ── */}
+        {/* ── Body ── */}
         <div className="d-flex align-items-stretch">
 
-          {/* ── Glassmorphism Sidebar (desktop) ── */}
+          {/* ── Sidebar ── */}
           <nav className="glass-sidebar d-none d-lg-flex flex-column align-items-center py-4 gap-1"
             style={{ width: 80, minHeight: "calc(100vh - 56px)", position: "sticky", top: 56, alignSelf: "flex-start", flexShrink: 0 }}>
             {[
@@ -419,7 +420,6 @@ const Dashboard = () => {
           {/* ── Main content ── */}
           <main style={{ flex: 1, padding: "24px 20px", paddingBottom: 100, minWidth: 0 }}>
 
-            {/* Mobile search */}
             <div className="d-md-none mb-3 position-relative">
               <i className="bi bi-search" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13, zIndex: 1 }}></i>
               <input className="search-input" style={{ width: "100%" }} placeholder="Search subjects, exams…" />
@@ -437,7 +437,6 @@ const Dashboard = () => {
                 </p>
               </div>
 
-              {/* Live clock */}
               <div className="dash-card d-none d-md-flex flex-column align-items-end p-3" style={{ gap: 2 }}>
                 <div className="live-clock">
                   {time.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
@@ -451,22 +450,14 @@ const Dashboard = () => {
             {/* ── Bento Grid ── */}
             <div className="bento">
 
-              {/* 1 ── Hero stat: Overall Progress — spans 2 cols */}
+              {/* 1 ── Semester Progress */}
               <div className="dash-card bento-span2 fade-up" style={{
                 padding: 24, position: "relative", overflow: "hidden",
                 background: "linear-gradient(135deg, #0056b3 0%, #1a6ed8 60%, #4d90fe 100%)",
                 borderRadius: 16, border: "none"
               }}>
-                {/* Decorative circle */}
-                <div style={{
-                  position: "absolute", right: -40, top: -40, width: 180, height: 180,
-                  borderRadius: "50%", background: "rgba(255,255,255,.08)"
-                }} />
-                <div style={{
-                  position: "absolute", right: 40, bottom: -60, width: 140, height: 140,
-                  borderRadius: "50%", background: "rgba(255,255,255,.05)"
-                }} />
-
+                <div style={{ position: "absolute", right: -40, top: -40, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,.08)" }} />
+                <div style={{ position: "absolute", right: 40, bottom: -60, width: 140, height: 140, borderRadius: "50%", background: "rgba(255,255,255,.05)" }} />
                 <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,.65)", textTransform: "uppercase", letterSpacing: ".06em" }}>
                   Semester Progress
                 </p>
@@ -477,13 +468,12 @@ const Dashboard = () => {
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,.55)" }}>On track for Dean's List</span>
                   </div>
                 </div>
-                {/* Progress bar */}
                 <div style={{ height: 6, borderRadius: 99, background: "rgba(255,255,255,.22)", overflow: "hidden" }}>
                   <div style={{ height: "100%", width: "68%", borderRadius: 99, background: "#fff", transition: "width 1.2s cubic-bezier(.4,0,.2,1)" }} />
                 </div>
               </div>
 
-              {/* 2 ── GPA chip */}
+              {/* 2 ── GPA */}
               <div className="stat-chip fade-up d-flex flex-column justify-content-between" style={{ minHeight: 140 }}>
                 <div className="d-flex justify-content-between align-items-start">
                   <div>
@@ -517,7 +507,7 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* 4 ── Tasks chip */}
+              {/* 4 ── Tasks */}
               <div className="stat-chip fade-up d-flex flex-column justify-content-between" style={{ minHeight: 140 }}>
                 <div className="d-flex justify-content-between align-items-start">
                   <div>
@@ -534,7 +524,7 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* 5 ── Class Rank chip */}
+              {/* 5 ── Class Rank */}
               <div className="stat-chip fade-up d-flex flex-column justify-content-between" style={{ minHeight: 140 }}>
                 <div className="d-flex justify-content-between align-items-start">
                   <div>
@@ -553,7 +543,7 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* 6 ── My Courses — spans 2 */}
+              {/* 6 ── My Courses */}
               <div className="dash-card bento-span2 fade-up" style={{ padding: 24 }}>
                 <div className="d-flex justify-content-between align-items-center mb-3">
                   <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>📚 My Courses</h2>
@@ -580,7 +570,7 @@ const Dashboard = () => {
                 ))}
               </div>
 
-              {/* 7 ── Activity Heatmap — spans 3 */}
+              {/* 7 ── Activity Heatmap */}
               <div className="dash-card bento-span3 fade-up" style={{ padding: 24 }}>
                 <div className="d-flex justify-content-between align-items-center mb-4">
                   <div>
@@ -602,10 +592,7 @@ const Dashboard = () => {
                 </div>
                 {deadlines.map((d, i) => (
                   <div key={i} className="dl-row">
-                    <div style={{
-                      width: 4, height: 36, borderRadius: 4, flexShrink: 0,
-                      background: urgencyColor[d.urgency]
-                    }} />
+                    <div style={{ width: 4, height: 36, borderRadius: 4, flexShrink: 0, background: urgencyColor[d.urgency] }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.title}</p>
                       <p style={{ margin: 0, fontSize: 11, color: "#94a3b8" }}>Due {d.due}</p>
@@ -638,7 +625,6 @@ const Dashboard = () => {
                   <span style={{ fontSize: 11, color: "#94a3b8" }}>2 hours ago</span>
                 </div>
 
-                {/* Quick links */}
                 <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
                   {[
                     { icon: "bi-file-earmark-text", label: "Submit Assignment",  color: "#0056b3" },
@@ -660,11 +646,56 @@ const Dashboard = () => {
                 </div>
               </div>
 
+              {/* 10 ── Security & Biometrics ── NEW */}
+              <div className="dash-card bento-span2 fade-up" style={{ padding: 24 }}>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <div className="d-flex align-items-center gap-2">
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: "#eef2ff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <i className="bi bi-shield-lock" style={{ color: "#0056b3", fontSize: 16 }}></i>
+                    </div>
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Security &amp; Biometrics</h2>
+                      <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>Typing signature for essay exam verification</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Baseline status indicator */}
+                {baselineInfo === null ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px", borderRadius: 10, background: "#f8faff", border: "1px solid #e2e8f0" }}>
+                    <div className="spinner-border spinner-border-sm text-primary" role="status" style={{ width: 14, height: 14, borderWidth: 2 }} />
+                    <span style={{ fontSize: 13, color: "#94a3b8" }}>Loading baseline status…</span>
+                  </div>
+                ) : baselineInfo.has_baseline ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 10, background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+                    <i className="bi bi-check-circle-fill" style={{ color: "#22c55e", fontSize: 16, flexShrink: 0 }}></i>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#15803d" }}>Baseline Active</p>
+                      <p style={{ margin: 0, fontSize: 11, color: "#4ade80" }}>
+                        Recorded on {new Date(baselineInfo.recorded_at).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" })}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 10, background: "#fff7ed", border: "1px solid #fed7aa" }}>
+                    <i className="bi bi-exclamation-triangle-fill" style={{ color: "#f59e0b", fontSize: 16, flexShrink: 0 }}></i>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#92400e" }}>No Baseline Found</p>
+                      <p style={{ margin: 0, fontSize: 11, color: "#b45309" }}>You'll be prompted to record one before your first exam.</p>
+                    </div>
+                  </div>
+                )}
+
+                <button className="bio-btn" onClick={() => navigate('/student/typing-test')}>
+                  <i className="bi bi-keyboard"></i>
+                  {baselineInfo?.has_baseline ? "Update Typing Baseline" : "Record Typing Baseline"}
+                </button>
+              </div>
+
             </div>{/* /bento */}
           </main>
-        </div>{/* /body */}
+        </div>
 
-        {/* Bottom nav mobile */}
         <BottomNav active="Home" />
       </div>
     </>

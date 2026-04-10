@@ -29,6 +29,7 @@ import StudentProfile from "./pages/student/StudentProfile";
 import CourseExamsPage from "./pages/student/CourseExamPage";
 import TakeExamPage from "./pages/student/TakeExamPage";
 import ExamResultsPage from "./pages/student/ExamResultsPage";
+import TypingTestPage from "./pages/student/TypingTestPage"; // ← ADD THIS
 
 // Admin Pages
 import AdminPage from "./pages/admin/AdminPage";
@@ -111,6 +112,9 @@ createRoot(document.getElementById("root")).render(
         <Route path="/student/exams/:examId/results" element={
           <ProtectedRoute role="student"><ExamResultsPage /></ProtectedRoute>
         } />
+        <Route path="/student/typing-test" element={
+          <ProtectedRoute role="student"><TypingTestPage /></ProtectedRoute>
+        } />  {/* ← ADD THIS */}
 
         {/* Admin routes */}
         <Route path="/admin" element={
