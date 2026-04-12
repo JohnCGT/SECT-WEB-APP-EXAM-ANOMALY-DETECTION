@@ -16,7 +16,6 @@ const BottomNav = ({ active }) => (
     {[
       { to: "/student",                  icon: "bi-speedometer2",    label: "Home"     },
       { to: "/student/subjects",         icon: "bi-journal-bookmark",label: "Subjects" },
-      { to: "/student/tasks",            icon: "bi-pencil-square",   label: "Tasks"    },
       { to: "/student/grades",           icon: "bi-graph-up-arrow",  label: "Grades"   },
       { to: "/student/account-settings", icon: "bi-gear",            label: "Settings" },
     ].map(({ to, icon, label }) => (
@@ -36,87 +35,56 @@ const BottomNav = ({ active }) => (
 );
 
 /* ─────────────────────────────────────────────
-   ACTIVITY HEATMAP
+   EXAM TYPE BADGE
 ───────────────────────────────────────────── */
-const ActivityHeatmap = () => {
-  const weeks = 26;
-  const days  = 7;
-  const levels = ["#e8f0fe", "#93bbfd", "#4d90fe", "#1a65e0", "#0056b3"];
-
-  const cells = Array.from({ length: weeks * days }, () => {
-    const rand = Math.random();
-    if (rand < 0.35) return 0;
-    if (rand < 0.55) return 1;
-    if (rand < 0.72) return 2;
-    if (rand < 0.88) return 3;
-    return 4;
-  });
-
-  const dayLabels = ["","M","","W","","F",""];
-
+const ExamTypeBadge = ({ type }) => {
+  const map = {
+    midterm: { bg: "#ede9fe", color: "#6d28d9", label: "Midterm" },
+    final:   { bg: "#fef2f2", color: "#dc2626", label: "Final"   },
+    quiz:    { bg: "#f0fdf4", color: "#15803d", label: "Quiz"    },
+    prelim:  { bg: "#fff7ed", color: "#c2410c", label: "Prelim"  },
+  };
+  const s = map[type] ?? { bg: "#f1f5f9", color: "#64748b", label: type };
   return (
-    <div style={{ overflowX: "auto" }}>
-      <div style={{ display: "flex", gap: 2, alignItems: "flex-start", minWidth: "fit-content" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 0 }}>
-          {dayLabels.map((d, i) => (
-            <div key={i} style={{
-              height: 11, width: 14, fontSize: 9, color: "#94a3b8",
-              display: "flex", alignItems: "center", fontFamily: "'DM Sans', sans-serif"
-            }}>{d}</div>
-          ))}
-        </div>
-        {Array.from({ length: weeks }, (_, w) => (
-          <div key={w} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {Array.from({ length: days }, (_, d) => {
-              const idx   = w * days + d;
-              const level = cells[idx];
-              return (
-                <div key={d} style={{
-                  width: 11, height: 11, borderRadius: 3,
-                  background: levels[level],
-                  transition: "transform .1s",
-                  cursor: "default",
-                }} title={`${level} contributions`}
-                  onMouseEnter={e => e.target.style.transform = "scale(1.4)"}
-                  onMouseLeave={e => e.target.style.transform = "scale(1)"}
-                />
-              );
-            })}
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 4, alignItems: "center", marginTop: 10 }}>
-        <span style={{ fontSize: 10, color: "#94a3b8", fontFamily: "'DM Sans', sans-serif" }}>Less</span>
-        {levels.map((c, i) => (
-          <div key={i} style={{ width: 11, height: 11, borderRadius: 3, background: c }} />
-        ))}
-        <span style={{ fontSize: 10, color: "#94a3b8", fontFamily: "'DM Sans', sans-serif" }}>More</span>
-      </div>
-    </div>
+    <span style={{
+      display: "inline-flex", alignItems: "center",
+      padding: "2px 8px", borderRadius: 99,
+      fontSize: 10, fontWeight: 700, letterSpacing: ".04em",
+      background: s.bg, color: s.color,
+      textTransform: "uppercase",
+    }}>{s.label}</span>
   );
 };
 
 /* ─────────────────────────────────────────────
-   MICRO SPARKLINE
+   COUNTDOWN to exam
 ───────────────────────────────────────────── */
-const Sparkline = ({ data, color = "#0056b3", height = 36 }) => {
-  const w = 80, h = height;
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const range = max - min || 1;
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - ((v - min) / range) * (h - 4) - 2;
-    return `${x},${y}`;
-  }).join(" ");
+const Countdown = ({ startTime }) => {
+  const [diff, setDiff] = useState(null);
+
+  useEffect(() => {
+    const calc = () => {
+      const ms = new Date(startTime) - new Date();
+      if (ms <= 0) { setDiff(null); return; }
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      setDiff({ h, m });
+    };
+    calc();
+    const t = setInterval(calc, 60000);
+    return () => clearInterval(t);
+  }, [startTime]);
+
+  if (!diff) return null;
+
+  const urgent = diff.h === 0 && diff.m <= 30;
   return (
-    <svg width={w} height={h} style={{ overflow: "visible" }}>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2"
-        strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={pts.split(" ").pop().split(",")[0]}
-              cy={pts.split(" ").pop().split(",")[1]}
-              r="3" fill={color} />
-    </svg>
+    <span style={{
+      fontSize: 11, fontWeight: 700, flexShrink: 0,
+      color: urgent ? "#ef4444" : "#64748b",
+    }}>
+      {diff.h > 0 ? `in ${diff.h}h ${diff.m}m` : `in ${diff.m}m`}
+    </span>
   );
 };
 
@@ -125,9 +93,13 @@ const Sparkline = ({ data, color = "#0056b3", height = 36 }) => {
 ───────────────────────────────────────────── */
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [time, setTime] = useState(new Date());
-  const [user, setUser] = useState(null);
-  const [baselineInfo, setBaselineInfo] = useState(null); // { has_baseline, recorded_at }
+  const [time, setTime]                   = useState(new Date());
+  const [user, setUser]                   = useState(null);
+  const [baselineInfo, setBaselineInfo]   = useState(null);
+  const [upcomingExams, setUpcomingExams] = useState(null);
+  const [activeExam, setActiveExam]       = useState(undefined);
+  const [recentResults, setRecentResults] = useState(null);
+  const [announcements, setAnnouncements] = useState(null);
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -135,16 +107,31 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    API.get("/me")
-      .then(res => setUser(res.data.user))
-      .catch(() => {});
+    API.get("/me").then(res => setUser(res.data.user)).catch(() => {});
   }, []);
 
-  // Fetch typing baseline status for the Security & Biometrics widget
   useEffect(() => {
     API.get("/student/typing-baseline/status")
       .then(res => setBaselineInfo(res.data))
       .catch(() => setBaselineInfo({ has_baseline: false, recorded_at: null }));
+  }, []);
+
+  useEffect(() => {
+    API.get("/student/dashboard/exams/upcoming")
+      .then(res => setUpcomingExams(res.data))
+      .catch(() => setUpcomingExams([]));
+
+    API.get("/student/dashboard/exams/active")
+      .then(res => setActiveExam(res.data))
+      .catch(() => setActiveExam(null));
+
+    API.get("/student/dashboard/exams/results")
+      .then(res => setRecentResults(res.data))
+      .catch(() => setRecentResults([]));
+
+    API.get("/student/dashboard/announcements")
+      .then(res => setAnnouncements(res.data))
+      .catch(() => setAnnouncements([]));
   }, []);
 
   const handleLogout = async () => {
@@ -158,21 +145,27 @@ const Dashboard = () => {
   const fullName  = user?.name ?? "Student";
 
   const greetingHour = time.getHours();
-  const greeting = greetingHour < 12 ? "Good morning" : greetingHour < 17 ? "Good afternoon" : "Good evening";
+  const greeting = greetingHour < 12 ? "Good morning"
+                 : greetingHour < 17 ? "Good afternoon"
+                 : "Good evening";
 
-  const courses = [
-    { name: "Data Structures", pct: 45, color: "#0056b3", badge: "Ongoing"     },
-    { name: "Database Mgmt",   pct: 82, color: "#22c55e", badge: "On Track"    },
-    { name: "UI/UX Principles",pct: 12, color: "#f59e0b", badge: "Just Started"},
-  ];
-
-  const deadlines = [
-    { title: "Database Normalization Quiz", due: "Oct 25 · 11:59 PM", urgency: "high"   },
-    { title: "Final Project Submission",    due: "Oct 28 · 5:00 PM",  urgency: "medium" },
-    { title: "Algorithm Assignment #3",     due: "Nov 02 · Midnight",  urgency: "low"    },
-  ];
-
-  const urgencyColor = { high: "#ef4444", medium: "#f59e0b", low: "#22c55e" };
+  const fmtDate = (iso) => {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+  };
+  const fmtTime = (iso) => {
+    if (!iso) return "";
+    return new Date(iso).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" });
+  };
+  const timeAgo = (iso) => {
+    if (!iso) return "";
+    const ms = Date.now() - new Date(iso);
+    const m  = Math.floor(ms / 60000);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
 
   return (
     <>
@@ -180,14 +173,12 @@ const Dashboard = () => {
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
 
         *, *::before, *::after { box-sizing: border-box; }
-
         body, html {
           margin: 0; padding: 0;
           background: #f0f4fb;
           font-family: 'DM Sans', system-ui, sans-serif;
           -webkit-font-smoothing: antialiased;
         }
-
         :root {
           --blue:      #0056b3;
           --blue-mid:  #1a6ed8;
@@ -197,10 +188,7 @@ const Dashboard = () => {
           --card-bg:   #ffffff;
           --card-br:   16px;
           --card-sh:   0 1px 3px rgba(0,0,0,.05), 0 4px 16px rgba(0,86,179,.06);
-          --glass-bg:  rgba(255,255,255,0.55);
-          --glass-bd:  1px solid rgba(255,255,255,0.70);
         }
-
         .dash-card {
           background: var(--card-bg);
           border-radius: var(--card-br);
@@ -213,7 +201,6 @@ const Dashboard = () => {
           box-shadow: 0 2px 6px rgba(0,0,0,.06), 0 8px 28px rgba(0,86,179,.10);
           transform: translateY(-1px);
         }
-
         .glass-sidebar {
           background: rgba(255,255,255,0.60);
           backdrop-filter: blur(20px) saturate(180%);
@@ -221,7 +208,6 @@ const Dashboard = () => {
           border-right: 1px solid rgba(255,255,255,0.80);
           box-shadow: 4px 0 24px rgba(0,86,179,.07);
         }
-
         .nav-pill {
           display: flex; flex-direction: column; align-items: center;
           padding: 10px 8px; border-radius: 12px; gap: 4px;
@@ -232,41 +218,6 @@ const Dashboard = () => {
         .nav-pill:hover  { background: var(--blue-lite); color: var(--blue); transform: translateY(-1px); }
         .nav-pill.active { background: var(--blue); color: #fff; box-shadow: 0 4px 14px rgba(0,86,179,.35); }
         .nav-pill i { font-size: 18px; }
-
-        .stat-chip {
-          background: var(--card-bg);
-          border-radius: 14px;
-          padding: 16px;
-          border: 1px solid rgba(0,86,179,.07);
-          box-shadow: var(--card-sh);
-          transition: box-shadow .2s, transform .2s;
-        }
-        .stat-chip:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,86,179,.12); }
-
-        .prog-track {
-          height: 6px; border-radius: 99px;
-          background: #eef2ff; overflow: hidden;
-        }
-        .prog-fill {
-          height: 100%; border-radius: 99px;
-          transition: width 1s cubic-bezier(.4,0,.2,1);
-        }
-
-        .course-row {
-          padding: 14px 0;
-          border-bottom: 1px solid #f1f5f9;
-          transition: background .15s;
-        }
-        .course-row:last-child { border-bottom: none; }
-
-        .dl-row {
-          display: flex; align-items: center; gap: 12px;
-          padding: 12px 16px; border-radius: 12px;
-          transition: background .15s;
-          cursor: default;
-        }
-        .dl-row:hover { background: #f8faff; }
-
         .live-clock {
           font-family: 'DM Mono', monospace;
           font-size: 28px; font-weight: 500;
@@ -274,23 +225,24 @@ const Dashboard = () => {
           line-height: 1;
         }
 
-        .bento {
+        /*
+          Two-column layout:
+            Left  (2fr): Upcoming Exams on top, Recent Results below
+            Right (1fr): Announcements on top, Security below
+          On mobile: single column, cards stack in source order.
+        */
+        .dash-layout {
           display: grid;
+          grid-template-columns: 2fr 1fr;
+          grid-template-rows: auto auto;
           gap: 16px;
-          grid-template-columns: 1fr 1fr 1fr;
-          grid-template-rows: auto;
         }
-        .bento-span2 { grid-column: span 2; }
-        .bento-span3 { grid-column: span 3; }
+        .col-left  { display: flex; flex-direction: column; gap: 16px; grid-column: 1; }
+        .col-right { display: flex; flex-direction: column; gap: 16px; grid-column: 2; }
 
-        @media (max-width: 991px) {
-          .bento { grid-template-columns: 1fr 1fr; }
-          .bento-span2 { grid-column: span 2; }
-          .bento-span3 { grid-column: span 2; }
-        }
-        @media (max-width: 600px) {
-          .bento { grid-template-columns: 1fr; }
-          .bento-span2, .bento-span3 { grid-column: span 1; }
+        @media (max-width: 768px) {
+          .dash-layout { grid-template-columns: 1fr; }
+          .col-left, .col-right { grid-column: 1; }
         }
 
         @keyframes fadeUp {
@@ -299,12 +251,7 @@ const Dashboard = () => {
         }
         .fade-up { animation: fadeUp .4s ease both; }
         .fade-up:nth-child(1) { animation-delay: .05s; }
-        .fade-up:nth-child(2) { animation-delay: .10s; }
-        .fade-up:nth-child(3) { animation-delay: .15s; }
-        .fade-up:nth-child(4) { animation-delay: .20s; }
-        .fade-up:nth-child(5) { animation-delay: .25s; }
-        .fade-up:nth-child(6) { animation-delay: .30s; }
-        .fade-up:nth-child(7) { animation-delay: .35s; }
+        .fade-up:nth-child(2) { animation-delay: .12s; }
 
         .topbar {
           background: rgba(255,255,255,0.80);
@@ -314,14 +261,12 @@ const Dashboard = () => {
           position: sticky; top: 0; z-index: 100;
           height: 56px;
         }
-
         .avatar {
           width: 34px; height: 34px; border-radius: 50%;
           background: var(--blue); color: #fff;
           display: flex; align-items: center; justify-content: center;
           font-size: 14px; font-weight: 700; flex-shrink: 0;
         }
-
         .search-input {
           border: 1px solid rgba(0,86,179,.15); border-radius: 10px;
           background: #f8faff; padding: 7px 14px 7px 36px;
@@ -333,14 +278,16 @@ const Dashboard = () => {
           border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,86,179,.10);
           background: #fff;
         }
-
-        .tag {
-          display: inline-flex; align-items: center;
-          padding: 2px 9px; border-radius: 99px;
-          font-size: 11px; font-weight: 600; letter-spacing: .02em;
+        .exam-row {
+          display: flex; align-items: flex-start; gap: 12px;
+          padding: 14px 0; border-bottom: 1px solid #f1f5f9;
         }
-
-        /* Biometrics widget button */
+        .exam-row:last-child { border-bottom: none; }
+        .result-row {
+          display: flex; align-items: center; gap: 12px;
+          padding: 11px 0; border-bottom: 1px solid #f1f5f9;
+        }
+        .result-row:last-child { border-bottom: none; }
         .bio-btn {
           display: flex; align-items: center; gap: 8px;
           background: #0056b3; color: #fff; border: none;
@@ -352,9 +299,29 @@ const Dashboard = () => {
           margin-top: 14px;
         }
         .bio-btn:hover { opacity: .85; }
+        .skeleton {
+          background: linear-gradient(90deg, #f1f5f9 25%, #e8f0fe 50%, #f1f5f9 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.4s infinite;
+          border-radius: 8px;
+        }
+        @keyframes shimmer {
+          0%   { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        .active-exam-pulse {
+          width: 8px; height: 8px; border-radius: 50%;
+          background: #22c55e; flex-shrink: 0;
+          animation: pulse 1.8s infinite;
+        }
+        @keyframes pulse {
+          0%   { box-shadow: 0 0 0 0 rgba(34,197,94,.5); }
+          70%  { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
+          100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+        }
       `}</style>
 
-      <div className="bg-light" style={{ background: "#f0f4fb", minHeight: "100vh" }}>
+      <div style={{ background: "#f0f4fb", minHeight: "100vh" }}>
 
         {/* ── Topbar ── */}
         <div className="topbar d-flex align-items-center px-3 px-lg-4 gap-3">
@@ -370,10 +337,12 @@ const Dashboard = () => {
           <div className="ms-auto d-flex align-items-center gap-2">
             <button style={{ background: "transparent", border: "none", position: "relative", padding: "4px 8px", cursor: "pointer" }}>
               <i className="bi bi-bell" style={{ fontSize: 18, color: "#64748b" }}></i>
-              <span style={{
-                position: "absolute", top: 2, right: 6, width: 7, height: 7,
-                background: "#ef4444", borderRadius: "50%", border: "1.5px solid #f0f4fb"
-              }}></span>
+              {announcements?.length > 0 && (
+                <span style={{
+                  position: "absolute", top: 2, right: 6, width: 7, height: 7,
+                  background: "#ef4444", borderRadius: "50%", border: "1.5px solid #f0f4fb"
+                }} />
+              )}
             </button>
 
             <div className="dropdown">
@@ -406,7 +375,6 @@ const Dashboard = () => {
             {[
               { to: "/student",                  icon: "bi-speedometer2",    label: "Home",    active: true  },
               { to: "/student/subjects",         icon: "bi-journal-bookmark",label: "Subjects",active: false },
-              { to: "/student/tasks",            icon: "bi-pencil-square",   label: "Tasks",   active: false },
               { to: "/student/grades",           icon: "bi-graph-up-arrow",  label: "Grades",  active: false },
               { to: "/student/account-settings", icon: "bi-gear",            label: "Settings",active: false },
             ].map(({ to, icon, label, active }) => (
@@ -420,6 +388,7 @@ const Dashboard = () => {
           {/* ── Main content ── */}
           <main style={{ flex: 1, padding: "24px 20px", paddingBottom: 100, minWidth: 0 }}>
 
+            {/* mobile search */}
             <div className="d-md-none mb-3 position-relative">
               <i className="bi bi-search" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13, zIndex: 1 }}></i>
               <input className="search-input" style={{ width: "100%" }} placeholder="Search subjects, exams…" />
@@ -433,7 +402,10 @@ const Dashboard = () => {
                   {fullName} 👋
                 </h1>
                 <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>
-                  {user ? `${user.year_level ?? "3rd Year"} · ${user.course ?? "BS Computer Science"} · Section ${user.section ?? "BSCS-3A"}` : "Loading your profile…"}
+                  {user
+                    ? [user.year_level, user.course, user.section ? `Section ${user.section}` : null]
+                        .filter(Boolean).join(" · ")
+                    : "Loading your profile…"}
                 </p>
               </div>
 
@@ -447,252 +419,240 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* ── Bento Grid ── */}
-            <div className="bento">
-
-              {/* 1 ── Semester Progress */}
-              <div className="dash-card bento-span2 fade-up" style={{
-                padding: 24, position: "relative", overflow: "hidden",
-                background: "linear-gradient(135deg, #0056b3 0%, #1a6ed8 60%, #4d90fe 100%)",
-                borderRadius: 16, border: "none"
+            {/* ── Active Exam Alert — only renders when an exam is live ── */}
+            {activeExam && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 12,
+                background: "#f0fdf4", border: "1px solid #bbf7d0",
+                borderRadius: 14, padding: "14px 18px", marginBottom: 16,
               }}>
-                <div style={{ position: "absolute", right: -40, top: -40, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,.08)" }} />
-                <div style={{ position: "absolute", right: 40, bottom: -60, width: 140, height: 140, borderRadius: "50%", background: "rgba(255,255,255,.05)" }} />
-                <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,.65)", textTransform: "uppercase", letterSpacing: ".06em" }}>
-                  Semester Progress
-                </p>
-                <div className="d-flex align-items-end gap-3 mt-2 mb-3">
-                  <span style={{ fontSize: 52, fontWeight: 700, color: "#fff", lineHeight: 1, letterSpacing: "-2px" }}>68%</span>
-                  <div style={{ paddingBottom: 6 }}>
-                    <span style={{ fontSize: 13, color: "rgba(255,255,255,.75)", display: "block" }}>↑ 4% vs last month</span>
-                    <span style={{ fontSize: 12, color: "rgba(255,255,255,.55)" }}>On track for Dean's List</span>
-                  </div>
-                </div>
-                <div style={{ height: 6, borderRadius: 99, background: "rgba(255,255,255,.22)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: "68%", borderRadius: 99, background: "#fff", transition: "width 1.2s cubic-bezier(.4,0,.2,1)" }} />
-                </div>
-              </div>
-
-              {/* 2 ── GPA */}
-              <div className="stat-chip fade-up d-flex flex-column justify-content-between" style={{ minHeight: 140 }}>
-                <div className="d-flex justify-content-between align-items-start">
-                  <div>
-                    <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em" }}>GPA</p>
-                    <p style={{ margin: "6px 0 0", fontSize: 36, fontWeight: 700, color: "#0f172a", letterSpacing: "-1.5px", lineHeight: 1 }}>3.84</p>
-                  </div>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: "#e8f0fe", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <i className="bi bi-mortarboard" style={{ color: "#0056b3", fontSize: 16 }}></i>
-                  </div>
-                </div>
-                <div>
-                  <Sparkline data={[3.5, 3.6, 3.7, 3.65, 3.75, 3.84]} />
-                  <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 600 }}>▲ +0.19 this semester</span>
-                </div>
-              </div>
-
-              {/* 3 ── Upcoming Exams */}
-              <div className="stat-chip fade-up d-flex flex-column justify-content-between" style={{ minHeight: 140 }}>
-                <div className="d-flex justify-content-between align-items-start">
-                  <div>
-                    <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em" }}>Exams</p>
-                    <p style={{ margin: "6px 0 0", fontSize: 36, fontWeight: 700, color: "#0f172a", letterSpacing: "-1.5px", lineHeight: 1 }}>3</p>
-                  </div>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: "#fff7ed", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <i className="bi bi-alarm" style={{ color: "#f59e0b", fontSize: 16 }}></i>
-                  </div>
-                </div>
-                <div>
-                  <Sparkline data={[1, 2, 1, 3, 2, 3]} color="#f59e0b" />
-                  <span style={{ fontSize: 11, color: "#f59e0b", fontWeight: 600 }}>This week · stay focused</span>
-                </div>
-              </div>
-
-              {/* 4 ── Tasks */}
-              <div className="stat-chip fade-up d-flex flex-column justify-content-between" style={{ minHeight: 140 }}>
-                <div className="d-flex justify-content-between align-items-start">
-                  <div>
-                    <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em" }}>Tasks</p>
-                    <p style={{ margin: "6px 0 0", fontSize: 36, fontWeight: 700, color: "#0f172a", letterSpacing: "-1.5px", lineHeight: 1 }}>12</p>
-                  </div>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <i className="bi bi-list-check" style={{ color: "#22c55e", fontSize: 16 }}></i>
-                  </div>
-                </div>
-                <div>
-                  <Sparkline data={[18, 16, 15, 14, 13, 12]} color="#22c55e" />
-                  <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 600 }}>↓ 6 done this week</span>
-                </div>
-              </div>
-
-              {/* 5 ── Class Rank */}
-              <div className="stat-chip fade-up d-flex flex-column justify-content-between" style={{ minHeight: 140 }}>
-                <div className="d-flex justify-content-between align-items-start">
-                  <div>
-                    <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em" }}>Class Rank</p>
-                    <p style={{ margin: "6px 0 0", fontSize: 36, fontWeight: 700, color: "#0f172a", letterSpacing: "-1.5px", lineHeight: 1 }}>#14</p>
-                  </div>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: "#fdf2f8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <i className="bi bi-trophy" style={{ color: "#a855f7", fontSize: 16 }}></i>
-                  </div>
-                </div>
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ height: 6, borderRadius: 99, background: "#eef2ff", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: "95%", background: "linear-gradient(90deg,#a855f7,#0056b3)", borderRadius: 99 }} />
-                  </div>
-                  <span style={{ fontSize: 11, color: "#a855f7", fontWeight: 600, marginTop: 4, display: "block" }}>Top 5% of batch</span>
-                </div>
-              </div>
-
-              {/* 6 ── My Courses */}
-              <div className="dash-card bento-span2 fade-up" style={{ padding: 24 }}>
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>📚 My Courses</h2>
-                  <Link to="/student/subjects" style={{ fontSize: 12, color: "#0056b3", fontWeight: 600, textDecoration: "none" }}>
-                    View all →
-                  </Link>
-                </div>
-                {courses.map((c, i) => (
-                  <div key={i} className="course-row">
-                    <div className="d-flex justify-content-between align-items-center mb-2">
-                      <div className="d-flex align-items-center gap-2">
-                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: c.color, flexShrink: 0 }} />
-                        <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{c.name}</span>
-                      </div>
-                      <div className="d-flex align-items-center gap-2">
-                        <span className="tag" style={{ background: c.color + "18", color: c.color, fontSize: 10 }}>{c.badge}</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: c.color, minWidth: 32, textAlign: "right" }}>{c.pct}%</span>
-                      </div>
-                    </div>
-                    <div className="prog-track">
-                      <div className="prog-fill" style={{ width: `${c.pct}%`, background: c.color }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* 7 ── Activity Heatmap */}
-              <div className="dash-card bento-span3 fade-up" style={{ padding: 24 }}>
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                  <div>
-                    <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Activity Heatmap</h2>
-                    <p style={{ margin: "2px 0 0", fontSize: 12, color: "#94a3b8" }}>Study sessions over the last 6 months</p>
-                  </div>
-                  <div style={{ fontSize: 11, color: "#64748b", background: "#f8faff", borderRadius: 8, padding: "4px 10px", fontWeight: 500 }}>
-                    126 active days
-                  </div>
-                </div>
-                <ActivityHeatmap />
-              </div>
-
-              {/* 8 ── Upcoming Deadlines */}
-              <div className="dash-card bento-span2 fade-up" style={{ padding: "20px 8px 8px 20px" }}>
-                <div className="d-flex justify-content-between align-items-center mb-2 pe-3">
-                  <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>⏰ Deadlines</h2>
-                  <Link to="/student/tasks" style={{ fontSize: 12, color: "#0056b3", fontWeight: 600, textDecoration: "none" }}>All tasks →</Link>
-                </div>
-                {deadlines.map((d, i) => (
-                  <div key={i} className="dl-row">
-                    <div style={{ width: 4, height: 36, borderRadius: 4, flexShrink: 0, background: urgencyColor[d.urgency] }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.title}</p>
-                      <p style={{ margin: 0, fontSize: 11, color: "#94a3b8" }}>Due {d.due}</p>
-                    </div>
-                    <button style={{
-                      flexShrink: 0, background: "#f8faff", border: "1px solid #e2e8f0",
-                      borderRadius: 8, padding: "5px 12px", fontSize: 11, fontWeight: 600,
-                      color: "#0056b3", cursor: "pointer", transition: "all .15s"
-                    }}
-                      onMouseEnter={e => { e.target.style.background = "#0056b3"; e.target.style.color = "#fff"; }}
-                      onMouseLeave={e => { e.target.style.background = "#f8faff"; e.target.style.color = "#0056b3"; }}>
-                      Start
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {/* 9 ── Announcements */}
-              <div className="dash-card fade-up" style={{ padding: 20 }}>
-                <h2 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>📢 Announcements</h2>
-                <div style={{
-                  borderRadius: 12, padding: 14,
-                  background: "linear-gradient(135deg, #f0f4fb, #e8f0fe)",
-                  border: "1px solid rgba(0,86,179,.10)"
-                }}>
-                  <span className="tag" style={{ background: "#0056b3", color: "#fff", marginBottom: 8, display: "inline-flex" }}>Admin</span>
-                  <p style={{ margin: "0 0 6px", fontSize: 13, color: "#1e293b", lineHeight: 1.5 }}>
-                    System maintenance scheduled tonight at 2:00 AM. Please save your work.
+                <div className="active-exam-pulse" />
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#15803d" }}>
+                    Exam in progress — {activeExam.title}
                   </p>
-                  <span style={{ fontSize: 11, color: "#94a3b8" }}>2 hours ago</span>
+                  <p style={{ margin: 0, fontSize: 11, color: "#16a34a" }}>
+                    {activeExam.course} · Ends at {fmtTime(activeExam.end_time)}
+                  </p>
                 </div>
-
-                <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-                  {[
-                    { icon: "bi-file-earmark-text", label: "Submit Assignment",  color: "#0056b3" },
-                    { icon: "bi-bar-chart-line",    label: "View Grade Report", color: "#22c55e" },
-                  ].map(q => (
-                    <button key={q.label} style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      background: "#f8faff", border: "1px solid #e2e8f0",
-                      borderRadius: 10, padding: "9px 14px", cursor: "pointer",
-                      fontSize: 12, fontWeight: 600, color: "#1e293b",
-                      textAlign: "left", transition: "border-color .15s, background .15s"
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = q.color; e.currentTarget.style.background = "#fff"; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.background = "#f8faff"; }}>
-                      <i className={`bi ${q.icon}`} style={{ color: q.color, fontSize: 15 }}></i>
-                      {q.label}
-                    </button>
-                  ))}
-                </div>
+                <button
+                  onClick={() => navigate(`/student/exams/${activeExam.id}`)}
+                  style={{
+                    background: "#16a34a", color: "#fff", border: "none",
+                    borderRadius: 10, padding: "8px 16px", fontSize: 12,
+                    fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                    flexShrink: 0,
+                  }}>
+                  Resume →
+                </button>
               </div>
+            )}
 
-              {/* 10 ── Security & Biometrics ── NEW */}
-              <div className="dash-card bento-span2 fade-up" style={{ padding: 24 }}>
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <div className="d-flex align-items-center gap-2">
+            {/* ── Two-column layout ── */}
+            <div className="dash-layout">
+
+              {/* ══ LEFT COLUMN ══ */}
+              <div className="col-left">
+
+                {/* 1 ── Upcoming Exams */}
+                <div className="dash-card fade-up" style={{ padding: 24 }}>
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
+                      📅 Upcoming Exams
+                    </h2>
+                    <Link to="/student/subjects" style={{ fontSize: 12, color: "#0056b3", fontWeight: 600, textDecoration: "none" }}>
+                      View all →
+                    </Link>
+                  </div>
+
+                  {upcomingExams === null ? (
+                    [1,2,3].map(i => (
+                      <div key={i} style={{ display: "flex", gap: 12, padding: "14px 0", borderBottom: "1px solid #f1f5f9" }}>
+                        <div className="skeleton" style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}>
+                          <div className="skeleton" style={{ height: 12, width: "60%", marginBottom: 8 }} />
+                          <div className="skeleton" style={{ height: 10, width: "40%" }} />
+                        </div>
+                      </div>
+                    ))
+                  ) : upcomingExams.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "28px 0", color: "#94a3b8" }}>
+                      <i className="bi bi-calendar-check" style={{ fontSize: 28, display: "block", marginBottom: 8 }}></i>
+                      <span style={{ fontSize: 13 }}>No upcoming exams. You're all caught up!</span>
+                    </div>
+                  ) : (
+                    upcomingExams.map((exam) => (
+                      <div key={exam.id} className="exam-row">
+                        <div style={{
+                          width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                          background: "#e8f0fe", display: "flex", flexDirection: "column",
+                          alignItems: "center", justifyContent: "center",
+                        }}>
+                          <span style={{ fontSize: 15, fontWeight: 700, color: "#0056b3", lineHeight: 1 }}>
+                            {new Date(exam.start_time).getDate()}
+                          </span>
+                          <span style={{ fontSize: 9, fontWeight: 600, color: "#4d90fe", textTransform: "uppercase" }}>
+                            {new Date(exam.start_time).toLocaleDateString("en-PH", { month: "short" })}
+                          </span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: "#1e293b" }}>{exam.title}</span>
+                            <ExamTypeBadge type={exam.type} />
+                          </div>
+                          <p style={{ margin: "3px 0 0", fontSize: 11, color: "#94a3b8" }}>
+                            {exam.course} · {fmtTime(exam.start_time)} · {exam.duration_minutes} min
+                          </p>
+                        </div>
+                        <Countdown startTime={exam.start_time} />
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* 2 ── Recent Results */}
+                <div className="dash-card fade-up" style={{ padding: 24 }}>
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
+                      📊 Recent Results
+                    </h2>
+                    <Link to="/student/courses/1/exams" style={{ fontSize: 12, color: "#0056b3", fontWeight: 600, textDecoration: "none" }}>
+                      View all →
+                    </Link>
+                  </div>
+
+                  {recentResults === null ? (
+                    [1,2,3].map(i => (
+                      <div key={i} style={{ display: "flex", gap: 12, padding: "11px 0", borderBottom: "1px solid #f1f5f9" }}>
+                        <div className="skeleton" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}>
+                          <div className="skeleton" style={{ height: 12, width: "55%", marginBottom: 8 }} />
+                          <div className="skeleton" style={{ height: 10, width: "35%" }} />
+                        </div>
+                        <div className="skeleton" style={{ width: 36, height: 20, borderRadius: 6, flexShrink: 0 }} />
+                      </div>
+                    ))
+                  ) : recentResults.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "28px 0", color: "#94a3b8" }}>
+                      <i className="bi bi-bar-chart" style={{ fontSize: 28, display: "block", marginBottom: 8 }}></i>
+                      <span style={{ fontSize: 13 }}>No exam results yet.</span>
+                    </div>
+                  ) : (
+                    recentResults.map((r, i) => {
+                      const pct    = r.total > 0 ? Math.round((r.score / r.total) * 100) : null;
+                      const passed = r.passed;
+                      return (
+                        <div key={i} className="result-row">
+                          <div style={{
+                            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                            background: passed === true ? "#f0fdf4" : passed === false ? "#fef2f2" : "#f8faff",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>
+                            <i className={`bi ${passed === true ? "bi-check-lg" : passed === false ? "bi-x-lg" : "bi-dash"}`}
+                              style={{ fontSize: 14, color: passed === true ? "#22c55e" : passed === false ? "#ef4444" : "#94a3b8" }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {r.exam}
+                            </p>
+                            <p style={{ margin: 0, fontSize: 11, color: "#94a3b8" }}>{r.course} · {fmtDate(r.date)}</p>
+                          </div>
+                          <div style={{ textAlign: "right", flexShrink: 0 }}>
+                            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: passed === true ? "#22c55e" : passed === false ? "#ef4444" : "#0f172a" }}>
+                              {pct !== null ? `${pct}%` : `${r.score}`}
+                            </p>
+                            <p style={{ margin: 0, fontSize: 10, color: "#94a3b8" }}>{r.score}/{r.total}</p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+              </div>{/* /col-left */}
+
+              {/* ══ RIGHT COLUMN ══ */}
+              <div className="col-right">
+
+                {/* 3 ── Announcements */}
+                <div className="dash-card fade-up" style={{ padding: 20 }}>
+                  <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
+                    📢 Announcements
+                  </h2>
+
+                  {announcements === null ? (
+                    [1,2].map(i => (
+                      <div key={i} className="skeleton" style={{ height: 72, borderRadius: 10, marginBottom: 10 }} />
+                    ))
+                  ) : announcements.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "36px 0", color: "#94a3b8" }}>
+                      <i className="bi bi-megaphone" style={{ fontSize: 24, display: "block", marginBottom: 8 }}></i>
+                      <span style={{ fontSize: 13 }}>No announcements.</span>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {announcements.map((a) => (
+                        <div key={a.id} style={{
+                          borderRadius: 12, padding: "12px 14px",
+                          background: "#f8faff",
+                          border: "1px solid rgba(0,86,179,.08)",
+                        }}>
+                          <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 600, color: "#1e293b", lineHeight: 1.4 }}>
+                            {a.title}
+                          </p>
+                          <p style={{ margin: "0 0 6px", fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>
+                            {a.body}
+                          </p>
+                          <span style={{ fontSize: 11, color: "#94a3b8" }}>{timeAgo(a.created_at)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 4 ── Security & Biometrics */}
+                <div className="dash-card fade-up" style={{ padding: 24 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
                     <div style={{ width: 36, height: 36, borderRadius: 10, background: "#eef2ff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <i className="bi bi-shield-lock" style={{ color: "#0056b3", fontSize: 16 }}></i>
                     </div>
                     <div>
-                      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Security &amp; Biometrics</h2>
-                      <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>Typing signature for essay exam verification</p>
+                      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Security</h2>
+                      <p style={{ margin: 0, fontSize: 11, color: "#94a3b8" }}>Typing baseline status</p>
                     </div>
                   </div>
+
+                  {baselineInfo === null ? (
+                    <div className="skeleton" style={{ height: 52, borderRadius: 10 }} />
+                  ) : baselineInfo.has_baseline ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 10, background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+                      <i className="bi bi-check-circle-fill" style={{ color: "#22c55e", fontSize: 16, flexShrink: 0 }}></i>
+                      <div>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#15803d" }}>Baseline Active</p>
+                        <p style={{ margin: 0, fontSize: 11, color: "#4ade80" }}>
+                          Recorded {fmtDate(baselineInfo.recorded_at)}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 10, background: "#fff7ed", border: "1px solid #fed7aa" }}>
+                      <i className="bi bi-exclamation-triangle-fill" style={{ color: "#f59e0b", fontSize: 16, flexShrink: 0 }}></i>
+                      <div>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#92400e" }}>No Baseline Found</p>
+                        <p style={{ margin: 0, fontSize: 11, color: "#b45309" }}>Required before your first exam.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <button className="bio-btn" onClick={() => navigate("/student/typing-test")}>
+                    <i className="bi bi-keyboard"></i>
+                    {baselineInfo?.has_baseline ? "Update Typing Baseline" : "Record Typing Baseline"}
+                  </button>
                 </div>
 
-                {/* Baseline status indicator */}
-                {baselineInfo === null ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px", borderRadius: 10, background: "#f8faff", border: "1px solid #e2e8f0" }}>
-                    <div className="spinner-border spinner-border-sm text-primary" role="status" style={{ width: 14, height: 14, borderWidth: 2 }} />
-                    <span style={{ fontSize: 13, color: "#94a3b8" }}>Loading baseline status…</span>
-                  </div>
-                ) : baselineInfo.has_baseline ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 10, background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
-                    <i className="bi bi-check-circle-fill" style={{ color: "#22c55e", fontSize: 16, flexShrink: 0 }}></i>
-                    <div>
-                      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#15803d" }}>Baseline Active</p>
-                      <p style={{ margin: 0, fontSize: 11, color: "#4ade80" }}>
-                        Recorded on {new Date(baselineInfo.recorded_at).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" })}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 10, background: "#fff7ed", border: "1px solid #fed7aa" }}>
-                    <i className="bi bi-exclamation-triangle-fill" style={{ color: "#f59e0b", fontSize: 16, flexShrink: 0 }}></i>
-                    <div>
-                      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#92400e" }}>No Baseline Found</p>
-                      <p style={{ margin: 0, fontSize: 11, color: "#b45309" }}>You'll be prompted to record one before your first exam.</p>
-                    </div>
-                  </div>
-                )}
+              </div>{/* /col-right */}
 
-                <button className="bio-btn" onClick={() => navigate('/student/typing-test')}>
-                  <i className="bi bi-keyboard"></i>
-                  {baselineInfo?.has_baseline ? "Update Typing Baseline" : "Record Typing Baseline"}
-                </button>
-              </div>
-
-            </div>{/* /bento */}
+            </div>{/* /dash-layout */}
           </main>
         </div>
 

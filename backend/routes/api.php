@@ -13,6 +13,7 @@ use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\StudentCourseController;
 use App\Http\Controllers\StudentExamController;
 use App\Http\Controllers\TypingBaselineController;
+use App\Http\Controllers\StudentDashboardController;
 use Illuminate\Support\Facades\Route;
 
 // ── Public ────────────────────────────────────────────────────────────────────
@@ -68,6 +69,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // ── Student: typing baseline ──────────────────────────────────────────────
     Route::get('/student/typing-baseline/status', [TypingBaselineController::class, 'status']);
     Route::post('/student/typing-baseline',        [TypingBaselineController::class, 'store']);
+
+    // ── Student: dashboard ────────────────────────────────────────────────────
+    Route::get('/student/dashboard/exams/upcoming', [StudentDashboardController::class, 'upcomingExams']);
+    Route::get('/student/dashboard/exams/active',   [StudentDashboardController::class, 'activeExam']);
+    Route::get('/student/dashboard/exams/results',  [StudentDashboardController::class, 'recentResults']);
+    Route::get('/student/dashboard/announcements',  [StudentDashboardController::class, 'announcements']);
 
     // ── Student: anomaly event ingestion ──────────────────────────────────────
     // Called silently by AnomalyCollector during an active exam session.
