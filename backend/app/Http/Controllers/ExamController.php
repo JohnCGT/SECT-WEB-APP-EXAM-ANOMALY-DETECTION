@@ -68,7 +68,7 @@ class ExamController extends Controller
             'start_time' => $request->start_time,
             'end_time' => $request->end_time,
             'duration_minutes' => $request->duration_minutes,
-            'status' => 'draft', // New exams start as 'draft' until published
+            'status' => $request->status ?? 'published',
         ]);
 
         // Return success response with the created exam and its course

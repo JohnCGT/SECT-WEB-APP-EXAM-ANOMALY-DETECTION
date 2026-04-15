@@ -18,7 +18,8 @@ const GLOBAL_CSS = `
   .nav-pill:hover{background:var(--blue-lite);color:var(--blue);transform:translateY(-1px);}
   .nav-pill.active{background:var(--blue);color:#fff;box-shadow:0 4px 14px rgba(0,86,179,.35);}
   .nav-pill i{font-size:18px;}
-  .avatar{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
+  .avatar{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;overflow:hidden;}
+  .avatar img{width:100%;height:100%;object-fit:cover;}
   .dash-card{background:var(--card-bg);border-radius:var(--card-br);box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);transition:box-shadow .2s,transform .2s;overflow:hidden;}
   .dash-card:hover{box-shadow:0 2px 6px rgba(0,0,0,.06),0 8px 28px rgba(0,86,179,.10);transform:translateY(-1px);}
   .stat-chip{background:var(--card-bg);border-radius:14px;padding:18px;border:1px solid rgba(0,86,179,.07);box-shadow:var(--card-sh);transition:box-shadow .2s,transform .2s;}
@@ -47,6 +48,8 @@ const GLOBAL_CSS = `
   .bento-span3{grid-column:span 3;}
   @media(max-width:991px){.bento{grid-template-columns:1fr 1fr;}.bento-span2{grid-column:span 2;}.bento-span3{grid-column:span 2;}}
   @media(max-width:600px){.bento{grid-template-columns:1fr;}.bento-span2,.bento-span3{grid-column:span 1;}}
+  .skeleton{background:linear-gradient(90deg,#f0f4fb 25%,#e8eef7 50%,#f0f4fb 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px;}
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 `;
 
 const NAV_ITEMS = [
@@ -58,22 +61,25 @@ const NAV_ITEMS = [
 ];
 
 const COURSES = [
-  { code:"CS 101", name:"Data Structures",      sched:"MWF 9:00–10:30",  inst:"Dr. Santos",  status:"Active"  },
-  { code:"CS 102", name:"Algorithm Analysis",   sched:"TTH 1:00–2:30",   inst:"Prof. Reyes", status:"Active"  },
-  { code:"CS 201", name:"Database Systems",     sched:"MWF 2:00–3:30",   inst:"Dr. Gomez",   status:"Active"  },
-  { code:"CS 202", name:"Network Security",     sched:"TTH 10:00–11:30", inst:"Engr. Cruz",  status:"Active"  },
-  { code:"CS 301", name:"Advanced Web Dev",     sched:"MWF 11:00–12:30", inst:"Ms. Lim",     status:"Active"  },
+  { code:"CS 101", name:"Data Structures",    sched:"MWF 9:00–10:30",  inst:"Dr. Santos",  status:"Active" },
+  { code:"CS 102", name:"Algorithm Analysis", sched:"TTH 1:00–2:30",   inst:"Prof. Reyes", status:"Active" },
+  { code:"CS 201", name:"Database Systems",   sched:"MWF 2:00–3:30",   inst:"Dr. Gomez",   status:"Active" },
+  { code:"CS 202", name:"Network Security",   sched:"TTH 10:00–11:30", inst:"Engr. Cruz",  status:"Active" },
+  { code:"CS 301", name:"Advanced Web Dev",   sched:"MWF 11:00–12:30", inst:"Ms. Lim",     status:"Active" },
 ];
 
 const ACTIVITY = [
-  { icon:"bi-file-earmark-text", color:"#0056b3", text:"Submitted: Data Structures Assignment 3",    time:"2 hours ago"    },
-  { icon:"bi-check-circle",      color:"#22c55e", text:"Completed exam: Algorithm Analysis Quiz 2",  time:"1 day ago"      },
-  { icon:"bi-bar-chart",         color:"#0ea5e9", text:"Viewed grades: Database Systems Midterm",    time:"2 days ago"     },
-  { icon:"bi-clock",             color:"#f59e0b", text:"Upcoming exam: Network Security Final",      time:"3 days from now"},
+  { icon:"bi-file-earmark-text", color:"#0056b3", text:"Submitted: Data Structures Assignment 3",   time:"2 hours ago"     },
+  { icon:"bi-check-circle",      color:"#22c55e", text:"Completed exam: Algorithm Analysis Quiz 2", time:"1 day ago"       },
+  { icon:"bi-bar-chart",         color:"#0ea5e9", text:"Viewed grades: Database Systems Midterm",   time:"2 days ago"      },
+  { icon:"bi-clock",             color:"#f59e0b", text:"Upcoming exam: Network Security Final",     time:"3 days from now" },
 ];
 
 const INTERESTS = ["Web Development","Cybersecurity","Data Science","AI & ML","Software Engineering"];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-components
+// ─────────────────────────────────────────────────────────────────────────────
 const BottomNav = ({ active }) => (
   <nav className="bottom-nav d-lg-none">
     {NAV_ITEMS.map(({ to, icon, label }) => (
@@ -99,12 +105,16 @@ const Topbar = ({ user, onLogout }) => {
           <button className="d-flex align-items-center gap-2 dropdown-toggle"
             style={{ background:"transparent", border:"none", cursor:"pointer", padding:"4px 6px", borderRadius:10 }}
             data-bs-toggle="dropdown">
-            <div className="avatar">{initial}</div>
+            <div className="avatar">
+              {user?.profile_photo_url
+                ? <img src={user.profile_photo_url} alt="avatar"/>
+                : initial}
+            </div>
             <span className="d-none d-sm-inline" style={{ fontSize:13, fontWeight:600, color:"#1e293b" }}>{firstName}</span>
           </button>
           <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0" style={{ borderRadius:12, fontSize:13 }}>
             <li><Link className="dropdown-item" to="/student/profile">My Profile</Link></li>
-            <li><hr className="dropdown-divider" /></li>
+            <li><hr className="dropdown-divider"/></li>
             <li>
               <button className="dropdown-item text-danger" onClick={onLogout}
                 style={{ border:"none", background:"none", width:"100%", textAlign:"left" }}>Logout</button>
@@ -127,9 +137,12 @@ const Sidebar = ({ active }) => (
   </nav>
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Main component
+// ─────────────────────────────────────────────────────────────────────────────
 const StudentProfile = () => {
-  const navigate = useNavigate();
-  const [user, setUser]     = useState(null);
+  const navigate              = useNavigate();
+  const [user, setUser]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("about");
 
@@ -142,27 +155,31 @@ const StudentProfile = () => {
 
   const handleLogout = async () => {
     try { await API.post("/logout"); } catch {}
-    localStorage.removeItem("user"); navigate("/");
+    localStorage.removeItem("user");
+    navigate("/");
   };
-
-  const initial   = user?.name?.charAt(0)?.toUpperCase() ?? "S";
-  const fullName  = user?.name ?? "Student";
 
   if (loading) return (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh", background:"#f0f4fb" }}>
-      <div className="spinner-border text-primary" role="status" />
+      <div className="spinner-border text-primary" role="status"/>
     </div>
   );
+
+  const initial  = user?.name?.charAt(0)?.toUpperCase() ?? "S";
+  const fullName = user?.name  ?? "Student";
+
+  // Build display tags from real data, filter out empty values
+  const profileTags = [user?.course, user?.year_level, user?.student_id].filter(Boolean);
 
   return (
     <>
       <style>{GLOBAL_CSS}</style>
       <div style={{ background:"#f0f4fb", minHeight:"100vh" }}>
 
-        <Topbar user={user} onLogout={handleLogout} />
+        <Topbar user={user} onLogout={handleLogout}/>
 
         <div className="d-flex align-items-stretch">
-          <Sidebar active="" />
+          <Sidebar active=""/>
 
           <main style={{ flex:1, padding:"24px 20px", paddingBottom:100, minWidth:0 }}>
 
@@ -173,54 +190,61 @@ const StudentProfile = () => {
               <p style={{ margin:0, fontSize:13, color:"#64748b" }}>Personal info, enrolled courses and recent activity</p>
             </div>
 
-            {/* Bento grid */}
             <div className="bento">
 
-              {/* 1 ── Identity hero card — spans 2 */}
+              {/* 1 ── Identity hero — spans 2 */}
               <div className="dash-card bento-span2 fade-up" style={{
-                padding:0, background:"linear-gradient(135deg, #0056b3 0%, #1a6ed8 60%, #4d90fe 100%)",
+                padding:0,
+                background:"linear-gradient(135deg, #0056b3 0%, #1a6ed8 60%, #4d90fe 100%)",
                 border:"none", position:"relative", overflow:"hidden"
               }}>
-                {/* Decorative circles */}
                 <div style={{ position:"absolute", right:-50, top:-50, width:200, height:200, borderRadius:"50%", background:"rgba(255,255,255,.06)" }}/>
                 <div style={{ position:"absolute", left:-30, bottom:-60, width:160, height:160, borderRadius:"50%", background:"rgba(255,255,255,.04)" }}/>
 
                 <div style={{ padding:"28px 28px 24px", position:"relative" }}>
-                  {/* Avatar */}
+                  {/* Avatar — shows real photo if uploaded */}
                   <div style={{
                     width:72, height:72, borderRadius:"50%",
                     background:"rgba(255,255,255,.2)", border:"3px solid rgba(255,255,255,.4)",
                     display:"flex", alignItems:"center", justifyContent:"center",
                     fontSize:28, fontWeight:700, color:"#fff",
-                    marginBottom:14, backdropFilter:"blur(8px)"
-                  }}>{initial}</div>
+                    marginBottom:14, backdropFilter:"blur(8px)", overflow:"hidden", flexShrink:0
+                  }}>
+                    {user?.profile_photo_url
+                      ? <img src={user.profile_photo_url} alt="Profile" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
+                      : initial}
+                  </div>
 
                   <h2 style={{ margin:"0 0 3px", fontSize:20, fontWeight:700, color:"#fff", letterSpacing:"-.3px" }}>{fullName}</h2>
                   <p style={{ margin:"0 0 14px", fontSize:13, color:"rgba(255,255,255,.7)" }}>
-                    {user?.student_id ?? "2022-04567"} · 3rd Year · BSCS-3A
+                    {user?.student_id ? `${user.student_id} · ` : ""}
+                    {user?.year_level ?? ""}
                   </p>
 
-                  {/* Tags */}
+                  {/* Real profile tags */}
                   <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-                    {["BS Computer Science","College of Computing Studies","Dean's List"].map(t => (
-                      <span key={t} style={{
-                        background:"rgba(255,255,255,.18)", color:"#fff",
-                        borderRadius:99, padding:"3px 11px", fontSize:11, fontWeight:600,
-                        backdropFilter:"blur(4px)"
-                      }}>{t}</span>
-                    ))}
+                    {profileTags.length > 0
+                      ? profileTags.map(t => (
+                          <span key={t} style={{ background:"rgba(255,255,255,.18)", color:"#fff", borderRadius:99, padding:"3px 11px", fontSize:11, fontWeight:600, backdropFilter:"blur(4px)" }}>
+                            {t}
+                          </span>
+                        ))
+                      : (
+                          <span style={{ background:"rgba(255,255,255,.18)", color:"rgba(255,255,255,.7)", borderRadius:99, padding:"3px 11px", fontSize:11, fontWeight:600 }}>
+                            No profile info yet — <Link to="/student/account-settings" style={{ color:"#fff" }}>add it in Settings</Link>
+                          </span>
+                        )
+                    }
                   </div>
 
-                  {/* Change photo btn */}
-                  <button style={{
+                  <Link to="/student/account-settings" style={{
                     marginTop:16, background:"rgba(255,255,255,.15)", border:"1px solid rgba(255,255,255,.3)",
                     borderRadius:10, padding:"6px 14px", fontSize:12, fontWeight:600, color:"#fff",
-                    cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", gap:6,
-                    backdropFilter:"blur(4px)", transition:"background .15s"
-                  }} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,.25)"}
-                     onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,.15)"}>
-                    <i className="bi bi-camera"></i>Change Photo
-                  </button>
+                    display:"inline-flex", alignItems:"center", gap:6,
+                    backdropFilter:"blur(4px)", textDecoration:"none"
+                  }}>
+                    <i className="bi bi-pencil-square"></i>Edit Profile
+                  </Link>
                 </div>
               </div>
 
@@ -292,14 +316,14 @@ const StudentProfile = () => {
                 <span style={{ fontSize:11, color:"#f59e0b", fontWeight:600 }}>Current semester</span>
               </div>
 
-              {/* 6 ── Contact info card */}
+              {/* 6 ── Contact info — always shows real data */}
               <div className="dash-card fade-up" style={{ padding:20 }}>
                 <h3 style={{ margin:"0 0 14px", fontSize:14, fontWeight:700, color:"#0f172a" }}>Contact Info</h3>
                 {[
-                  { icon:"bi-envelope",     color:"#0056b3", label:"Email",      val: user?.email ?? "alex.delacruz@student.university.edu.ph" },
-                  { icon:"bi-telephone",    color:"#22c55e", label:"Phone",      val:"+63 917 654 3210" },
-                  { icon:"bi-person-badge", color:"#a855f7", label:"Student ID", val: user?.student_id ?? "2022-04567" },
-                  { icon:"bi-building",     color:"#f59e0b", label:"College",    val:"College of Computing Studies" },
+                  { icon:"bi-envelope",     color:"#0056b3", label:"Email",      val: user?.email      ?? "—" },
+                  { icon:"bi-telephone",    color:"#22c55e", label:"Phone",      val: user?.phone      ?? "Not set" },
+                  { icon:"bi-person-badge", color:"#a855f7", label:"Student ID", val: user?.student_id ?? "Not set" },
+                  { icon:"bi-building",     color:"#f59e0b", label:"Course",     val: user?.course     ?? "Not set" },
                 ].map(row => (
                   <div key={row.label} className="info-row">
                     <div style={{ width:28, height:28, borderRadius:8, background:row.color+"18", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
@@ -307,15 +331,16 @@ const StudentProfile = () => {
                     </div>
                     <div>
                       <p style={{ margin:0, fontSize:10, fontWeight:600, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".04em" }}>{row.label}</p>
-                      <p style={{ margin:0, fontSize:12, fontWeight:500, color:"#1e293b", wordBreak:"break-word" }}>{row.val}</p>
+                      <p style={{ margin:0, fontSize:12, fontWeight:500, color: row.val === "Not set" ? "#94a3b8" : "#1e293b", wordBreak:"break-word", fontStyle: row.val === "Not set" ? "italic" : "normal" }}>
+                        {row.val}
+                      </p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* 7 ── Detailed info tabs — spans 3 */}
+              {/* 7 ── Detail tabs — spans 3 */}
               <div className="dash-card bento-span3 fade-up" style={{ padding:0 }}>
-                {/* Tab bar */}
                 <div style={{ padding:"14px 20px 0", borderBottom:"1px solid #f1f5f9", display:"flex", gap:6 }}>
                   {[
                     { key:"about",    label:"About"    },
@@ -335,7 +360,9 @@ const StudentProfile = () => {
                     <div>
                       <h3 style={{ margin:"0 0 10px", fontSize:14, fontWeight:700, color:"#0f172a" }}>Student Bio</h3>
                       <p style={{ margin:"0 0 20px", fontSize:13, color:"#64748b", lineHeight:1.7 }}>
-                        {fullName} is a third-year Computer Science student with strong interests in software engineering, cybersecurity, and data analytics. Consistently maintaining academic excellence while actively participating in tech-related student organizations.
+                        {fullName} is a {user?.year_level ? user.year_level.toLowerCase() : "current"} Computer Science student
+                        with strong interests in software engineering, cybersecurity, and data analytics.
+                        Consistently maintaining academic excellence while actively participating in tech-related student organizations.
                       </p>
                       <h3 style={{ margin:"0 0 10px", fontSize:14, fontWeight:700, color:"#0f172a" }}>Academic Interests</h3>
                       <div>
@@ -400,7 +427,7 @@ const StudentProfile = () => {
           </main>
         </div>
 
-        <BottomNav active="" />
+        <BottomNav active=""/>
       </div>
     </>
   );

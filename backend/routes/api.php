@@ -14,6 +14,7 @@ use App\Http\Controllers\StudentCourseController;
 use App\Http\Controllers\StudentExamController;
 use App\Http\Controllers\TypingBaselineController;
 use App\Http\Controllers\StudentDashboardController;
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 // ── Public ────────────────────────────────────────────────────────────────────
@@ -27,6 +28,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me',      [AuthController::class, 'me']);
+    Route::put('/profile',         [ProfileController::class, 'update']);
+    Route::put('/profile/password', [ProfileController::class, 'changePassword']);
+    Route::post('/profile/photo',   [ProfileController::class, 'uploadPhoto']);
 
     // ── Admin: User Management ────────────────────────────────────────────────
     Route::prefix('admin')->group(function () {
@@ -69,12 +73,15 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // ── Student: typing baseline ──────────────────────────────────────────────
     Route::get('/student/typing-baseline/status', [TypingBaselineController::class, 'status']);
     Route::post('/student/typing-baseline',        [TypingBaselineController::class, 'store']);
+    Route::get('/student/dashboard/typing-stats', [StudentDashboardController::class, 'typingStats']);
 
     // ── Student: dashboard ────────────────────────────────────────────────────
     Route::get('/student/dashboard/exams/upcoming', [StudentDashboardController::class, 'upcomingExams']);
     Route::get('/student/dashboard/exams/active',   [StudentDashboardController::class, 'activeExam']);
     Route::get('/student/dashboard/exams/results',  [StudentDashboardController::class, 'recentResults']);
     Route::get('/student/dashboard/announcements',  [StudentDashboardController::class, 'announcements']);
+    Route::get('/student/dashboard/integrity', [StudentDashboardController::class, 'integrityStats']);
+    Route::get('/student/dashboard/score-stats',    [StudentDashboardController::class, 'scoreStats']);
 
     // ── Student: anomaly event ingestion ──────────────────────────────────────
     // Called silently by AnomalyCollector during an active exam session.
