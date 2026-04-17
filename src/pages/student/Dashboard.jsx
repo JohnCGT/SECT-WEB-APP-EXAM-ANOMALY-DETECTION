@@ -351,6 +351,7 @@ const Dashboard = () => {
             {[
               { to: "/student",                  icon: "bi-speedometer2",    label: "Home",    active: true  },
               { to: "/student/subjects",         icon: "bi-journal-bookmark",label: "Subjects",active: false },
+              { to: "/student/tasks",            icon: "bi-pencil-square",    label: "Tasks", active: false  },
               { to: "/student/grades",           icon: "bi-graph-up-arrow",  label: "Grades",  active: false },
               { to: "/student/account-settings", icon: "bi-gear",            label: "Settings",active: false },
             ].map(({ to, icon, label, active }) => (
