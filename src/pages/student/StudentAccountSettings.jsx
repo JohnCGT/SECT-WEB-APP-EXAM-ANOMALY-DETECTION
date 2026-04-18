@@ -76,7 +76,7 @@ const GLOBAL_CSS = `
 const NAV_ITEMS = [
   { to:"/student",                  icon:"bi-speedometer2",    label:"Home"    },
   { to:"/student/subjects",         icon:"bi-journal-bookmark",label:"Subjects"},
-  { to:"/student/tasks",            icon:"bi-pencil-square",   label:"Tasks"   },
+  { to: "/student/exams",           icon: "bi-pencil-square",  label: "Exams" },
   { to:"/student/grades",           icon:"bi-graph-up-arrow",  label:"Grades"  },
   { to:"/student/account-settings", icon:"bi-gear",            label:"Settings"},
 ];

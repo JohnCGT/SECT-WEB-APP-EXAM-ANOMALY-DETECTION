@@ -22,7 +22,7 @@ import ExamEdit from "./pages/instructor/ExamEdit";
 // Student Pages
 import Dashboard from "./pages/student/Dashboard";
 import SubjectPage from "./pages/student/SubjectPage";
-import TasksPage from "./pages/student/TasksPage";
+import ExamsPage from "./pages/student/ExamsPage";
 import GradesPage from "./pages/student/GradesPage";
 import StudentAccountSettings from "./pages/student/StudentAccountSettings";
 import StudentProfile from "./pages/student/StudentProfile";
@@ -91,8 +91,8 @@ createRoot(document.getElementById("root")).render(
         <Route path="/student/subjects" element={
           <ProtectedRoute role="student"><SubjectPage /></ProtectedRoute>
         } />
-        <Route path="/student/tasks" element={
-          <ProtectedRoute role="student"><TasksPage /></ProtectedRoute>
+        <Route path="/student/exams" element={
+          <ProtectedRoute role="student"><ExamsPage /></ProtectedRoute>
         } />
         <Route path="/student/grades" element={
           <ProtectedRoute role="student"><GradesPage /></ProtectedRoute>

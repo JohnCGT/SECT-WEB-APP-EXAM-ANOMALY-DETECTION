@@ -80,18 +80,6 @@ const Countdown = ({ startTime }) => {
 };
 
 /* ─────────────────────────────────────────────
-   CPI LABEL COLOR
-───────────────────────────────────────────── */
-const cpiColor = (label) => {
-  if (!label) return { color: "#94a3b8", bg: "#f1f5f9" };
-  const l = label.toLowerCase();
-  if (l.includes("unlikely"))  return { color: "#15803d", bg: "#f0fdf4" };
-  if (l.includes("possible"))  return { color: "#b45309", bg: "#fff7ed" };
-  if (l.includes("likely") || l.includes("high")) return { color: "#dc2626", bg: "#fef2f2" };
-  return { color: "#64748b", bg: "#f1f5f9" };
-};
-
-/* ─────────────────────────────────────────────
    STAT CHIP (reusable)
 ───────────────────────────────────────────── */
 const StatChip = ({ label, value, sub, color = "#0056b3", bg = "#e8f0fe" }) => (
@@ -119,8 +107,6 @@ const Dashboard = () => {
   const [announcements, setAnnouncements] = useState(null);
   const [courses, setCourses]             = useState(null);
   const [scoreStats, setScoreStats]       = useState(null);
-  const [integrity, setIntegrity]         = useState(null);
-  const [typingStats, setTypingStats]     = useState(null);
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -162,13 +148,6 @@ const Dashboard = () => {
       .then(res => setScoreStats(res.data))
       .catch(() => setScoreStats(null));
 
-    API.get("/student/dashboard/integrity")
-      .then(res => setIntegrity(res.data))
-      .catch(() => setIntegrity(null));
-
-    API.get("/student/dashboard/typing-stats")
-      .then(res => setTypingStats(res.data))
-      .catch(() => setTypingStats(null));
   }, []);
 
   const handleLogout = async () => {
@@ -203,8 +182,6 @@ const Dashboard = () => {
     if (h < 24) return `${h}h ago`;
     return `${Math.floor(h / 24)}d ago`;
   };
-
-  const cpi = cpiColor(integrity?.cpi_label);
 
   return (
     <>
@@ -300,9 +277,6 @@ const Dashboard = () => {
         }
         .course-chip:hover{border-color:#0056b3;box-shadow:0 4px 16px rgba(0,86,179,.12);transform:translateY(-2px);}
 
-        /* Flag dots */
-        .flag-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f8faff;}
-        .flag-row:last-child{border-bottom:none;}
       `}</style>
 
       <div style={{ background: "#f0f4fb", minHeight: "100vh" }}>
@@ -351,7 +325,7 @@ const Dashboard = () => {
             {[
               { to: "/student",                  icon: "bi-speedometer2",    label: "Home",    active: true  },
               { to: "/student/subjects",         icon: "bi-journal-bookmark",label: "Subjects",active: false },
-              { to: "/student/tasks",            icon: "bi-pencil-square",    label: "Tasks", active: false  },
+              { to: "/student/exams", icon: "bi-pencil-square", label: "Exams" },
               { to: "/student/grades",           icon: "bi-graph-up-arrow",  label: "Grades",  active: false },
               { to: "/student/account-settings", icon: "bi-gear",            label: "Settings",active: false },
             ].map(({ to, icon, label, active }) => (
@@ -607,100 +581,6 @@ const Dashboard = () => {
                         </div>
                       ))}
                     </div>
-                  )}
-                </div>
-
-                {/* 5 ── Typing Speed */}
-                <div className="dash-card fade-up" style={{ padding: 20 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 10, background: "#e8f0fe", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <i className="bi bi-keyboard" style={{ color: "#0056b3", fontSize: 15 }}></i>
-                    </div>
-                    <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Typing Speed</h2>
-                  </div>
-
-                  {typingStats === null ? (
-                    <div className="skeleton" style={{ height: 60, borderRadius: 10 }} />
-                  ) : typingStats.samples === 0 ? (
-                    <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>No typing data yet. Take an essay exam to generate data.</p>
-                  ) : (
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <StatChip label="Avg WPM" value={typingStats.avg_wpm} color="#0056b3" bg="#e8f0fe" />
-                      <StatChip label="Peak WPM" value={typingStats.max_wpm} color="#15803d" bg="#f0fdf4"
-                        sub={`${typingStats.samples} samples`} />
-                    </div>
-                  )}
-                </div>
-
-                {/* 6 ── Exam Integrity */}
-                <div className="dash-card fade-up" style={{ padding: 20 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 10, background: "#eef2ff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <i className="bi bi-shield-lock" style={{ color: "#0056b3", fontSize: 15 }}></i>
-                    </div>
-                    <div>
-                      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Exam Integrity</h2>
-                      <p style={{ margin: 0, fontSize: 11, color: "#94a3b8" }}>Based on your exam behavior</p>
-                    </div>
-                  </div>
-
-                  {integrity === null ? (
-                    <div className="skeleton" style={{ height: 80, borderRadius: 10 }} />
-                  ) : integrity.total_exams === 0 ? (
-                    <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>No exam data processed yet.</p>
-                  ) : (
-                    <>
-                      {/* CPI label pill */}
-                      <div style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "10px 14px", borderRadius: 10,
-                        background: cpi.bg, border: `1px solid ${cpi.color}30`,
-                        marginBottom: 14,
-                      }}>
-                        <div>
-                          <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: cpi.color }}>
-                            Cheating Probability
-                          </p>
-                          <p style={{ margin: "2px 0 0", fontSize: 18, fontWeight: 700, color: cpi.color }}>
-                            {integrity.cpi_label ?? "N/A"}
-                          </p>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <p style={{ margin: 0, fontSize: 11, color: "#94a3b8" }}>CPI Score</p>
-                          <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: cpi.color }}>
-                            {integrity.avg_cpi?.toFixed(2) ?? "—"}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Flag breakdown */}
-                      <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".05em" }}>
-                        Flag Breakdown
-                      </p>
-                      {[
-                        { label: "Tab Switching",    val: integrity.flags.tab_switch,    icon: "bi-window-stack"   },
-                        { label: "Keyboard Shortcuts", val: integrity.flags.keyboard,    icon: "bi-keyboard"       },
-                        { label: "Response Time",    val: integrity.flags.response_time, icon: "bi-clock-history"  },
-                        { label: "Keystroke Pattern",val: integrity.flags.keystroke,     icon: "bi-activity"       },
-                      ].map(f => (
-                        <div key={f.label} className="flag-row">
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <i className={`bi ${f.icon}`} style={{ fontSize: 13, color: "#94a3b8" }}></i>
-                            <span style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>{f.label}</span>
-                          </div>
-                          <span style={{
-                            fontSize: 12, fontWeight: 700,
-                            color: f.val > 0 ? "#ef4444" : "#22c55e",
-                          }}>
-                            {f.val > 0 ? `${f.val} flag${f.val > 1 ? "s" : ""}` : "Clean"}
-                          </span>
-                        </div>
-                      ))}
-
-                      <p style={{ margin: "12px 0 0", fontSize: 11, color: "#94a3b8", textAlign: "right" }}>
-                        Across {integrity.total_exams} exam{integrity.total_exams !== 1 ? "s" : ""}
-                      </p>
-                    </>
                   )}
                 </div>
 

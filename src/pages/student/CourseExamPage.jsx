@@ -93,18 +93,18 @@ const GLOBAL_CSS = `
 `;
 
 const NAV_ITEMS = [
-  { to:"/student",                  icon:"bi-speedometer2",    label:"Home"    },
-  { to:"/student/subjects",         icon:"bi-journal-bookmark",label:"Subjects"},
-  { to:"/student/tasks",            icon:"bi-pencil-square",   label:"Tasks"   },
-  { to:"/student/grades",           icon:"bi-graph-up-arrow",  label:"Grades"  },
-  { to:"/student/account-settings", icon:"bi-gear",            label:"Settings"},
+  { to:"/student",                  icon:"bi-speedometer2",     label:"Home"     },
+  { to:"/student/subjects",         icon:"bi-journal-bookmark", label:"Subjects" },
+  { to:"/student/exams",            icon:"bi-pencil-square",    label:"Exams"    }, // ← consistent with all other pages
+  { to:"/student/grades",           icon:"bi-graph-up-arrow",   label:"Grades"   },
+  { to:"/student/account-settings", icon:"bi-gear",             label:"Settings" },
 ];
 
 const STATUS = {
-  submitted:{ color:"#22c55e", bg:"#f0fdf4", label:"Submitted"     },
-  open:     { color:"#0056b3", bg:"#e8f0fe", label:"Open"          },
-  upcoming: { color:"#f59e0b", bg:"#fff7ed", label:"Upcoming"       },
-  ended:    { color:"#94a3b8", bg:"#f1f5f9", label:"Ended"          },
+  submitted:{ color:"#22c55e", bg:"#f0fdf4", label:"Submitted" },
+  open:     { color:"#0056b3", bg:"#e8f0fe", label:"Open"      },
+  upcoming: { color:"#f59e0b", bg:"#fff7ed", label:"Upcoming"  },
+  ended:    { color:"#94a3b8", bg:"#f1f5f9", label:"Ended"     },
 };
 
 const getStatus = (exam) => {
@@ -115,6 +115,7 @@ const getStatus = (exam) => {
   return "open";
 };
 
+/* ─── Bottom Nav ─── */
 const BottomNav = ({ active }) => (
   <nav className="bottom-nav d-lg-none">
     {NAV_ITEMS.map(({ to, icon, label }) => (
@@ -125,6 +126,7 @@ const BottomNav = ({ active }) => (
   </nav>
 );
 
+/* ─── Topbar ─── */
 const Topbar = ({ user, onLogout }) => {
   const initial   = user?.name?.charAt(0)?.toUpperCase() ?? "S";
   const firstName = user?.name?.split(" ")[0] ?? "Student";
@@ -159,6 +161,7 @@ const Topbar = ({ user, onLogout }) => {
   );
 };
 
+/* ─── Sidebar ─── */
 const Sidebar = ({ active }) => (
   <nav className="glass-sidebar d-none d-lg-flex flex-column align-items-center py-4 gap-1"
     style={{ width:80, minHeight:"calc(100vh - 56px)", position:"sticky", top:56, alignSelf:"flex-start", flexShrink:0 }}>
@@ -170,6 +173,9 @@ const Sidebar = ({ active }) => (
   </nav>
 );
 
+/* ══════════════════════════════════════
+   COURSE EXAM PAGE
+══════════════════════════════════════ */
 const CourseExamPage = () => {
   const { courseId } = useParams();
   const navigate     = useNavigate();
@@ -221,14 +227,17 @@ const CourseExamPage = () => {
         <Topbar user={user} onLogout={handleLogout} />
 
         <div className="d-flex align-items-stretch">
-          <Sidebar active="Subjects" />
+
+          {/* ↓ FIXED: was "Subjects", now "Exams" so the pill highlights correctly */}
+          <Sidebar active="Exams" />
 
           <main style={{ flex:1, padding:"24px 20px", paddingBottom:100, minWidth:0 }}>
 
             {/* Back + page header */}
             <div style={{ marginBottom:24 }}>
-              <Link to="/student/subjects" className="back-btn" style={{ marginBottom:14, display:"inline-flex" }}>
-                <i className="bi bi-arrow-left"></i>Back to Subjects
+              {/* ↓ Back button now goes to /student/exams (the Exams hub) */}
+              <Link to="/student/exams" className="back-btn" style={{ marginBottom:14, display:"inline-flex" }}>
+                <i className="bi bi-arrow-left"></i>Back to Exams
               </Link>
               {course && (
                 <>
@@ -250,10 +259,10 @@ const CourseExamPage = () => {
             {exams.length > 0 && (
               <div style={{ display:"flex", gap:12, marginBottom:24, flexWrap:"wrap" }}>
                 {[
-                  { label:"Total Exams",  val:exams.length, color:"#0056b3", bg:"#e8f0fe" },
-                  { label:"Open Now",     val:open,         color:"#0056b3", bg:"#e8f0fe" },
-                  { label:"Upcoming",     val:upcoming,     color:"#f59e0b", bg:"#fff7ed" },
-                  { label:"Submitted",    val:submitted,    color:"#22c55e", bg:"#f0fdf4" },
+                  { label:"Total Exams", val:exams.length, color:"#0056b3", bg:"#e8f0fe" },
+                  { label:"Open Now",    val:open,         color:"#0056b3", bg:"#e8f0fe" },
+                  { label:"Upcoming",    val:upcoming,     color:"#f59e0b", bg:"#fff7ed" },
+                  { label:"Submitted",   val:submitted,    color:"#22c55e", bg:"#f0fdf4" },
                 ].map(s => (
                   <div key={s.label} className="fade-up" style={{
                     background:s.bg, borderRadius:12, padding:"10px 16px",
@@ -296,7 +305,7 @@ const CourseExamPage = () => {
                   const scoreColor = pct >= 75 ? "#22c55e" : pct >= 50 ? "#f59e0b" : "#ef4444";
 
                   return (
-                    <div key={exam.id} className={`exam-card fade-up`}
+                    <div key={exam.id} className="exam-card fade-up"
                       style={{ animationDelay:`${idx * 0.05}s`, borderTop:`3px solid ${st.color}` }}>
 
                       <div style={{ padding:"18px 20px 0" }}>
@@ -319,9 +328,9 @@ const CourseExamPage = () => {
                       {/* Stat pips */}
                       <div style={{ display:"flex", gap:8, padding:"0 20px", marginBottom:14 }}>
                         {[
-                          { val:exam.questions_count,    label:"Questions" },
+                          { val:exam.questions_count,        label:"Questions" },
                           { val:`${exam.duration_minutes}m`, label:"Duration"  },
-                          { val:exam.total_points,       label:"Points"    },
+                          { val:exam.total_points,           label:"Points"    },
                         ].map(s => (
                           <div key={s.label} className="stat-pip">
                             <div style={{ fontSize:14, fontWeight:700, color:"#0f172a" }}>{s.val}</div>
@@ -361,8 +370,7 @@ const CourseExamPage = () => {
                           <Link to={`/student/exams/${exam.id}/take`} style={{
                             display:"flex", alignItems:"center", justifyContent:"center", gap:8,
                             background:"#0056b3", color:"#fff", borderRadius:10, padding:"10px",
-                            fontSize:13, fontWeight:700, textDecoration:"none",
-                            transition:"opacity .15s"
+                            fontSize:13, fontWeight:700, textDecoration:"none", transition:"opacity .15s"
                           }} onMouseEnter={e=>e.currentTarget.style.opacity=".85"}
                              onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
                             <i className="bi bi-pencil-square"></i>Take Exam
@@ -399,7 +407,8 @@ const CourseExamPage = () => {
           </main>
         </div>
 
-        <BottomNav active="Subjects" />
+        {/* ↓ FIXED: was "Subjects", now "Exams" */}
+        <BottomNav active="Exams" />
       </div>
     </>
   );

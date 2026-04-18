@@ -28,71 +28,57 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me',      [AuthController::class, 'me']);
-    Route::put('/profile',         [ProfileController::class, 'update']);
+    Route::put('/profile',          [ProfileController::class, 'update']);
     Route::put('/profile/password', [ProfileController::class, 'changePassword']);
     Route::post('/profile/photo',   [ProfileController::class, 'uploadPhoto']);
 
     // ── Admin: User Management ────────────────────────────────────────────────
     Route::prefix('admin')->group(function () {
 
-        // User Management (existing)
         Route::get('/users',               [AdminUserController::class, 'index']);
         Route::post('/users',              [AdminUserController::class, 'store']);
         Route::put('/users/{id}',          [AdminUserController::class, 'update']);
         Route::patch('/users/{id}/status', [AdminUserController::class, 'updateStatus']);
         Route::delete('/users/{id}',       [AdminUserController::class, 'destroy']);
 
-        // Dashboard overview stats + recent CPI results
         Route::get('/dashboard', [AdminDashboardController::class, 'dashboard']);
 
-        // Exam Management (admin-wide — sees all instructors' exams)
-        Route::get('/exams',                      [AdminDashboardController::class, 'exams']);
-        Route::patch('/exams/{id}/status',        [AdminDashboardController::class, 'updateExamStatus']);
-        Route::delete('/exams/{id}/sessions',     [AdminDashboardController::class, 'resetSessions']);
+        Route::get('/exams',                  [AdminDashboardController::class, 'exams']);
+        Route::patch('/exams/{id}/status',    [AdminDashboardController::class, 'updateExamStatus']);
+        Route::delete('/exams/{id}/sessions', [AdminDashboardController::class, 'resetSessions']);
 
-        // Anomaly Reports (admin-wide feed — merges all four anomaly log tables)
         Route::get('/anomalies', [AdminDashboardController::class, 'anomalies']);
-
-        // System Logs
-        // Requires spatie/laravel-activitylog: composer require spatie/laravel-activitylog
-        // Then publish & migrate: php artisan vendor:publish --provider="Spatie\Activitylog\ActivitylogServiceProvider"
-        //                          php artisan migrate
-        Route::get('/logs', [AdminDashboardController::class, 'logs']);
+        Route::get('/logs',      [AdminDashboardController::class, 'logs']);
     });
 
-    // ── Student: enrolled courses (MUST stay before /courses/{id}) ───────────
+    // ── Student: enrolled courses ─────────────────────────────────────────────
     Route::get('/student/courses',            [StudentCourseController::class, 'index']);
     Route::get('/student/courses/{courseId}', [StudentCourseController::class, 'show']);
 
     // ── Student: exams ────────────────────────────────────────────────────────
-    Route::get('/student/courses/{courseId}/exams', [StudentExamController::class, 'courseExams']);
-    Route::post('/student/exams/{examId}/start',    [StudentExamController::class, 'start']);
-    Route::post('/student/exams/{examId}/submit',   [StudentExamController::class, 'submit']);
-    Route::get('/student/exams/{examId}/results',   [StudentExamController::class, 'results']);
+    // ⚠️  /student/exams MUST come before /student/exams/{examId}/* so Laravel
+    //     doesn't swallow the literal "exams" word as a route parameter.
+    Route::get('/student/exams',                            [StudentExamController::class, 'allExams']);
+    Route::get('/student/grades',                           [StudentExamController::class, 'grades']);
+    Route::get('/student/courses/{courseId}/exams',         [StudentExamController::class, 'courseExams']);
+    Route::post('/student/exams/{examId}/start',            [StudentExamController::class, 'start']);
+    Route::post('/student/exams/{examId}/submit',           [StudentExamController::class, 'submit']);
+    Route::get('/student/exams/{examId}/results',           [StudentExamController::class, 'results']);
 
     // ── Student: typing baseline ──────────────────────────────────────────────
     Route::get('/student/typing-baseline/status', [TypingBaselineController::class, 'status']);
     Route::post('/student/typing-baseline',        [TypingBaselineController::class, 'store']);
-    Route::get('/student/dashboard/typing-stats', [StudentDashboardController::class, 'typingStats']);
+    Route::get('/student/dashboard/typing-stats',  [StudentDashboardController::class, 'typingStats']);
 
     // ── Student: dashboard ────────────────────────────────────────────────────
     Route::get('/student/dashboard/exams/upcoming', [StudentDashboardController::class, 'upcomingExams']);
     Route::get('/student/dashboard/exams/active',   [StudentDashboardController::class, 'activeExam']);
     Route::get('/student/dashboard/exams/results',  [StudentDashboardController::class, 'recentResults']);
     Route::get('/student/dashboard/announcements',  [StudentDashboardController::class, 'announcements']);
-    Route::get('/student/dashboard/integrity', [StudentDashboardController::class, 'integrityStats']);
+    Route::get('/student/dashboard/integrity',      [StudentDashboardController::class, 'integrityStats']);
     Route::get('/student/dashboard/score-stats',    [StudentDashboardController::class, 'scoreStats']);
 
     // ── Student: anomaly event ingestion ──────────────────────────────────────
-    // Called silently by AnomalyCollector during an active exam session.
-    // Hyphenated slugs match what the JS collector sends via XHR.
-    // Rate-limited to 60 req/min per student to prevent flooding.
-    //
-    // Algorithm mapping (computation deferred to Python Flask):
-    //   tab-switch         → Isolation Forest
-    //   keyboard-shortcut  → One-Class SVM
-    //   response-time      → Z-Score Method
-    //   keystroke-dynamics → Hidden Markov Model
     Route::middleware(['throttle:60,1'])
         ->prefix('student/exams/{examId}/anomalies')
         ->group(function () {
@@ -129,7 +115,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/exams/{examId}/questions/{id}', [QuestionController::class, 'destroy']);
 
     // ── Instructor: anomaly review ────────────────────────────────────────────
-    // Instructors view risk summaries and individual event logs per exam.
     Route::prefix('exams/{examId}')->group(function () {
         Route::get('/anomalies',                             [AnomalyController::class, 'index']);
         Route::get('/anomalies/summary',                    [AnomalyController::class, 'summary']);
