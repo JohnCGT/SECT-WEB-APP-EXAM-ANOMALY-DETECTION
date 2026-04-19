@@ -107,18 +107,18 @@ class StudentExamController extends Controller
             }
 
             return [
-                'course_id'      => $course->id,
-                'course_name'    => $course->name,
-                'course_code'    => $course->code,
-                'semester'       => $course->semester,
-                'credits'        => $course->credits ?? 3,
-                'instructor'     => $course->instructor?->name,
-                'total_exams'    => $exams->count(),
-                'submitted_exams'=> $submitted->count(),
-                'average'        => $average,        // null if no exams taken yet
-                'letter_grade'   => $this->letterGrade($average),
-                'grade_points'   => $this->gradePoints($average),
-                'exams'          => $examBreakdown,
+                'course_id'       => $course->id,
+                'course_name'     => $course->name,
+                'course_code'     => $course->code,
+                'semester'        => $course->semester,
+                'credits'         => $course->credits ?? 3,
+                'instructor'      => $course->instructor?->name,
+                'total_exams'     => $exams->count(),
+                'submitted_exams' => $submitted->count(),
+                'average'         => $average,
+                'letter_grade'    => $this->letterGrade($average),
+                'grade_points'    => $this->gradePoints($average),
+                'exams'           => $examBreakdown,
             ];
         });
 
@@ -175,7 +175,7 @@ class StudentExamController extends Controller
         if ($pct >= 70) return 1.7;
         if ($pct >= 60) return 1.0;
         return 0.0;
-    }    
+    }
 
     /**
      * GET /student/exams
@@ -347,6 +347,17 @@ class StudentExamController extends Controller
             ];
         });
 
+        if ($exam->shuffle_questions) {
+            $seed = crc32($submission->id . '_' . $examId);
+            mt_srand($seed);
+            $arr = $questions->values()->all();
+            for ($i = count($arr) - 1; $i > 0; $i--) {
+                $j = mt_rand(0, $i);
+                [$arr[$i], $arr[$j]] = [$arr[$j], $arr[$i]];
+            }
+            $questions = collect($arr);
+        }
+
         return response()->json([
             'exam' => [
                 'id'               => $exam->id,
@@ -368,6 +379,12 @@ class StudentExamController extends Controller
 
     /**
      * POST /student/exams/{examId}/submit
+     *
+     * FIX: Essays are stored with points_earned = NULL and is_correct = null
+     * at submission time. This is the only way to distinguish "not yet graded
+     * by instructor" (null) from "instructor awarded 0 points" (0).
+     * Previously storing 0 caused EssayGradingController to treat all essays
+     * as already graded on first load.
      */
     public function submit(Request $request, $examId)
     {
@@ -391,22 +408,24 @@ class StudentExamController extends Controller
                 ? (string) $answers[$question->id]
                 : null;
 
-            $isCorrect    = false;
-            $pointsEarned = 0;
+            $isCorrect    = null;  // default for essay
+            $pointsEarned = null;  // default for essay (null = awaiting instructor grade)
 
             if (in_array($question->type, ['multiple_choice', 'true_false'])) {
+                // Auto-grade MC and T/F immediately
                 $isCorrect    = $this->answersMatch($studentAnswer, (string) $question->correct_answer);
                 $pointsEarned = $isCorrect ? $question->points : 0;
+                $score       += $pointsEarned;
             }
-
-            $score += $pointsEarned;
+            // Essays: points_earned stays NULL — instructor must grade manually.
+            // They do NOT contribute to score until graded.
 
             $gradedAnswers[] = [
                 'question_id'     => $question->id,
                 'student_answer'  => $studentAnswer,
                 'correct_answer'  => $question->correct_answer,
                 'is_correct'      => $isCorrect,
-                'points_earned'   => $pointsEarned,
+                'points_earned'   => $pointsEarned,   // null for essays
                 'points_possible' => $question->points,
             ];
         }
@@ -414,7 +433,7 @@ class StudentExamController extends Controller
         $submission->update([
             'status'       => 'submitted',
             'submitted_at' => now(),
-            'score'        => $score,
+            'score'        => $score,   // only MC/TF score for now; essays add to it when graded
             'answers'      => $gradedAnswers,
         ]);
 
@@ -467,20 +486,18 @@ class StudentExamController extends Controller
         foreach ($exam->questions as $question) {
             $answerData = collect($answers)->firstWhere('question_id', $question->id);
 
-            $storedIsCorrect = $answerData['is_correct'] ?? null;
-
             if ($question->type !== 'essay') {
-                $storedStudentAnswer  = $answerData['student_answer'] ?? null;
-                $storedCorrectAnswer  = $answerData['correct_answer'] ?? $question->correct_answer;
-                $derivedIsCorrect = $this->answersMatch(
+                $storedStudentAnswer = $answerData['student_answer'] ?? null;
+                $storedCorrectAnswer = $answerData['correct_answer'] ?? $question->correct_answer;
+                $isCorrect    = $this->answersMatch(
                     $storedStudentAnswer !== null ? (string) $storedStudentAnswer : null,
                     (string) $storedCorrectAnswer
                 );
-                $isCorrect    = $derivedIsCorrect;
-                $pointsEarned = $derivedIsCorrect ? $question->points : 0;
+                $pointsEarned = $isCorrect ? $question->points : 0;
             } else {
-                $isCorrect    = $storedIsCorrect;
-                $pointsEarned = $answerData['points_earned'] ?? 0;
+                // Essay: use whatever the instructor set (may still be null = pending)
+                $isCorrect    = $answerData['is_correct']    ?? null;
+                $pointsEarned = $answerData['points_earned'] ?? null;
             }
 
             $questionResults[] = [
@@ -495,6 +512,7 @@ class StudentExamController extends Controller
                 'correct_answer' => $question->correct_answer,
                 'is_correct'     => $isCorrect,
                 'points_earned'  => $pointsEarned,
+                'feedback'       => $answerData['feedback'] ?? null,
             ];
         }
 
@@ -509,7 +527,7 @@ class StudentExamController extends Controller
                 'started_at'   => $submission->started_at,
                 'submitted_at' => $submission->submitted_at,
             ],
-            'exam'      => [
+            'exam' => [
                 'id'          => $exam->id,
                 'title'       => $exam->title,
                 'description' => $exam->description,

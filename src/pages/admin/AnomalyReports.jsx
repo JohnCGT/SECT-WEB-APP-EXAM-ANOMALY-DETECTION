@@ -1,14 +1,13 @@
 // src/pages/admin/AnomalyReports.jsx
-import React, { useState, useEffect, useCallback } from "react";
-import { Link, useLocation } from "react-router-dom";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import NotificationBell from "./NotificationBell";
 
-/* ─── Inject shared styles ───────────────────────────────────────────── */
 (function bootstrap() {
   if (document.getElementById("admin-base-styles")) return;
   const link = document.createElement("link");
   link.rel = "stylesheet";
-  link.href =
-    "https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Epilogue:wght@400;500;600&display=swap";
+  link.href = "https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Epilogue:wght@400;500;600&display=swap";
   document.head.appendChild(link);
   const style = document.createElement("style");
   style.id = "admin-base-styles";
@@ -17,6 +16,7 @@ import { Link, useLocation } from "react-router-dom";
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     @keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
     @keyframes rowIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:translateX(0)}}
+    @keyframes ddIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
     .a-btn{transition:filter .15s,transform .12s,opacity .15s;cursor:pointer}
     .a-btn:hover:not(:disabled){filter:brightness(1.07);transform:translateY(-1px)}
     .a-btn:active:not(:disabled){transform:translateY(0)}
@@ -26,6 +26,8 @@ import { Link, useLocation } from "react-router-dom";
     .a-tr:hover td{background:#F5F4FF}
     .a-nav-link{transition:all .15s;text-decoration:none}
     .a-nav-link:hover{background:rgba(108,99,255,.08)!important}
+    .a-dd-item{transition:background .12s}
+    .a-dd-item:hover{background:#F5F4FF}
     ::-webkit-scrollbar{width:6px;height:6px}
     ::-webkit-scrollbar-track{background:#F4F3FF}
     ::-webkit-scrollbar-thumb{background:#D0CEFF;border-radius:3px}
@@ -33,20 +35,18 @@ import { Link, useLocation } from "react-router-dom";
   document.head.appendChild(style);
 })();
 
-/* ─── Design tokens ──────────────────────────────────────────────────── */
 const C = {
   bg:"#F4F3FF", card:"#FFFFFF", border:"#E6E4FF",
   accent:"#6C63FF", text:"#0D0C1D", muted:"#7A788F",
   danger:"#E53935", warn:"#FB8C00", green:"#2E7D32", sidebar:"#0D0C1D",
 };
 
-/* ─── API ────────────────────────────────────────────────────────────── */
 const BASE = import.meta?.env?.VITE_API_URL ?? "/api";
 async function api(method, path, body) {
   const opts = {
     method,
     headers: { "Content-Type":"application/json","Accept":"application/json","X-Requested-With":"XMLHttpRequest" },
-    credentials: "include",
+    credentials:"include",
   };
   if (body !== undefined) opts.body = JSON.stringify(body);
   const res = await fetch(BASE + path, opts);
@@ -55,19 +55,20 @@ async function api(method, path, body) {
   return json;
 }
 
-/* ─── Sidebar ────────────────────────────────────────────────────────── */
 const NAV = [
   { to:"/admin",           icon:"⊞", label:"Dashboard" },
   { to:"/admin/users",     icon:"👥", label:"Users"     },
+  { to:"/admin/courses",   icon:"📚", label:"Courses"   },
   { to:"/admin/exams",     icon:"📋", label:"Exams"     },
   { to:"/admin/anomalies", icon:"⚠️", label:"Anomalies" },
-  { to:"/admin/logs",      icon:"📊", label:"Logs"      },
+  { to:"/admin/support",   icon:"🎫", label:"Support"   },
 ];
+
 function Sidebar() {
   const loc = useLocation();
   return (
     <nav style={{ width:200, background:C.sidebar, display:"flex", flexDirection:"column",
-      padding:"24px 0", flexShrink:0, minHeight:"100vh" }}>
+      padding:"24px 0", flexShrink:0, minHeight:"100vh", position:"sticky", top:0, height:"100vh" }}>
       <div style={{ padding:"0 20px 24px", borderBottom:"1px solid rgba(255,255,255,.08)" }}>
         <p style={{ margin:0, fontSize:11, fontWeight:700, color:C.accent, textTransform:"uppercase", letterSpacing:".14em" }}>SECT</p>
         <p style={{ margin:"2px 0 0", fontSize:18, fontWeight:800, fontFamily:"'Syne',sans-serif", color:"#fff" }}>Admin</p>
@@ -78,10 +79,10 @@ function Sidebar() {
           return (
             <li key={to} style={{ marginBottom:4 }}>
               <Link to={to} className="a-nav-link" style={{
-                display:"flex", alignItems:"center", gap:10,
-                padding:"10px 14px", borderRadius:10, fontSize:13, fontWeight:600,
+                display:"flex", alignItems:"center", gap:10, padding:"10px 14px",
+                borderRadius:10, fontSize:13, fontWeight:600,
                 background: active ? "rgba(108,99,255,.22)" : "transparent",
-                color: active ? "#fff" : "rgba(255,255,255,.55)",
+                color:      active ? "#fff" : "rgba(255,255,255,.55)",
                 borderLeft: active ? `3px solid ${C.accent}` : "3px solid transparent",
               }}><span style={{ fontSize:16 }}>{icon}</span>{label}</Link>
             </li>
@@ -98,7 +99,57 @@ function Sidebar() {
   );
 }
 
-/* ─── Topbar ─────────────────────────────────────────────────────────── */
+function AvatarDropdown() {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  const handleLogout = async () => {
+    try { await api("POST", "/logout"); } catch {}
+    localStorage.removeItem("user");
+    navigate("/");
+  };
+  return (
+    <div ref={ref} style={{ position:"relative" }}>
+      <div onClick={() => setOpen(v => !v)} style={{
+        width:36, height:36, borderRadius:"50%",
+        background: open ? "#5550d4" : C.accent,
+        display:"flex", alignItems:"center", justifyContent:"center",
+        fontSize:14, fontWeight:800, fontFamily:"'Syne',sans-serif",
+        color:"#fff", cursor:"pointer",
+        border:`2px solid ${open ? C.accent : C.border}`,
+        transition:"background .15s",
+      }}>A</div>
+      {open && (
+        <div style={{
+          position:"absolute", top:44, right:0, zIndex:1200,
+          background:C.card, border:`1px solid ${C.border}`,
+          borderRadius:12, boxShadow:"0 8px 32px rgba(0,0,0,.16)",
+          overflow:"hidden", minWidth:170, animation:"ddIn .15s ease",
+        }}>
+          <Link to="/admin/profile" onClick={() => setOpen(false)} className="a-dd-item" style={{
+            display:"flex", alignItems:"center", gap:10,
+            padding:"12px 16px", textDecoration:"none",
+            fontSize:13, fontWeight:600, color:C.text,
+            borderBottom:`1px solid ${C.border}`,
+          }}><span>👤</span> My Profile</Link>
+          <button onClick={handleLogout} className="a-dd-item" style={{
+            display:"flex", alignItems:"center", gap:10,
+            padding:"12px 16px", width:"100%",
+            background:"transparent", border:"none",
+            fontSize:13, fontWeight:600, color:C.danger,
+            cursor:"pointer", fontFamily:"'Epilogue',sans-serif", textAlign:"left",
+          }}><span>⏻</span> Logout</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Topbar({ title, subtitle }) {
   return (
     <div style={{ height:60, background:C.card, borderBottom:`1px solid ${C.border}`,
@@ -108,21 +159,14 @@ function Topbar({ title, subtitle }) {
         <p style={{ margin:0, fontSize:16, fontWeight:700, fontFamily:"'Syne',sans-serif", color:C.text }}>{title}</p>
         {subtitle && <p style={{ margin:0, fontSize:12, color:C.muted }}>{subtitle}</p>}
       </div>
-      <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-        <input placeholder="Search…" style={{
-          padding:"7px 14px", border:`1.5px solid ${C.border}`, borderRadius:20,
-          fontSize:13, fontFamily:"'Epilogue',sans-serif", color:C.text,
-          background:C.bg, outline:"none", width:220,
-        }} />
-        <div style={{ width:36, height:36, borderRadius:"50%", background:C.accent,
-          display:"flex", alignItems:"center", justifyContent:"center",
-          fontSize:14, fontWeight:800, fontFamily:"'Syne',sans-serif", color:"#fff", cursor:"pointer" }}>A</div>
+      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+        <NotificationBell />
+        <AvatarDropdown />
       </div>
     </div>
   );
 }
 
-/* ─── Toast ──────────────────────────────────────────────────────────── */
 function Toast({ msg, type, onDone }) {
   useEffect(() => { const t = setTimeout(onDone, 3800); return () => clearTimeout(t); }, [onDone]);
   const isErr = type === "error";
@@ -139,46 +183,32 @@ function Toast({ msg, type, onDone }) {
   );
 }
 
-/* ─── Anomaly type config ─────────────────────────────────────────────── */
 const TYPE_CONFIG = {
-  tab_switch:        { label:"Tab Switch",       icon:"🪟", color:"#E53935", bg:"#FFEBEE", algo:"Isolation Forest"    },
-  keyboard_shortcut: { label:"Keyboard Shortcut",icon:"⌨️", color:"#FB8C00", bg:"#FFF3E0", algo:"One-Class SVM"        },
-  response_time:     { label:"Response Time",    icon:"⏱️", color:"#1E88E5", bg:"#E3F2FD", algo:"Z-Score"              },
-  keystroke:         { label:"Keystroke",        icon:"🔡", color:"#6A1B9A", bg:"#F3E5F5", algo:"Hidden Markov Model"  },
+  tab_switch:        { label:"Tab Switch",       icon:"🪟", color:"#E53935", bg:"#FFEBEE", algo:"Isolation Forest"   },
+  keyboard_shortcut: { label:"Keyboard Shortcut",icon:"⌨️", color:"#FB8C00", bg:"#FFF3E0", algo:"One-Class SVM"       },
+  response_time:     { label:"Response Time",    icon:"⏱️", color:"#1E88E5", bg:"#E3F2FD", algo:"Z-Score"             },
+  keystroke:         { label:"Keystroke",        icon:"🔡", color:"#6A1B9A", bg:"#F3E5F5", algo:"Hidden Markov Model" },
 };
-
 const SEV_CONFIG = {
   high:   { bg:"#FFEBEE", color:"#E53935" },
   medium: { bg:"#FFF3E0", color:"#FB8C00" },
   low:    { bg:"#E8F5E9", color:"#2E7D32" },
 };
 
-/* ─── Main ───────────────────────────────────────────────────────────── */
 export default function AnomalyReports() {
-  const [anomalies, setAnomalies] = useState([]);
-  const [loading,   setLoading]   = useState(true);
+  const [anomalies,  setAnomalies]  = useState([]);
+  const [loading,    setLoading]    = useState(true);
   const [typeFilter, setTypeFilter] = useState("all");
   const [sevFilter,  setSevFilter]  = useState("all");
-  const [search, setSearch] = useState("");
-  const [toast, setToast]   = useState(null);
-  const [page, setPage]     = useState(1);
+  const [search,     setSearch]     = useState("");
+  const [toast,      setToast]      = useState(null);
+  const [page,       setPage]       = useState(1);
 
-  const notify = (msg, type = "success") => setToast({ msg, type });
+  const notify = (msg, type="success") => setToast({ msg, type });
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      /**
-       * GET /api/admin/anomalies
-       * Query params: type (tab_switch|keyboard_shortcut|response_time|keystroke), severity (low|medium|high)
-       *
-       * Expects a unified anomaly feed. Your backend should UNION the four anomaly log
-       * tables (tab_switch_logs, keyboard_shortcut_logs, response_time_logs,
-       * keystroke_dynamics_logs) and attach student + exam info.
-       *
-       * Response shape: { data: [{ id, type, severity, student: {name}, exam: {title},
-       *   cpi_score, detail: {…}, occurred_at }] }
-       */
       const params = new URLSearchParams();
       if (typeFilter !== "all") params.set("type", typeFilter);
       if (sevFilter  !== "all") params.set("severity", sevFilter);
@@ -193,7 +223,6 @@ export default function AnomalyReports() {
 
   useEffect(() => { load(); setPage(1); }, [load]);
 
-  /* client-side search + pagination */
   const filtered = anomalies.filter(a => {
     const q = search.toLowerCase();
     return !q || a.student?.name?.toLowerCase().includes(q) || a.exam?.title?.toLowerCase().includes(q);
@@ -202,11 +231,8 @@ export default function AnomalyReports() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const pageData = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
-  /* Counts by type */
-  const typeCounts = anomalies.reduce((acc, a) => {
-    acc[a.type] = (acc[a.type] ?? 0) + 1; return acc;
-  }, {});
-  const highCount = anomalies.filter(a => a.severity === "high").length;
+  const typeCounts = anomalies.reduce((acc, a) => { acc[a.type] = (acc[a.type] ?? 0) + 1; return acc; }, {});
+  const highCount  = anomalies.filter(a => a.severity === "high").length;
 
   return (
     <div style={{ display:"flex", minHeight:"100vh", background:C.bg, fontFamily:"'Epilogue',sans-serif" }}>
@@ -219,12 +245,12 @@ export default function AnomalyReports() {
           {/* Summary stat row */}
           <div style={{ display:"flex", gap:14, marginBottom:24, flexWrap:"wrap" }}>
             {[
-              { label:"Total Signals",  value: anomalies.length,                   color: C.accent,  icon:"📡" },
-              { label:"High Severity",  value: highCount,                           color: C.danger,  icon:"🚨" },
-              { label:"Tab Switches",   value: typeCounts.tab_switch        ?? 0,   color:"#E53935",  icon:"🪟" },
-              { label:"Kbd Shortcuts",  value: typeCounts.keyboard_shortcut ?? 0,   color:"#FB8C00",  icon:"⌨️" },
-              { label:"Resp. Time",     value: typeCounts.response_time     ?? 0,   color:"#1E88E5",  icon:"⏱️" },
-              { label:"Keystroke",      value: typeCounts.keystroke         ?? 0,   color:"#6A1B9A",  icon:"🔡" },
+              { label:"Total Signals", value:anomalies.length,                   color:C.accent, icon:"📡" },
+              { label:"High Severity", value:highCount,                           color:C.danger, icon:"🚨" },
+              { label:"Tab Switches",  value:typeCounts.tab_switch        ?? 0,  color:"#E53935",icon:"🪟" },
+              { label:"Kbd Shortcuts", value:typeCounts.keyboard_shortcut ?? 0,  color:"#FB8C00",icon:"⌨️" },
+              { label:"Resp. Time",    value:typeCounts.response_time     ?? 0,  color:"#1E88E5",icon:"⏱️" },
+              { label:"Keystroke",     value:typeCounts.keystroke         ?? 0,  color:"#6A1B9A",icon:"🔡" },
             ].map(({ label, value, color, icon }) => (
               <div key={label} style={{
                 background:C.card, borderRadius:12, border:`1px solid ${C.border}`,
@@ -246,26 +272,22 @@ export default function AnomalyReports() {
             {/* Toolbar */}
             <div style={{ padding:"16px 20px", borderBottom:`1px solid ${C.border}`,
               display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
-              {/* Search */}
               <div style={{ position:"relative", flex:1, minWidth:200 }}>
                 <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:13, color:C.muted }}>🔍</span>
-                <input className="a-btn" value={search} onChange={e => setSearch(e.target.value)}
+                <input value={search} onChange={e => setSearch(e.target.value)}
                   placeholder="Search student or exam…" style={{
                     width:"100%", padding:"8px 12px 8px 34px", border:`1.5px solid ${C.border}`,
                     borderRadius:8, fontSize:13, fontFamily:"'Epilogue',sans-serif",
                     color:C.text, background:"#fff", outline:"none",
                   }} />
               </div>
-
-              {/* Type filter */}
               <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                 {["all","tab_switch","keyboard_shortcut","response_time","keystroke"].map(t => {
                   const cfg = TYPE_CONFIG[t];
                   return (
                     <button key={t} className="a-btn" onClick={() => { setTypeFilter(t); setPage(1); }} style={{
-                      border:"none", borderRadius:20, padding:"6px 14px",
-                      fontSize:12, fontWeight:700, cursor:"pointer",
-                      fontFamily:"'Epilogue',sans-serif",
+                      border:"none", borderRadius:20, padding:"6px 14px", fontSize:12, fontWeight:700,
+                      cursor:"pointer", fontFamily:"'Epilogue',sans-serif",
                       background: typeFilter === t ? (cfg?.color ?? C.accent) : C.bg,
                       color: typeFilter === t ? "#fff" : C.muted,
                     }}>
@@ -274,20 +296,16 @@ export default function AnomalyReports() {
                   );
                 })}
               </div>
-
-              {/* Severity filter */}
               <div style={{ display:"flex", gap:6 }}>
                 {["all","high","medium","low"].map(s => (
                   <button key={s} className="a-btn" onClick={() => { setSevFilter(s); setPage(1); }} style={{
-                    border:"none", borderRadius:20, padding:"6px 12px",
-                    fontSize:12, fontWeight:700, cursor:"pointer",
-                    fontFamily:"'Epilogue',sans-serif", textTransform:"capitalize",
+                    border:"none", borderRadius:20, padding:"6px 12px", fontSize:12, fontWeight:700,
+                    cursor:"pointer", fontFamily:"'Epilogue',sans-serif", textTransform:"capitalize",
                     background: sevFilter === s ? (SEV_CONFIG[s]?.color ?? C.accent) : C.bg,
                     color: sevFilter === s ? "#fff" : C.muted,
                   }}>{s === "all" ? "All Severity" : s}</button>
                 ))}
               </div>
-
               <button className="a-btn" onClick={load} style={{
                 border:`1.5px solid ${C.border}`, background:"transparent",
                 borderRadius:8, padding:"7px 14px", fontSize:12,
@@ -314,40 +332,30 @@ export default function AnomalyReports() {
                 </thead>
                 <tbody>
                   {pageData.map((a, i) => {
-                    const tc  = TYPE_CONFIG[a.type] ?? { label:a.type, icon:"❓", color:C.muted, bg:"#F1F1F1", algo:"—" };
-                    const sc  = SEV_CONFIG[a.severity] ?? { bg:"#F1F1F1", color:C.muted };
+                    const tc = TYPE_CONFIG[a.type] ?? { label:a.type, icon:"❓", color:C.muted, bg:"#F1F1F1", algo:"—" };
+                    const sc = SEV_CONFIG[a.severity] ?? { bg:"#F1F1F1", color:C.muted };
                     return (
                       <tr key={a.id ?? i} className="a-tr a-row"
                         style={{ borderBottom:`1px solid ${C.border}`, animationDelay:`${i*25}ms` }}>
-                        <td style={{ padding:"12px 18px", fontSize:14, fontWeight:600, color:C.text }}>
-                          {a.student?.name ?? "—"}
-                        </td>
-                        <td style={{ padding:"12px 18px", fontSize:13, color:C.muted }}>
-                          {a.exam?.title ?? "—"}
-                        </td>
+                        <td style={{ padding:"12px 18px", fontSize:14, fontWeight:600, color:C.text }}>{a.student?.name ?? "—"}</td>
+                        <td style={{ padding:"12px 18px", fontSize:13, color:C.muted }}>{a.exam?.title ?? "—"}</td>
                         <td style={{ padding:"12px 18px" }}>
-                          <span style={{
-                            display:"inline-flex", alignItems:"center", gap:5,
-                            padding:"3px 10px", borderRadius:20, fontSize:11,
-                            fontWeight:700, background:tc.bg, color:tc.color,
-                          }}>
-                            {tc.icon} {tc.label}
-                          </span>
+                          <span style={{ display:"inline-flex", alignItems:"center", gap:5,
+                            padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700,
+                            background:tc.bg, color:tc.color }}>{tc.icon} {tc.label}</span>
                         </td>
                         <td style={{ padding:"12px 18px", fontSize:12, color:C.muted }}>{tc.algo}</td>
                         <td style={{ padding:"12px 18px" }}>
-                          <span style={{
-                            padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700,
-                            background:sc.bg, color:sc.color,
-                            textTransform:"uppercase", letterSpacing:".05em",
-                          }}>{a.severity ?? "low"}</span>
+                          <span style={{ padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700,
+                            background:sc.bg, color:sc.color, textTransform:"uppercase", letterSpacing:".05em" }}>
+                            {a.severity ?? "low"}
+                          </span>
                         </td>
                         <td style={{ padding:"12px 18px", fontSize:12, color:C.muted, maxWidth:200 }}>
-                          {/* Detail varies by type */}
-                          {a.type === "tab_switch" && `${a.hidden_duration_ms ?? "?"}ms hidden`}
+                          {a.type === "tab_switch"        && `${a.hidden_duration_ms ?? "?"}ms hidden`}
                           {a.type === "keyboard_shortcut" && `Keys: ${a.keys ?? "?"}${a.is_paste ? " (paste)" : ""}`}
-                          {a.type === "response_time" && `${a.direction ?? "?"} · z=${typeof a.z_score === "number" ? a.z_score.toFixed(2) : "?"}`}
-                          {a.type === "keystroke" && `WPM: ${a.wpm ?? "?"} · z=${typeof a.z_score === "number" ? a.z_score.toFixed(2) : "?"}`}
+                          {a.type === "response_time"     && `${a.direction ?? "?"} · z=${typeof a.z_score === "number" ? a.z_score.toFixed(2) : "?"}`}
+                          {a.type === "keystroke"         && `WPM: ${a.wpm ?? "?"} · z=${typeof a.z_score === "number" ? a.z_score.toFixed(2) : "?"}`}
                           {!["tab_switch","keyboard_shortcut","response_time","keystroke"].includes(a.type) && "—"}
                         </td>
                         <td style={{ padding:"12px 18px", fontSize:12, color:C.muted }}>
@@ -362,7 +370,6 @@ export default function AnomalyReports() {
               </table>
             )}
 
-            {/* Pagination footer */}
             {!loading && filtered.length > PER_PAGE && (
               <div style={{ padding:"12px 20px", borderTop:`1px solid ${C.border}`,
                 display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -372,14 +379,14 @@ export default function AnomalyReports() {
                 <div style={{ display:"flex", gap:6 }}>
                   <button className="a-btn" onClick={() => setPage(p => Math.max(1,p-1))} disabled={page===1} style={{
                     border:`1.5px solid ${C.border}`, background:"transparent", borderRadius:6,
-                    padding:"5px 12px", fontSize:12, fontWeight:600, color:C.muted, cursor:"pointer",
+                    padding:"5px 12px", fontSize:12, fontWeight:600, color:C.muted,
                   }}>← Prev</button>
                   <span style={{ fontSize:12, color:C.text, display:"flex", alignItems:"center", padding:"0 8px" }}>
                     {page} / {totalPages}
                   </span>
                   <button className="a-btn" onClick={() => setPage(p => Math.min(totalPages,p+1))} disabled={page===totalPages} style={{
                     border:`1.5px solid ${C.border}`, background:"transparent", borderRadius:6,
-                    padding:"5px 12px", fontSize:12, fontWeight:600, color:C.muted, cursor:"pointer",
+                    padding:"5px 12px", fontSize:12, fontWeight:600, color:C.muted,
                   }}>Next →</button>
                 </div>
               </div>

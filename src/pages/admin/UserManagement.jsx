@@ -1,23 +1,23 @@
 // src/pages/admin/UserManagement.jsx
-import React, { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import NotificationBell from "./NotificationBell";
 
-/* ─── Inject fonts & keyframes once ──────────────────────────────────── */
 (function bootstrap() {
   if (document.getElementById("um-styles")) return;
   const link = document.createElement("link");
   link.rel = "stylesheet";
   link.href = "https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Epilogue:wght@400;500;600&display=swap";
   document.head.appendChild(link);
-
   const style = document.createElement("style");
   style.id = "um-styles";
   style.textContent = `
-    *{box-sizing:border-box}
-    @keyframes fadeIn  {from{opacity:0}to{opacity:1}}
-    @keyframes slideUp {from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes popIn   {from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
-    @keyframes rowIn   {from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:translateX(0)}}
+    *{box-sizing:border-box}body{margin:0;font-family:'Epilogue',sans-serif}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes popIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+    @keyframes rowIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:translateX(0)}}
+    @keyframes ddIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
     .um-row{animation:rowIn .2s ease both}
     .um-btn{transition:filter .15s,transform .12s,opacity .15s;cursor:pointer}
     .um-btn:hover:not(:disabled){filter:brightness(1.07);transform:translateY(-1px)}
@@ -29,55 +29,46 @@ import { Link } from "react-router-dom";
     .um-tr:hover td{background:#F5F4FF}
     .um-tab{transition:all .15s}
     .um-tab:hover{color:#6C63FF!important}
+    .um-nav-link{transition:all .15s;text-decoration:none}
+    .um-nav-link:hover{background:rgba(108,99,255,.08)!important}
+    .a-dd-item{transition:background .12s}
+    .a-dd-item:hover{background:#F5F4FF}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:#F4F3FF}
+    ::-webkit-scrollbar-thumb{background:#D0CEFF;border-radius:3px}
   `;
   document.head.appendChild(style);
 })();
 
-/* ─── API helper ─────────────────────────────────────────────────────── */
 const BASE = (import.meta?.env?.VITE_API_URL ?? "/api");
-
 async function api(method, path, body) {
   const opts = {
     method,
-    headers: { 
-      "Content-Type": "application/json", 
-      "Accept": "application/json",
-      // MANDATORY for Laravel 11 stateful API
-      "X-Requested-With": "XMLHttpRequest" 
+    headers: {
+      "Content-Type":"application/json",
+      "Accept":"application/json",
+      "X-Requested-With":"XMLHttpRequest",
     },
-    credentials: "include",
+    credentials:"include",
   };
   if (body !== undefined) opts.body = JSON.stringify(body);
   const res = await fetch(BASE + path, opts);
-  
-  // Handle 419 specifically to provide a clear error
-  if (res.status === 419) {
-    throw new Error("CSRF Token mismatch. Please refresh the page.");
-  }
-
+  if (res.status === 419) throw new Error("CSRF Token mismatch. Please refresh the page.");
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = json?.errors
-        ? Object.values(json.errors).flat().join(" ")
-        : json?.message ?? "Something went wrong.";
+      ? Object.values(json.errors).flat().join(" ")
+      : json?.message ?? "Something went wrong.";
     throw new Error(msg);
   }
   return json;
 }
 
-/* ─── Design tokens ──────────────────────────────────────────────────── */
 const C = {
-  bg:      "#F4F3FF",
-  card:    "#FFFFFF",
-  border:  "#E6E4FF",
-  accent:  "#6C63FF",
-  text:    "#0D0C1D",
-  muted:   "#7A788F",
-  danger:  "#E53935",
-  warn:    "#FB8C00",
-  green:   "#2E7D32",
+  bg:"#F4F3FF", card:"#FFFFFF", border:"#E6E4FF",
+  accent:"#6C63FF", text:"#0D0C1D", muted:"#7A788F",
+  danger:"#E53935", warn:"#FB8C00", green:"#2E7D32", sidebar:"#0D0C1D",
 };
-
 const ROLE_STYLE = {
   student:    { bg:"#EDE9FF", color:"#3D34B0", dot:"#6C63FF" },
   instructor: { bg:"#E3F2FD", color:"#1565C0", dot:"#1E88E5" },
@@ -88,175 +79,225 @@ const STATUS_STYLE = {
   suspended: { bg:"#FFF3E0", color:"#E65100" },
 };
 
-/* ─── Tiny atoms ─────────────────────────────────────────────────────── */
-function Avatar({ name = "" }) {
-  const initials = name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase() || "?";
-  const hue = [...name].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+const NAV = [
+  { to:"/admin",           icon:"⊞", label:"Dashboard" },
+  { to:"/admin/users",     icon:"👥", label:"Users"     },
+  { to:"/admin/courses",   icon:"📚", label:"Courses"   },
+  { to:"/admin/exams",     icon:"📋", label:"Exams"     },
+  { to:"/admin/anomalies", icon:"⚠️", label:"Anomalies" },
+  { to:"/admin/support",   icon:"🎫", label:"Support"   },
+];
+
+function Sidebar() {
+  const loc = useLocation();
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", justifyContent: "center",
-      width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-      background: `hsl(${hue},55%,88%)`, color: `hsl(${hue},45%,30%)`,
-      fontSize: 12, fontWeight: 700, fontFamily: "'Syne',sans-serif",
-    }}>
-      {initials}
-    </span>
+    <nav style={{ width:200, background:C.sidebar, display:"flex", flexDirection:"column",
+      padding:"24px 0", flexShrink:0, minHeight:"100vh", position:"sticky", top:0, height:"100vh" }}>
+      <div style={{ padding:"0 20px 24px", borderBottom:"1px solid rgba(255,255,255,.08)" }}>
+        <p style={{ margin:0, fontSize:11, fontWeight:700, color:C.accent, textTransform:"uppercase", letterSpacing:".14em" }}>SECT</p>
+        <p style={{ margin:"2px 0 0", fontSize:18, fontWeight:800, fontFamily:"'Syne',sans-serif", color:"#fff" }}>Admin</p>
+      </div>
+      <ul style={{ listStyle:"none", margin:"16px 0 0", padding:"0 10px", flexGrow:1 }}>
+        {NAV.map(({ to, icon, label }) => {
+          const active = loc.pathname === to || (to !== "/admin" && loc.pathname.startsWith(to));
+          return (
+            <li key={to} style={{ marginBottom:4 }}>
+              <Link to={to} className="um-nav-link" style={{
+                display:"flex", alignItems:"center", gap:10, padding:"10px 14px",
+                borderRadius:10, fontSize:13, fontWeight:600,
+                background: active ? "rgba(108,99,255,.22)" : "transparent",
+                color:      active ? "#fff" : "rgba(255,255,255,.55)",
+                borderLeft: active ? `3px solid ${C.accent}` : "3px solid transparent",
+              }}><span style={{ fontSize:16 }}>{icon}</span>{label}</Link>
+            </li>
+          );
+        })}
+      </ul>
+      <div style={{ padding:"16px 10px 0", borderTop:"1px solid rgba(255,255,255,.08)" }}>
+        <Link to="/" className="um-nav-link" style={{
+          display:"flex", alignItems:"center", gap:10, padding:"10px 14px",
+          borderRadius:10, fontSize:13, fontWeight:600, color:"rgba(255,255,255,.4)",
+        }}><span>⏻</span> Logout</Link>
+      </div>
+    </nav>
   );
 }
 
-function RoleChip({ role = "" }) {
-  const s = ROLE_STYLE[role.toLowerCase()] ?? { bg: "#F1F1F1", color: "#555" };
+function AvatarDropdown() {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  const handleLogout = async () => {
+    try { await api("POST", "/logout"); } catch {}
+    localStorage.removeItem("user");
+    navigate("/");
+  };
+  return (
+    <div ref={ref} style={{ position:"relative" }}>
+      <div onClick={() => setOpen(v => !v)} style={{
+        width:36, height:36, borderRadius:"50%",
+        background: open ? "#5550d4" : C.accent,
+        display:"flex", alignItems:"center", justifyContent:"center",
+        fontSize:14, fontWeight:800, fontFamily:"'Syne',sans-serif",
+        color:"#fff", cursor:"pointer",
+        border:`2px solid ${open ? C.accent : C.border}`,
+        transition:"background .15s",
+      }}>A</div>
+      {open && (
+        <div style={{
+          position:"absolute", top:44, right:0, zIndex:1200,
+          background:C.card, border:`1px solid ${C.border}`,
+          borderRadius:12, boxShadow:"0 8px 32px rgba(0,0,0,.16)",
+          overflow:"hidden", minWidth:170, animation:"ddIn .15s ease",
+        }}>
+          <Link to="/admin/profile" onClick={() => setOpen(false)} className="a-dd-item" style={{
+            display:"flex", alignItems:"center", gap:10, padding:"12px 16px",
+            textDecoration:"none", fontSize:13, fontWeight:600, color:C.text,
+            borderBottom:`1px solid ${C.border}`,
+          }}><span>👤</span> My Profile</Link>
+          <button onClick={handleLogout} className="a-dd-item" style={{
+            display:"flex", alignItems:"center", gap:10, padding:"12px 16px", width:"100%",
+            background:"transparent", border:"none", fontSize:13, fontWeight:600,
+            color:C.danger, cursor:"pointer", fontFamily:"'Epilogue',sans-serif", textAlign:"left",
+          }}><span>⏻</span> Logout</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Topbar() {
+  return (
+    <div style={{ height:60, background:C.card, borderBottom:`1px solid ${C.border}`,
+      display:"flex", alignItems:"center", justifyContent:"space-between",
+      padding:"0 28px", flexShrink:0 }}>
+      <div>
+        <p style={{ margin:0, fontSize:16, fontWeight:700, fontFamily:"'Syne',sans-serif", color:C.text }}>User Management</p>
+        <p style={{ margin:0, fontSize:12, color:C.muted }}>Manage all system accounts</p>
+      </div>
+      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+        <NotificationBell />
+        <AvatarDropdown />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Atoms ──────────────────────────────────────────────────────────── */
+function Avatar({ name="" }) {
+  const initials = name.split(" ").map(w => w[0]).slice(0,2).join("").toUpperCase() || "?";
+  const hue = [...name].reduce((a,c) => a + c.charCodeAt(0), 0) % 360;
   return (
     <span style={{
-      display: "inline-flex", alignItems: "center", gap: 5,
-      padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
-      background: s.bg, color: s.color, letterSpacing: ".04em", textTransform: "uppercase",
-    }}>
-      {s.dot && <span style={{ width: 5, height: 5, borderRadius: "50%", background: s.dot }} />}
+      display:"inline-flex", alignItems:"center", justifyContent:"center",
+      width:34, height:34, borderRadius:"50%", flexShrink:0,
+      background:`hsl(${hue},55%,88%)`, color:`hsl(${hue},45%,30%)`,
+      fontSize:12, fontWeight:700, fontFamily:"'Syne',sans-serif",
+    }}>{initials}</span>
+  );
+}
+function RoleChip({ role="" }) {
+  const s = ROLE_STYLE[role.toLowerCase()] ?? { bg:"#F1F1F1", color:"#555" };
+  return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5,
+      padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700,
+      background:s.bg, color:s.color, letterSpacing:".04em", textTransform:"uppercase" }}>
+      {s.dot && <span style={{ width:5, height:5, borderRadius:"50%", background:s.dot }} />}
       {role}
     </span>
   );
 }
-
-function StatusChip({ status = "" }) {
-  const s = STATUS_STYLE[status.toLowerCase()] ?? { bg: "#F1F1F1", color: "#555" };
+function StatusChip({ status="" }) {
+  const s = STATUS_STYLE[status.toLowerCase()] ?? { bg:"#F1F1F1", color:"#555" };
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 5,
-      padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
-      background: s.bg, color: s.color, letterSpacing: ".04em", textTransform: "uppercase",
-    }}>
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5,
+      padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700,
+      background:s.bg, color:s.color, letterSpacing:".04em", textTransform:"uppercase" }}>
       {status}
     </span>
   );
 }
-
-function Btn({ onClick, variant = "primary", size = "md", disabled, children, style: extra = {} }) {
-  const PAD = size === "sm" ? "5px 12px" : size === "lg" ? "11px 24px" : "8px 16px";
-  const FS  = size === "sm" ? 12 : 14;
+function Btn({ onClick, variant="primary", size="md", disabled, children, style:extra={} }) {
+  const PAD = size==="sm" ? "5px 12px" : size==="lg" ? "11px 24px" : "8px 16px";
+  const FS  = size==="sm" ? 12 : 14;
   const VARS = {
-    primary: { background: C.accent,   color: "#fff", border: "none" },
-    danger:  { background: C.danger,   color: "#fff", border: "none" },
-    warn:    { background: C.warn,     color: "#fff", border: "none" },
-    ghost:   { background: "transparent", color: C.accent, border: `1.5px solid ${C.border}` },
-    outline: { background: "transparent", color: C.muted,  border: `1.5px solid ${C.border}` },
+    primary: { background:C.accent, color:"#fff", border:"none" },
+    danger:  { background:C.danger, color:"#fff", border:"none" },
+    warn:    { background:C.warn,   color:"#fff", border:"none" },
+    ghost:   { background:"transparent", color:C.accent, border:`1.5px solid ${C.border}` },
+    outline: { background:"transparent", color:C.muted,  border:`1.5px solid ${C.border}` },
   };
   return (
     <button className="um-btn" onClick={onClick} disabled={disabled} style={{
-      border: "none", borderRadius: 8, padding: PAD, fontSize: FS,
-      fontFamily: "'Epilogue',sans-serif", fontWeight: 600,
+      border:"none", borderRadius:8, padding:PAD, fontSize:FS,
+      fontFamily:"'Epilogue',sans-serif", fontWeight:600,
       ...VARS[variant], ...extra,
-    }}>
-      {children}
-    </button>
+    }}>{children}</button>
   );
 }
-
-function FormInput({ label, error, type = "text", value, onChange, placeholder }) {
+function FormInput({ label, error, type="text", value, onChange, placeholder }) {
   return (
-    <div style={{ marginBottom: 14 }}>
-      <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.muted,
-        textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 5 }}>
-        {label}
-      </label>
-      <input
-        className="um-input"
-        type={type}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        style={{
-          width: "100%", padding: "9px 12px", border: `1.5px solid ${C.border}`,
-          borderRadius: 8, fontSize: 14, fontFamily: "'Epilogue',sans-serif",
-          color: C.text, background: "#fff",
-        }}
-      />
-      {error && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{error}</p>}
+    <div style={{ marginBottom:14 }}>
+      <label style={{ display:"block", fontSize:11, fontWeight:700, color:C.muted,
+        textTransform:"uppercase", letterSpacing:".07em", marginBottom:5 }}>{label}</label>
+      <input className="um-input" type={type} value={value} onChange={onChange} placeholder={placeholder}
+        style={{ width:"100%", padding:"9px 12px", border:`1.5px solid ${C.border}`,
+          borderRadius:8, fontSize:14, fontFamily:"'Epilogue',sans-serif", color:C.text, background:"#fff" }} />
+      {error && <p style={{ margin:"4px 0 0", fontSize:12, color:C.danger }}>{error}</p>}
     </div>
   );
 }
-
 function FormSelect({ label, error, value, onChange, options }) {
   return (
-    <div style={{ marginBottom: 14 }}>
-      <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.muted,
-        textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 5 }}>
-        {label}
-      </label>
-      <select
-        className="um-input"
-        value={value}
-        onChange={onChange}
-        style={{
-          width: "100%", padding: "9px 12px", border: `1.5px solid ${C.border}`,
-          borderRadius: 8, fontSize: 14, fontFamily: "'Epilogue',sans-serif",
-          color: C.text, background: "#fff", appearance: "none", cursor: "pointer",
-        }}
-      >
+    <div style={{ marginBottom:14 }}>
+      <label style={{ display:"block", fontSize:11, fontWeight:700, color:C.muted,
+        textTransform:"uppercase", letterSpacing:".07em", marginBottom:5 }}>{label}</label>
+      <select className="um-input" value={value} onChange={onChange}
+        style={{ width:"100%", padding:"9px 12px", border:`1.5px solid ${C.border}`,
+          borderRadius:8, fontSize:14, fontFamily:"'Epilogue',sans-serif",
+          color:C.text, background:"#fff", appearance:"none", cursor:"pointer" }}>
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      {error && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{error}</p>}
+      {error && <p style={{ margin:"4px 0 0", fontSize:12, color:C.danger }}>{error}</p>}
     </div>
   );
 }
-
-/* ─── Toast ──────────────────────────────────────────────────────────── */
 function Toast({ msg, type, onDone }) {
   useEffect(() => { const t = setTimeout(onDone, 3800); return () => clearTimeout(t); }, [onDone]);
   const isErr = type === "error";
   return (
     <div style={{
-      position: "fixed", bottom: 28, right: 28, zIndex: 9999,
-      background: isErr ? "#FFEBEE" : "#E8F5E9",
-      color: isErr ? C.danger : C.green,
-      padding: "12px 20px", borderRadius: 10, fontSize: 14, fontWeight: 500,
-      fontFamily: "'Epilogue',sans-serif",
-      display: "flex", alignItems: "center", gap: 10,
-      boxShadow: "0 6px 30px rgba(0,0,0,.14)",
-      animation: "slideUp .25s ease",
+      position:"fixed", bottom:28, right:28, zIndex:9999,
+      background: isErr ? "#FFEBEE" : "#E8F5E9", color: isErr ? C.danger : C.green,
+      padding:"12px 20px", borderRadius:10, fontSize:14, fontWeight:500,
+      fontFamily:"'Epilogue',sans-serif", display:"flex", alignItems:"center", gap:10,
+      boxShadow:"0 6px 30px rgba(0,0,0,.14)", animation:"slideUp .25s ease",
     }}>
-      <span style={{ fontWeight: 700 }}>{isErr ? "✕" : "✓"}</span>
-      {msg}
+      <span style={{ fontWeight:700 }}>{isErr ? "✕" : "✓"}</span>{msg}
     </div>
   );
 }
-
-/* ─── Modal shell ────────────────────────────────────────────────────── */
-/* ─── Modal shell ────────────────────────────────────────────────────── */
-function Modal({ title, onClose, children, width = 460 }) {
+function Modal({ title, onClose, children, width=460 }) {
   return (
-    <div
-      // FIX: Use onMouseDown + target check
-      // This prevents the modal from closing if the user starts 
-      // selecting text inside but releases the mouse outside.
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      style={{
-        position: "fixed", inset: 0, zIndex: 999,
-        background: "rgba(10,9,25,.5)", backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        animation: "fadeIn .15s ease",
-      }}
-    >
-      <div
-        // Stop the mouse event from bubbling up to the backdrop
-        onMouseDown={e => e.stopPropagation()}
-        style={{
-          background: C.card, borderRadius: 16, padding: "28px 30px",
-          width, maxWidth: "94vw",
-          boxShadow: "0 24px 70px rgba(0,0,0,.22)",
-          animation: "popIn .2s ease",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-          <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, fontFamily: "'Syne',sans-serif", color: C.text }}>
-            {title}
-          </h3>
-          <button onClick={onClose} style={{
-            border: "none", background: "none", fontSize: 22,
-            cursor: "pointer", color: C.muted, lineHeight: 1,
-          }}>×</button>
+    <div onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }} style={{
+      position:"fixed", inset:0, zIndex:999,
+      background:"rgba(10,9,25,.5)", backdropFilter:"blur(4px)",
+      display:"flex", alignItems:"center", justifyContent:"center",
+      animation:"fadeIn .15s ease",
+    }}>
+      <div onMouseDown={e => e.stopPropagation()} style={{
+        background:C.card, borderRadius:16, padding:"28px 30px",
+        width, maxWidth:"94vw", boxShadow:"0 24px 70px rgba(0,0,0,.22)",
+        animation:"popIn .2s ease",
+      }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:22 }}>
+          <h3 style={{ margin:0, fontSize:20, fontWeight:800, fontFamily:"'Syne',sans-serif", color:C.text }}>{title}</h3>
+          <button onClick={onClose} style={{ border:"none", background:"none", fontSize:22, cursor:"pointer", color:C.muted, lineHeight:1 }}>×</button>
         </div>
         {children}
       </div>
@@ -264,20 +305,16 @@ function Modal({ title, onClose, children, width = 460 }) {
   );
 }
 
-/* ─── UserForm (Add & Edit) ──────────────────────────────────────────── */
-const BLANK = { name: "", email: "", password: "", role: "student" };
+const BLANK = { name:"", email:"", password:"", role:"student" };
 const ROLE_OPTIONS = [
-  { value: "student",    label: "Student"    },
-  { value: "instructor", label: "Instructor" },
-  { value: "admin",      label: "Admin"      },
+  { value:"student",    label:"Student"    },
+  { value:"instructor", label:"Instructor" },
+  { value:"admin",      label:"Admin"      },
 ];
-
 function UserForm({ initial, isEdit, onSubmit, onCancel, saving }) {
-  const [form, setForm]     = useState({ ...BLANK, ...initial });
+  const [form,   setForm]   = useState({ ...BLANK, ...initial });
   const [errors, setErrors] = useState({});
-
-  const set = key => e => setForm(f => ({ ...f, [key]: e.target.value }));
-
+  const set = key => e => setForm(f => ({ ...f, [key]:e.target.value }));
   const validate = () => {
     const e = {};
     if (!form.name.trim())  e.name  = "Name is required.";
@@ -286,30 +323,18 @@ function UserForm({ initial, isEdit, onSubmit, onCancel, saving }) {
     setErrors(e);
     return Object.keys(e).length === 0;
   };
-
   const submit = () => { if (validate()) onSubmit(form); };
-
   return (
     <div>
-      <FormInput
-        label="Full Name" error={errors.name}
-        value={form.name} onChange={set("name")} placeholder="e.g. Juan Dela Cruz"
-      />
-      <FormInput
-        label="Email" type="email" error={errors.email}
-        value={form.email} onChange={set("email")} placeholder="user@school.edu"
-      />
+      <FormInput label="Full Name" error={errors.name} value={form.name} onChange={set("name")} placeholder="e.g. Juan Dela Cruz" />
+      <FormInput label="Email" type="email" error={errors.email} value={form.email} onChange={set("email")} placeholder="user@school.edu" />
       <FormInput
         label={isEdit ? "New Password (blank = keep current)" : "Password"}
-        type="password" error={errors.password}
-        value={form.password} onChange={set("password")}
+        type="password" error={errors.password} value={form.password} onChange={set("password")}
         placeholder="Min 8 chars · Aa1@"
       />
-      <FormSelect
-        label="Role" error={errors.role}
-        value={form.role} onChange={set("role")} options={ROLE_OPTIONS}
-      />
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 }}>
+      <FormSelect label="Role" error={errors.role} value={form.role} onChange={set("role")} options={ROLE_OPTIONS} />
+      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:6 }}>
         <Btn variant="ghost" onClick={onCancel}>Cancel</Btn>
         <Btn variant="primary" onClick={submit} disabled={saving}>
           {saving ? "Saving…" : isEdit ? "Save Changes" : "Register User"}
@@ -318,111 +343,81 @@ function UserForm({ initial, isEdit, onSubmit, onCancel, saving }) {
     </div>
   );
 }
-
-/* ─── StatCard ───────────────────────────────────────────────────────── */
 function StatCard({ label, value, color, onClick, active }) {
   return (
-    <div
-      onClick={onClick}
-      className="um-btn"
-      style={{
-        background: active ? color : C.card,
-        border: `1.5px solid ${active ? color : C.border}`,
-        borderRadius: 12, padding: "14px 18px", cursor: "pointer",
-        flex: 1, minWidth: 110,
-      }}
-    >
-      <p style={{ margin: 0, fontSize: 26, fontWeight: 800,
-        fontFamily: "'Syne',sans-serif", color: active ? "#fff" : color }}>
-        {value}
-      </p>
-      <p style={{ margin: "2px 0 0", fontSize: 12, fontWeight: 600,
-        color: active ? "rgba(255,255,255,.8)" : C.muted, textTransform: "uppercase", letterSpacing: ".06em" }}>
-        {label}
-      </p>
+    <div onClick={onClick} className="um-btn" style={{
+      background: active ? color : C.card,
+      border:`1.5px solid ${active ? color : C.border}`,
+      borderRadius:12, padding:"14px 18px", cursor:"pointer", flex:1, minWidth:110,
+    }}>
+      <p style={{ margin:0, fontSize:26, fontWeight:800, fontFamily:"'Syne',sans-serif",
+        color: active ? "#fff" : color }}>{value}</p>
+      <p style={{ margin:"2px 0 0", fontSize:12, fontWeight:600,
+        color: active ? "rgba(255,255,255,.8)" : C.muted,
+        textTransform:"uppercase", letterSpacing:".06em" }}>{label}</p>
     </div>
   );
 }
 
-/* ─── Main Page ──────────────────────────────────────────────────────── */
 export default function UserManagement() {
-  const [users,   setUsers]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search,  setSearch]  = useState("");
+  const [users,      setUsers]      = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [search,     setSearch]     = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [toast,   setToast]   = useState(null);
-  const [modal,   setModal]   = useState(null); // { type: "add"|"edit"|"delete", user? }
-  const [saving,  setSaving]  = useState(false);
+  const [toast,      setToast]      = useState(null);
+  const [modal,      setModal]      = useState(null);
+  const [saving,     setSaving]     = useState(false);
 
-  const notify    = (msg, type = "success") => setToast({ msg, type });
+  const notify     = (msg, type="success") => setToast({ msg, type });
   const closeModal = () => setModal(null);
 
-  /* ── Load users ───────────────────────────────────────────────────── */
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api("GET", "/admin/users");
-      // Laravel resource collection → { data: [...] }  OR plain array
       setUsers(res.data ?? res.users ?? (Array.isArray(res) ? res : []));
-    } catch (err) {
-      notify(err.message, "error");
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { notify(err.message, "error"); }
+    finally { setLoading(false); }
   }, []);
-
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
-  /* ── Add user ─────────────────────────────────────────────────────── */
-  const handleAdd = async (form) => {
+  const handleAdd = async form => {
     setSaving(true);
     try {
-      const res = await api("POST", "/admin/users", {
-        name:     form.name,
-        email:    form.email,
-        password: form.password,
-        role:     form.role,
-      });
+      const res = await api("POST", "/admin/users", { name:form.name, email:form.email, password:form.password, role:form.role });
       setUsers(u => [...u, res.user ?? res]);
       notify("User registered successfully.");
       closeModal();
-    } catch (err) {
-      notify(err.message, "error");
-    } finally { setSaving(false); }
+    } catch (err) { notify(err.message, "error"); }
+    finally { setSaving(false); }
   };
 
-  /* ── Edit user ────────────────────────────────────────────────────── */
-  const handleEdit = async (form) => {
+  const handleEdit = async form => {
     const { id } = modal.user;
     setSaving(true);
     try {
-      const payload = { name: form.name, email: form.email, role: form.role };
+      const payload = { name:form.name, email:form.email, role:form.role };
       if (form.password.trim()) payload.password = form.password;
       const res = await api("PUT", `/admin/users/${id}`, payload);
       setUsers(u => u.map(x => x.id === id ? (res.user ?? res) : x));
       notify("User updated.");
       closeModal();
-    } catch (err) {
-      notify(err.message, "error");
-    } finally { setSaving(false); }
+    } catch (err) { notify(err.message, "error"); }
+    finally { setSaving(false); }
   };
 
-  /* ── Toggle suspend ───────────────────────────────────────────────── */
-  const handleToggleSuspend = async (user) => {
+  const handleToggleSuspend = async user => {
     const newStatus = user.status?.toLowerCase() === "suspended" ? "active" : "suspended";
-    // optimistic update
-    setUsers(u => u.map(x => x.id === user.id ? { ...x, status: newStatus } : x));
+    setUsers(u => u.map(x => x.id === user.id ? { ...x, status:newStatus } : x));
     try {
-      await api("PATCH", `/admin/users/${user.id}/status`, { status: newStatus });
+      await api("PATCH", `/admin/users/${user.id}/status`, { status:newStatus });
       notify(`User ${newStatus === "suspended" ? "suspended" : "reactivated"}.`);
     } catch (err) {
-      // rollback
-      setUsers(u => u.map(x => x.id === user.id ? { ...x, status: user.status } : x));
+      setUsers(u => u.map(x => x.id === user.id ? { ...x, status:user.status } : x));
       notify(err.message, "error");
     }
   };
 
-  /* ── Delete user ──────────────────────────────────────────────────── */
   const handleDelete = async () => {
     const { id } = modal.user;
     setSaving(true);
@@ -431,22 +426,16 @@ export default function UserManagement() {
       setUsers(u => u.filter(x => x.id !== id));
       notify("User deleted.");
       closeModal();
-    } catch (err) {
-      notify(err.message, "error");
-    } finally { setSaving(false); }
+    } catch (err) { notify(err.message, "error"); }
+    finally { setSaving(false); }
   };
 
-  /* ── Filtered list ────────────────────────────────────────────────── */
   const filtered = users.filter(u => {
     const q  = search.toLowerCase();
-    const ok = !q
-      || u.name?.toLowerCase().includes(q)
-      || u.email?.toLowerCase().includes(q);
-    const roleOk = roleFilter === "all" || u.role?.toLowerCase() === roleFilter;
-    return ok && roleOk;
+    const ok = !q || u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
+    return ok && (roleFilter === "all" || u.role?.toLowerCase() === roleFilter);
   });
 
-  /* ── Counts for stat cards ────────────────────────────────────────── */
   const counts = {
     all:        users.length,
     student:    users.filter(u => u.role?.toLowerCase() === "student").length,
@@ -454,250 +443,152 @@ export default function UserManagement() {
     admin:      users.filter(u => u.role?.toLowerCase() === "admin").length,
   };
 
-  /* ─── Render ──────────────────────────────────────────────────────── */
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 24px", fontFamily: "'Epilogue',sans-serif" }}>
+    <div style={{ display:"flex", minHeight:"100vh", background:C.bg, fontFamily:"'Epilogue',sans-serif" }}>
+      <Sidebar />
+      <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+        <Topbar />
+        <div style={{ flex:1, padding:"28px", overflowY:"auto" }}>
 
-      {/* ── Page header ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
-        <div>
-          <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: C.accent,
-            textTransform: "uppercase", letterSpacing: ".12em" }}>
-            Admin Panel
-          </p>
-          <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800,
-            fontFamily: "'Syne',sans-serif", color: C.text }}>
-            User Management
-          </h1>
-          <p style={{ margin: "5px 0 0", fontSize: 14, color: C.muted }}>
-            {users.length} total account{users.length !== 1 ? "s" : ""} in the system
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <Link to="/admin" style={{
-            textDecoration: "none", fontSize: 13, color: C.muted, fontWeight: 500,
-            display: "flex", alignItems: "center", gap: 4,
-          }}>
-            ← Dashboard
-          </Link>
-          <Btn variant="primary" size="lg" onClick={() => setModal({ type: "add" })}>
-            + Register User
-          </Btn>
-        </div>
-      </div>
-
-      {/* ── Stat cards ── */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
-        {[
-          { key: "all",        label: "All Users",   color: C.accent  },
-          { key: "student",    label: "Students",    color: "#6C63FF" },
-          { key: "instructor", label: "Instructors", color: "#1E88E5" },
-          { key: "admin",      label: "Admins",      color: C.danger  },
-        ].map(({ key, label, color }) => (
-          <StatCard
-            key={key} label={label} value={counts[key]} color={color}
-            active={roleFilter === key}
-            onClick={() => setRoleFilter(roleFilter === key ? "all" : key)}
-          />
-        ))}
-      </div>
-
-      {/* ── Table card ── */}
-      <div style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.border}`,
-        boxShadow: "0 4px 20px rgba(108,99,255,.07)", overflow: "hidden" }}>
-
-        {/* Toolbar */}
-        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`,
-          display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          {/* Search */}
-          <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
-            <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)",
-              fontSize: 14, color: C.muted }}>🔍</span>
-            <input
-              className="um-input"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search by name or email…"
-              style={{
-                width: "100%", padding: "8px 12px 8px 34px",
-                border: `1.5px solid ${C.border}`, borderRadius: 8,
-                fontSize: 13, fontFamily: "'Epilogue',sans-serif", color: C.text, background: "#fff",
-              }}
-            />
+          {/* Page header */}
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:28 }}>
+            <div>
+              <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700, color:C.accent,
+                textTransform:"uppercase", letterSpacing:".12em" }}>Admin Panel</p>
+              <h1 style={{ margin:0, fontSize:30, fontWeight:800, fontFamily:"'Syne',sans-serif", color:C.text }}>
+                User Management
+              </h1>
+              <p style={{ margin:"5px 0 0", fontSize:14, color:C.muted }}>
+                {users.length} total account{users.length !== 1 ? "s" : ""} in the system
+              </p>
+            </div>
+            <Btn variant="primary" size="lg" onClick={() => setModal({ type:"add" })}>
+              + Register User
+            </Btn>
           </div>
-          {/* Role filter pills */}
-          {["all","student","instructor","admin"].map(r => (
-            <button
-              key={r}
-              className="um-tab"
-              onClick={() => setRoleFilter(r)}
-              style={{
-                border: "none", borderRadius: 20, padding: "6px 14px",
-                fontSize: 12, fontWeight: 700, cursor: "pointer",
-                fontFamily: "'Epilogue',sans-serif", textTransform: "capitalize",
-                background: roleFilter === r ? C.accent : C.bg,
-                color: roleFilter === r ? "#fff" : C.muted,
-              }}
-            >
-              {r === "all" ? "All Roles" : r}
-            </button>
-          ))}
-          <Btn variant="outline" size="sm" onClick={loadUsers}>↻ Refresh</Btn>
-        </div>
 
-        {/* Table */}
-        {loading ? (
-          <div style={{ padding: 60, textAlign: "center", color: C.muted, fontSize: 14 }}>
-            Loading users…
+          {/* Stat cards */}
+          <div style={{ display:"flex", gap:12, marginBottom:24, flexWrap:"wrap" }}>
+            {[
+              { key:"all",        label:"All Users",   color:C.accent  },
+              { key:"student",    label:"Students",    color:"#6C63FF" },
+              { key:"instructor", label:"Instructors", color:"#1E88E5" },
+              { key:"admin",      label:"Admins",      color:C.danger  },
+            ].map(({ key, label, color }) => (
+              <StatCard key={key} label={label} value={counts[key]} color={color}
+                active={roleFilter === key}
+                onClick={() => setRoleFilter(roleFilter === key ? "all" : key)} />
+            ))}
           </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: 60, textAlign: "center", color: C.muted, fontSize: 14 }}>
-            {search || roleFilter !== "all" ? "No users match your filters." : "No users found."}
-          </div>
-        ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                {["User", "Email", "Role", "Status", "Joined", "Actions"].map(h => (
-                  <th key={h} style={{
-                    padding: "11px 16px", textAlign: "left", fontSize: 11, fontWeight: 700,
-                    color: C.muted, textTransform: "uppercase", letterSpacing: ".07em",
-                    background: "#FAFAFE",
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((user, i) => {
-                const isSuspended = user.status?.toLowerCase() === "suspended";
-                const isAdmin     = user.role?.toLowerCase() === "admin";
-                return (
-                  <tr
-                    key={user.id}
-                    className="um-tr um-row"
-                    style={{ borderBottom: `1px solid ${C.border}`, animationDelay: `${i * 30}ms` }}
-                  >
-                    {/* Name + Avatar */}
-                    <td style={{ padding: "12px 16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <Avatar name={user.name} />
-                        <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
-                          {user.name}
-                        </span>
-                      </div>
-                    </td>
 
-                    {/* Email */}
-                    <td style={{ padding: "12px 16px", fontSize: 13, color: C.muted }}>
-                      {user.email}
-                    </td>
+          {/* Table card */}
+          <div style={{ background:C.card, borderRadius:14, border:`1px solid ${C.border}`,
+            boxShadow:"0 4px 20px rgba(108,99,255,.07)", overflow:"hidden" }}>
+            <div style={{ padding:"16px 20px", borderBottom:`1px solid ${C.border}`,
+              display:"flex", gap:12, alignItems:"center", flexWrap:"wrap" }}>
+              <div style={{ position:"relative", flex:1, minWidth:200 }}>
+                <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:14, color:C.muted }}>🔍</span>
+                <input className="um-input" value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Search by name or email…" style={{
+                    width:"100%", padding:"8px 12px 8px 34px", border:`1.5px solid ${C.border}`,
+                    borderRadius:8, fontSize:13, fontFamily:"'Epilogue',sans-serif", color:C.text, background:"#fff",
+                  }} />
+              </div>
+              {["all","student","instructor","admin"].map(r => (
+                <button key={r} className="um-tab" onClick={() => setRoleFilter(r)} style={{
+                  border:"none", borderRadius:20, padding:"6px 14px", fontSize:12, fontWeight:700,
+                  cursor:"pointer", fontFamily:"'Epilogue',sans-serif", textTransform:"capitalize",
+                  background: roleFilter === r ? C.accent : C.bg,
+                  color: roleFilter === r ? "#fff" : C.muted,
+                }}>{r === "all" ? "All Roles" : r}</button>
+              ))}
+              <Btn variant="outline" size="sm" onClick={loadUsers}>↻ Refresh</Btn>
+            </div>
 
-                    {/* Role chip */}
-                    <td style={{ padding: "12px 16px" }}>
-                      <RoleChip role={user.role} />
-                    </td>
-
-                    {/* Status chip */}
-                    <td style={{ padding: "12px 16px" }}>
-                      <StatusChip status={user.status ?? "active"} />
-                    </td>
-
-                    {/* Joined date */}
-                    <td style={{ padding: "12px 16px", fontSize: 13, color: C.muted }}>
-                      {user.created_at
-                        ? new Date(user.created_at).toLocaleDateString("en-PH", {
-                            year: "numeric", month: "short", day: "numeric",
-                          })
-                        : "—"}
-                    </td>
-
-                    {/* Actions */}
-                    <td style={{ padding: "12px 16px" }}>
-                      {isAdmin ? (
-                        <span style={{ fontSize: 12, color: C.muted }}>System</span>
-                      ) : (
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {/* Edit */}
-                          <Btn
-                            size="sm" 
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation(); // Stops event from bubbling
-                              setModal({ type: "edit", user });
-                            }}
-                          >
-                            Edit
-                          </Btn>
-
-                          {/* Suspend / Activate */}
-                          <Btn
-                            size="sm"
-                            variant={isSuspended ? "primary" : "warn"}
-                            onClick={() => handleToggleSuspend(user)}
-                          >
-                            {isSuspended ? "Activate" : "Suspend"}
-                          </Btn>
-
-                          {/* Delete */}
-                          <Btn
-                            size="sm" variant="danger"
-                            onClick={() => setModal({ type: "delete", user })}
-                          >
-                            Delete
-                          </Btn>
-                        </div>
-                      )}
-                    </td>
+            {loading ? (
+              <div style={{ padding:60, textAlign:"center", color:C.muted, fontSize:14 }}>Loading users…</div>
+            ) : filtered.length === 0 ? (
+              <div style={{ padding:60, textAlign:"center", color:C.muted, fontSize:14 }}>
+                {search || roleFilter !== "all" ? "No users match your filters." : "No users found."}
+              </div>
+            ) : (
+              <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                <thead>
+                  <tr style={{ borderBottom:`1px solid ${C.border}` }}>
+                    {["User","Email","Role","Status","Joined","Actions"].map(h => (
+                      <th key={h} style={{ padding:"11px 16px", textAlign:"left", fontSize:11, fontWeight:700,
+                        color:C.muted, textTransform:"uppercase", letterSpacing:".07em", background:"#FAFAFE" }}>{h}</th>
+                    ))}
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-
-        {/* Footer count */}
-        {!loading && filtered.length > 0 && (
-          <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`,
-            fontSize: 12, color: C.muted, textAlign: "right" }}>
-            Showing {filtered.length} of {users.length} users
+                </thead>
+                <tbody>
+                  {filtered.map((user, i) => {
+                    const isSuspended = user.status?.toLowerCase() === "suspended";
+                    const isAdmin     = user.role?.toLowerCase() === "admin";
+                    return (
+                      <tr key={user.id} className="um-tr um-row"
+                        style={{ borderBottom:`1px solid ${C.border}`, animationDelay:`${i*30}ms` }}>
+                        <td style={{ padding:"12px 16px" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                            <Avatar name={user.name} />
+                            <span style={{ fontSize:14, fontWeight:600, color:C.text }}>{user.name}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding:"12px 16px", fontSize:13, color:C.muted }}>{user.email}</td>
+                        <td style={{ padding:"12px 16px" }}><RoleChip role={user.role} /></td>
+                        <td style={{ padding:"12px 16px" }}><StatusChip status={user.status ?? "active"} /></td>
+                        <td style={{ padding:"12px 16px", fontSize:13, color:C.muted }}>
+                          {user.created_at
+                            ? new Date(user.created_at).toLocaleDateString("en-PH",{year:"numeric",month:"short",day:"numeric"})
+                            : "—"}
+                        </td>
+                        <td style={{ padding:"12px 16px" }}>
+                          {isAdmin ? (
+                            <span style={{ fontSize:12, color:C.muted }}>System</span>
+                          ) : (
+                            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                              <Btn size="sm" variant="ghost" onClick={e => { e.stopPropagation(); setModal({ type:"edit", user }); }}>Edit</Btn>
+                              <Btn size="sm" variant={isSuspended ? "primary" : "warn"} onClick={() => handleToggleSuspend(user)}>
+                                {isSuspended ? "Activate" : "Suspend"}
+                              </Btn>
+                              <Btn size="sm" variant="danger" onClick={() => setModal({ type:"delete", user })}>Delete</Btn>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+            {!loading && filtered.length > 0 && (
+              <div style={{ padding:"10px 20px", borderTop:`1px solid ${C.border}`,
+                fontSize:12, color:C.muted, textAlign:"right" }}>
+                Showing {filtered.length} of {users.length} users
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* ── Add modal ── */}
       {modal?.type === "add" && (
         <Modal title="Register New User" onClose={closeModal}>
-          <UserForm
-            isEdit={false}
-            onSubmit={handleAdd}
-            onCancel={closeModal}
-            saving={saving}
-          />
+          <UserForm isEdit={false} onSubmit={handleAdd} onCancel={closeModal} saving={saving} />
         </Modal>
       )}
-
-      {/* ── Edit modal ── */}
       {modal?.type === "edit" && (
         <Modal title="Edit User" onClose={closeModal}>
-          <UserForm
-            isEdit
-            initial={{ name: modal.user.name, email: modal.user.email, role: modal.user.role, password: "" }}
-            onSubmit={handleEdit}
-            onCancel={closeModal}
-            saving={saving}
-          />
+          <UserForm isEdit initial={{ name:modal.user.name, email:modal.user.email, role:modal.user.role, password:"" }}
+            onSubmit={handleEdit} onCancel={closeModal} saving={saving} />
         </Modal>
       )}
-
-      {/* ── Delete confirm modal ── */}
       {modal?.type === "delete" && (
         <Modal title="Delete User" onClose={closeModal} width={380}>
-          <p style={{ margin: "0 0 20px", fontSize: 14, color: C.muted, lineHeight: 1.6 }}>
+          <p style={{ margin:"0 0 20px", fontSize:14, color:C.muted, lineHeight:1.6 }}>
             Are you sure you want to permanently delete{" "}
-            <strong style={{ color: C.text }}>{modal.user.name}</strong>?
-            This action cannot be undone.
+            <strong style={{ color:C.text }}>{modal.user.name}</strong>? This action cannot be undone.
           </p>
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
             <Btn variant="ghost" onClick={closeModal}>Cancel</Btn>
             <Btn variant="danger" onClick={handleDelete} disabled={saving}>
               {saving ? "Deleting…" : "Yes, Delete"}
@@ -705,8 +596,6 @@ export default function UserManagement() {
           </div>
         </Modal>
       )}
-
-      {/* ── Toast ── */}
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   );
