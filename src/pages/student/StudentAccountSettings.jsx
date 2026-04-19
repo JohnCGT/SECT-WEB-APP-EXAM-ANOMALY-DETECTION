@@ -2,9 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API, { fetchCsrfToken } from "../../api";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Styles
-// ─────────────────────────────────────────────────────────────────────────────
 const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
   *,*::before,*::after{box-sizing:border-box;}
@@ -44,7 +41,6 @@ const GLOBAL_CSS = `
   .section-title{font-size:13px;font-weight:700;color:#0f172a;margin:0 0 16px;}
   .section-sub{font-size:12px;color:#94a3b8;margin:2px 0 0;}
   .err-msg{font-size:11px;color:#ef4444;margin-top:4px;display:flex;align-items:center;gap:4px;}
-  .pw-strength{height:3px;border-radius:99px;margin-top:6px;transition:width .3s,background .3s;}
   .pw-hint{font-size:11px;margin-top:4px;}
   @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   .fade-up{animation:fadeUp .35s ease both;}
@@ -59,24 +55,21 @@ const GLOBAL_CSS = `
   .switch-slider::before{content:"";position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 4px rgba(0,0,0,.15);}
   input:checked+.switch-slider{background:var(--blue);}
   input:checked+.switch-slider::before{transform:translateX(18px);}
-  /* Toast */
   .toast-wrap{position:fixed;top:68px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
   .toast{background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.12);padding:12px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;min-width:260px;pointer-events:all;animation:slideIn .25s ease;}
   .toast.success{border-left:4px solid #22c55e;color:#166534;}
   .toast.error{border-left:4px solid #ef4444;color:#991b1b;}
   @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
-  /* Photo upload overlay */
   .photo-overlay{position:absolute;inset:0;background:rgba(0,0,0,.45);border-radius:50%;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;cursor:pointer;}
   .avatar-lg:hover .photo-overlay{opacity:1;}
+  .coming-soon-badge{display:inline-flex;align-items:center;gap:4px;background:#f1f5f9;color:#94a3b8;border-radius:99px;padding:3px 10px;font-size:11px;font-weight:600;}
+  .empty-history{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px;gap:8px;text-align:center;}
 `;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
   { to:"/student",                  icon:"bi-speedometer2",    label:"Home"    },
   { to:"/student/subjects",         icon:"bi-journal-bookmark",label:"Subjects"},
-  { to: "/student/exams",           icon: "bi-pencil-square",  label: "Exams" },
+  { to:"/student/exams",            icon:"bi-pencil-square",   label:"Exams"   },
   { to:"/student/grades",           icon:"bi-graph-up-arrow",  label:"Grades"  },
   { to:"/student/account-settings", icon:"bi-gear",            label:"Settings"},
 ];
@@ -88,9 +81,6 @@ const SETTINGS_TABS = [
   { key:"preferences",   label:"Learning",      icon:"bi-book"        },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Password strength helper
-// ─────────────────────────────────────────────────────────────────────────────
 function getPasswordStrength(pw) {
   if (!pw) return { score: 0, label: "", color: "" };
   let score = 0;
@@ -100,12 +90,12 @@ function getPasswordStrength(pw) {
   if (/[0-9]/.test(pw))            score++;
   if (/[@$!%*#?&]/.test(pw))       score++;
   const map = [
-    { label:"",          color:"#e2e8f0" },
-    { label:"Very weak", color:"#ef4444" },
-    { label:"Weak",      color:"#f97316" },
-    { label:"Fair",      color:"#eab308" },
-    { label:"Strong",    color:"#22c55e" },
-    { label:"Very strong",color:"#0056b3"},
+    { label:"",           color:"#e2e8f0" },
+    { label:"Very weak",  color:"#ef4444" },
+    { label:"Weak",       color:"#f97316" },
+    { label:"Fair",       color:"#eab308" },
+    { label:"Strong",     color:"#22c55e" },
+    { label:"Very strong",color:"#0056b3" },
   ];
   return { score, ...map[score] };
 }
@@ -124,8 +114,8 @@ const BottomNav = ({ active }) => (
 );
 
 const Topbar = ({ user, onLogout }) => {
-  const initial    = user?.name?.charAt(0)?.toUpperCase() ?? "S";
-  const firstName  = user?.name?.split(" ")[0] ?? "Student";
+  const initial   = user?.name?.charAt(0)?.toUpperCase() ?? "S";
+  const firstName = user?.name?.split(" ")[0] ?? "Student";
   return (
     <div className="topbar d-flex align-items-center px-3 px-lg-4 gap-3">
       <span style={{ fontFamily:"'DM Sans',sans-serif", fontWeight:700, fontSize:15, color:"#0056b3", letterSpacing:"-.3px", flexShrink:0 }}>
@@ -172,10 +162,10 @@ const Sidebar = ({ active }) => (
   </nav>
 );
 
-const Toggle = ({ checked, onChange }) => (
+const Toggle = ({ checked, onChange, disabled }) => (
   <label className="switch">
-    <input type="checkbox" checked={checked} onChange={onChange}/>
-    <span className="switch-slider"/>
+    <input type="checkbox" checked={checked} onChange={onChange} disabled={disabled}/>
+    <span className="switch-slider" style={disabled ? { opacity:.45, cursor:"not-allowed" } : {}}/>
   </label>
 );
 
@@ -187,7 +177,6 @@ const Field = ({ label, error, children }) => (
   </div>
 );
 
-// Toast manager — renders outside the card so it floats
 const ToastList = ({ toasts }) => (
   <div className="toast-wrap">
     {toasts.map(t => (
@@ -206,35 +195,36 @@ const StudentAccountSettings = () => {
   const navigate   = useNavigate();
   const photoInput = useRef(null);
 
-  const [user,       setUser]       = useState(null);
-  const [activeTab,  setActiveTab]  = useState("general");
-  const [toasts,     setToasts]     = useState([]);
+  const [user,      setUser]      = useState(null);
+  const [activeTab, setActiveTab] = useState("general");
+  const [toasts,    setToasts]    = useState([]);
 
   // ── General form ──────────────────────────────────────────────────────────
   const [form, setForm] = useState({
     firstName:"", lastName:"", email:"", phone:"", course:"", year_level:""
   });
-  const [formErrors,  setFormErrors]  = useState({});
-  const [savingInfo,  setSavingInfo]  = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+  const [savingInfo, setSavingInfo] = useState(false);
 
-  // ── Photo ────────────────────────────────────────────────────────────────
-  const [photoPreview,  setPhotoPreview]  = useState(null);
-  const [uploadingPhoto,setUploadingPhoto]= useState(false);
+  // ── Photo ─────────────────────────────────────────────────────────────────
+  const [photoPreview,   setPhotoPreview]   = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // ── Password form ─────────────────────────────────────────────────────────
-  const [pw, setPw] = useState({ current:"", next:"", confirm:"" });
-  const [pwErrors,  setPwErrors]  = useState({});
-  const [savingPw,  setSavingPw]  = useState(false);
+  const [pw, setPw]         = useState({ current:"", next:"", confirm:"" });
+  const [pwErrors, setPwErrors] = useState({});
+  const [savingPw, setSavingPw] = useState(false);
   const strength = getPasswordStrength(pw.next);
 
-  // ── Notifications (local state — extend to backend if needed) ─────────────
+  // ── Notifications ─────────────────────────────────────────────────────────
   const [notifs, setNotifs] = useState({
-    assignments:true, exams:true, grades:true, announcements:false, frequency:"Real-time"
+    assignments:false, exams:false, grades:false, announcements:false, frequency:"Real-time"
   });
+  const [savingNotifs, setSavingNotifs] = useState(false);
 
   // ── Learning preferences ──────────────────────────────────────────────────
   const [prefs, setPrefs] = useState({
-    studyReminders:true, autoDownload:false, studyMode:"Visual", weeklyGoal:10
+    studyReminders:false, autoDownload:false, studyMode:"Visual", weeklyGoal:10
   });
   const [savingPrefs, setSavingPrefs] = useState(false);
 
@@ -256,14 +246,22 @@ const StudentAccountSettings = () => {
       setUser(u);
       const parts = (u?.name ?? "").split(" ");
       setForm({
-        firstName:  parts[0]           ?? "",
+        firstName:  parts[0]                ?? "",
         lastName:   parts.slice(1).join(" ") ?? "",
-        email:      u?.email           ?? "",
-        phone:      u?.phone           ?? "",
-        course:     u?.course          ?? "",
-        year_level: u?.year_level      ?? "",
+        email:      u?.email                ?? "",
+        phone:      u?.phone                ?? "",
+        course:     u?.course               ?? "",
+        year_level: u?.year_level           ?? "",
       });
       if (u?.profile_photo_url) setPhotoPreview(u.profile_photo_url);
+
+      // Load saved preferences if they exist on the user object
+      if (u?.notification_preferences) {
+        setNotifs(prev => ({ ...prev, ...u.notification_preferences }));
+      }
+      if (u?.learning_preferences) {
+        setPrefs(prev => ({ ...prev, ...u.learning_preferences }));
+      }
     }).catch(() => {});
   }, []);
 
@@ -280,11 +278,11 @@ const StudentAccountSettings = () => {
   // ─────────────────────────────────────────────────────────────────────────
   const validateInfo = () => {
     const e = {};
-    if (!form.firstName.trim())                    e.firstName = "First name is required.";
-    if (!form.lastName.trim())                     e.lastName  = "Last name is required.";
-    if (!form.email.trim())                        e.email     = "Email is required.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Enter a valid email address.";
-    if (form.phone && !/^[+\d\s\-()]{7,20}$/.test(form.phone)) e.phone = "Enter a valid phone number.";
+    if (!form.firstName.trim())                                              e.firstName = "First name is required.";
+    if (!form.lastName.trim())                                               e.lastName  = "Last name is required.";
+    if (!form.email.trim())                                                  e.email     = "Email is required.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))               e.email     = "Enter a valid email address.";
+    if (form.phone && !/^[+\d\s\-()]{7,20}$/.test(form.phone))             e.phone     = "Enter a valid phone number.";
     return e;
   };
 
@@ -325,19 +323,12 @@ const StudentAccountSettings = () => {
   const handlePhotoChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { addToast("Photo must be under 2 MB.", "error"); return; }
 
-    // Client-side size check (2 MB)
-    if (file.size > 2 * 1024 * 1024) {
-      addToast("Photo must be under 2 MB.", "error");
-      return;
-    }
-
-    // Local preview immediately
     const reader = new FileReader();
     reader.onload = ev => setPhotoPreview(ev.target.result);
     reader.readAsDataURL(file);
 
-    // Upload
     setUploadingPhoto(true);
     try {
       await fetchCsrfToken();
@@ -354,24 +345,24 @@ const StudentAccountSettings = () => {
       setPhotoPreview(user?.profile_photo_url ?? null);
     } finally {
       setUploadingPhoto(false);
-      e.target.value = "";   // reset input so same file can be re-selected
+      e.target.value = "";
     }
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Password validation + save
+  // Password
   // ─────────────────────────────────────────────────────────────────────────
   const validatePassword = () => {
     const e = {};
-    if (!pw.current)                               e.current = "Current password is required.";
-    if (!pw.next)                                  e.next    = "New password is required.";
-    else if (pw.next.length < 8)                   e.next    = "Password must be at least 8 characters.";
-    else if (!/[A-Z]/.test(pw.next))               e.next    = "Must include at least one uppercase letter.";
-    else if (!/[a-z]/.test(pw.next))               e.next    = "Must include at least one lowercase letter.";
-    else if (!/[0-9]/.test(pw.next))               e.next    = "Must include at least one number.";
-    else if (!/[@$!%*#?&]/.test(pw.next))          e.next    = "Must include at least one special character (@$!%*#?&).";
-    if (!pw.confirm)                               e.confirm = "Please confirm your new password.";
-    else if (pw.next !== pw.confirm)               e.confirm = "Passwords do not match.";
+    if (!pw.current)                      e.current = "Current password is required.";
+    if (!pw.next)                         e.next    = "New password is required.";
+    else if (pw.next.length < 8)          e.next    = "Password must be at least 8 characters.";
+    else if (!/[A-Z]/.test(pw.next))      e.next    = "Must include at least one uppercase letter.";
+    else if (!/[a-z]/.test(pw.next))      e.next    = "Must include at least one lowercase letter.";
+    else if (!/[0-9]/.test(pw.next))      e.next    = "Must include at least one number.";
+    else if (!/[@$!%*#?&]/.test(pw.next)) e.next    = "Must include at least one special character (@$!%*#?&).";
+    if (!pw.confirm)                      e.confirm = "Please confirm your new password.";
+    else if (pw.next !== pw.confirm)      e.confirm = "Passwords do not match.";
     return e;
   };
 
@@ -402,13 +393,35 @@ const StudentAccountSettings = () => {
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Preferences save (local state — wire to backend when ready)
+  // Notifications save (ready for backend wire-up)
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleSaveNotifs = async () => {
+    setSavingNotifs(true);
+    try {
+      await fetchCsrfToken();
+      await API.put("/profile/preferences", { notification_preferences: notifs });
+      addToast("Notification settings saved!");
+    } catch {
+      addToast("Failed to save notification settings.", "error");
+    } finally {
+      setSavingNotifs(false);
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Learning prefs save (ready for backend wire-up)
   // ─────────────────────────────────────────────────────────────────────────
   const handleSavePrefs = async () => {
     setSavingPrefs(true);
-    await new Promise(r => setTimeout(r, 600)); // simulate
-    addToast("Preferences saved!");
-    setSavingPrefs(false);
+    try {
+      await fetchCsrfToken();
+      await API.put("/profile/preferences", { learning_preferences: prefs });
+      addToast("Preferences saved!");
+    } catch {
+      addToast("Failed to save preferences.", "error");
+    } finally {
+      setSavingPrefs(false);
+    }
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -436,15 +449,8 @@ const StudentAccountSettings = () => {
 
             {/* Profile identity card */}
             <div className="dash-card fade-up" style={{ padding:20, marginBottom:20, display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
-              {/* Clickable avatar */}
-              <div
-                className="avatar-lg"
-                onClick={() => photoInput.current?.click()}
-                title="Change profile photo"
-              >
-                {photoPreview
-                  ? <img src={photoPreview} alt="Profile"/>
-                  : initial}
+              <div className="avatar-lg" onClick={() => photoInput.current?.click()} title="Change profile photo">
+                {photoPreview ? <img src={photoPreview} alt="Profile"/> : initial}
                 <div className="photo-overlay">
                   {uploadingPhoto
                     ? <span className="spinner-border spinner-border-sm text-white" role="status"/>
@@ -452,7 +458,6 @@ const StudentAccountSettings = () => {
                 </div>
               </div>
 
-              {/* Hidden file input */}
               <input
                 ref={photoInput}
                 type="file"
@@ -590,7 +595,6 @@ const StudentAccountSettings = () => {
                       value={pw.next}
                       onChange={e => { setPw(p => ({ ...p, next:e.target.value })); setPwErrors(x => ({ ...x, next:null })); }}
                     />
-                    {/* Strength bar */}
                     {pw.next && (
                       <>
                         <div style={{ display:"flex", gap:4, marginTop:6 }}>
@@ -598,7 +602,7 @@ const StudentAccountSettings = () => {
                             <div key={i} style={{ flex:1, height:3, borderRadius:99, background: i <= strength.score ? strength.color : "#e2e8f0", transition:"background .3s" }}/>
                           ))}
                         </div>
-                        <p className="pw-hint" style={{ color: strength.color }}>{strength.label}</p>
+                        <p className="pw-hint" style={{ color:strength.color }}>{strength.label}</p>
                       </>
                     )}
                   </Field>
@@ -620,48 +624,66 @@ const StudentAccountSettings = () => {
                   </button>
                 </div>
 
-                {/* 2FA (UI only for now) */}
+                {/* 2FA — clearly marked as coming soon, no fake toggle */}
                 <div className="dash-card fade-up" style={{ padding:24 }}>
-                  <h3 className="section-title">Two-Factor Authentication</h3>
-                  <div className="toggle-row">
-                    <div>
-                      <p style={{ margin:0, fontSize:13, fontWeight:600, color:"#1e293b" }}>Enable 2FA</p>
-                      <p className="section-sub">Add an extra layer of security to your account</p>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+                    <h3 className="section-title" style={{ margin:0 }}>Two-Factor Authentication</h3>
+                    <span className="coming-soon-badge"><i className="bi bi-hourglass-split" style={{ fontSize:10 }}></i>Coming soon</span>
+                  </div>
+                  <div style={{ background:"#f8faff", borderRadius:12, padding:"16px 18px", display:"flex", alignItems:"flex-start", gap:12 }}>
+                    <div style={{ width:36, height:36, borderRadius:10, background:"#e8f0fe", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, marginTop:2 }}>
+                      <i className="bi bi-shield-lock" style={{ color:"#0056b3", fontSize:16 }}></i>
                     </div>
-                    <Toggle checked={false} onChange={() => addToast("2FA setup coming soon.", "error")}/>
+                    <div>
+                      <p style={{ margin:"0 0 4px", fontSize:13, fontWeight:600, color:"#1e293b" }}>Extra layer of protection</p>
+                      <p style={{ margin:0, fontSize:12, color:"#64748b", lineHeight:1.6 }}>
+                        Two-factor authentication adds a second verification step when you sign in.
+                        This feature will be available in a future update.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Login history */}
+                {/* Login history — empty state until backend provides data */}
                 <div className="dash-card fade-up" style={{ padding:24 }}>
                   <h3 className="section-title">Login History</h3>
-                  <div style={{ overflowX:"auto" }}>
-                    <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-                      <thead>
-                        <tr style={{ borderBottom:"1px solid #f1f5f9" }}>
-                          {["Date & Time","IP Address","Device","Location"].map((h,i) => (
-                            <th key={h} style={{ padding:"8px 12px", textAlign:"left", fontSize:11, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".04em", whiteSpace:"nowrap" }}
-                              className={h==="IP Address"?"d-none d-sm-table-cell":h==="Location"?"d-none d-md-table-cell":""}>
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          { date:"Feb 05, 2026 · 7:45 PM", ip:"192.168.1.120", device:"Windows · Chrome", loc:"Manila, PH" },
-                          { date:"Feb 04, 2026 · 3:20 PM", ip:"192.168.1.120", device:"Android · Chrome", loc:"Quezon City, PH" },
-                        ].map((r, i) => (
-                          <tr key={i} style={{ borderBottom:"1px solid #f8faff" }}>
-                            <td style={{ padding:"10px 12px", color:"#1e293b", fontWeight:500 }}>{r.date}</td>
-                            <td style={{ padding:"10px 12px", color:"#64748b", fontFamily:"'DM Mono',monospace", fontSize:12 }} className="d-none d-sm-table-cell">{r.ip}</td>
-                            <td style={{ padding:"10px 12px", color:"#64748b" }}>{r.device}</td>
-                            <td style={{ padding:"10px 12px", color:"#64748b" }} className="d-none d-md-table-cell">{r.loc}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  {user?.login_history?.length > 0
+                    ? (
+                      <div style={{ overflowX:"auto" }}>
+                        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+                          <thead>
+                            <tr style={{ borderBottom:"1px solid #f1f5f9" }}>
+                              {["Date & Time","IP Address","Device","Location"].map((h,i) => (
+                                <th key={h} style={{ padding:"8px 12px", textAlign:"left", fontSize:11, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".04em", whiteSpace:"nowrap" }}
+                                  className={h==="IP Address"?"d-none d-sm-table-cell":h==="Location"?"d-none d-md-table-cell":""}>
+                                  {h}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {user.login_history.map((r, i) => (
+                              <tr key={i} style={{ borderBottom:"1px solid #f8faff" }}>
+                                <td style={{ padding:"10px 12px", color:"#1e293b", fontWeight:500 }}>{r.date}</td>
+                                <td style={{ padding:"10px 12px", color:"#64748b", fontFamily:"'DM Mono',monospace", fontSize:12 }} className="d-none d-sm-table-cell">{r.ip_address}</td>
+                                <td style={{ padding:"10px 12px", color:"#64748b" }}>{r.device}</td>
+                                <td style={{ padding:"10px 12px", color:"#64748b" }} className="d-none d-md-table-cell">{r.location ?? "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                    : (
+                      <div className="empty-history">
+                        <div style={{ width:44, height:44, borderRadius:12, background:"#f1f5f9", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          <i className="bi bi-clock-history" style={{ color:"#94a3b8", fontSize:20 }}></i>
+                        </div>
+                        <p style={{ margin:0, fontSize:13, fontWeight:600, color:"#64748b" }}>No login records yet</p>
+                        <p style={{ margin:0, fontSize:12, color:"#94a3b8" }}>Sign-in history will appear here once login tracking is enabled</p>
+                      </div>
+                    )
+                  }
                 </div>
               </div>
             )}
@@ -671,11 +693,14 @@ const StudentAccountSettings = () => {
               <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
                 <div className="dash-card fade-up" style={{ padding:24 }}>
                   <h3 className="section-title">Email Notifications</h3>
+                  <p style={{ margin:"-8px 0 16px", fontSize:12, color:"#94a3b8" }}>
+                    Choose which events you'd like to be notified about.
+                  </p>
                   {[
-                    { key:"assignments", label:"Assignment Deadlines",  sub:"Get notified when assignments are due"        },
-                    { key:"exams",       label:"Exam Schedules",         sub:"Receive reminders before exams start"         },
-                    { key:"grades",      label:"Grades Posted",          sub:"Get notified when new grades are released"    },
-                    { key:"announcements",label:"System Announcements",  sub:"Receive important academic updates"           },
+                    { key:"assignments",   label:"Assignment Deadlines",  sub:"Get notified when assignments are due"     },
+                    { key:"exams",         label:"Exam Schedules",         sub:"Receive reminders before exams start"      },
+                    { key:"grades",        label:"Grades Posted",          sub:"Get notified when new grades are released" },
+                    { key:"announcements", label:"System Announcements",   sub:"Receive important academic updates"        },
                   ].map(n => (
                     <div key={n.key} className="toggle-row">
                       <div>
@@ -688,22 +713,27 @@ const StudentAccountSettings = () => {
                       />
                     </div>
                   ))}
-                </div>
 
-                <div className="dash-card fade-up" style={{ padding:24 }}>
-                  <h3 className="section-title">Alert Frequency</h3>
-                  <Field label="How often to receive digests">
-                    <select
-                      className="field-select"
-                      style={{ maxWidth:280 }}
-                      value={notifs.frequency}
-                      onChange={e => setNotifs(v => ({ ...v, frequency:e.target.value }))}
-                    >
-                      <option>Real-time</option>
-                      <option>Hourly Digest</option>
-                      <option>Daily Summary</option>
-                    </select>
-                  </Field>
+                  <div style={{ marginTop:20 }}>
+                    <Field label="Alert Frequency">
+                      <select
+                        className="field-select"
+                        style={{ maxWidth:280 }}
+                        value={notifs.frequency}
+                        onChange={e => setNotifs(v => ({ ...v, frequency:e.target.value }))}
+                      >
+                        <option>Real-time</option>
+                        <option>Hourly Digest</option>
+                        <option>Daily Summary</option>
+                      </select>
+                    </Field>
+                  </div>
+
+                  <button className="save-btn" onClick={handleSaveNotifs} disabled={savingNotifs} style={{ marginTop:4 }}>
+                    {savingNotifs
+                      ? <><span className="spinner-border spinner-border-sm me-2" role="status"/>Saving…</>
+                      : <><i className="bi bi-check2 me-1"></i>Save Notification Settings</>}
+                  </button>
                 </div>
               </div>
             )}
@@ -712,13 +742,13 @@ const StudentAccountSettings = () => {
             {activeTab === "preferences" && (
               <div className="dash-card fade-up" style={{ padding:24 }}>
                 <h3 className="section-title">Learning Preferences</h3>
-                <p style={{ margin:"0 0 20px", fontSize:13, color:"#64748b" }}>
+                <p style={{ margin:"-8px 0 20px", fontSize:13, color:"#64748b" }}>
                   Customize how you receive materials and study reminders.
                 </p>
 
                 {[
-                  { key:"studyReminders", label:"Enable Study Reminders",    sub:"Get periodic reminders to review lessons"            },
-                  { key:"autoDownload",   label:"Auto-Download Course Files", sub:"Automatically save materials when uploaded"          },
+                  { key:"studyReminders", label:"Enable Study Reminders",    sub:"Get periodic reminders to review lessons"   },
+                  { key:"autoDownload",   label:"Auto-Download Course Files", sub:"Automatically save materials when uploaded" },
                 ].map(n => (
                   <div key={n.key} className="toggle-row">
                     <div>

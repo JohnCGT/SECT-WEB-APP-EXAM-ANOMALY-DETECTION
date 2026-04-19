@@ -250,26 +250,13 @@ const GradesPage = () => {
 
           <main style={{ flex:1, padding:"24px 20px", paddingBottom:100, minWidth:0 }}>
 
-            {/* Page header */}
-            <div style={{ marginBottom:24, display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:12 }}>
-              <div>
-                <p style={{ margin:0, fontSize:12, fontWeight:600, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".06em" }}>Academic</p>
-                <h1 style={{ margin:"4px 0 4px", fontSize:24, fontWeight:700, color:"#0f172a", letterSpacing:"-.4px" }}>Performance</h1>
-                <p style={{ margin:0, fontSize:13, color:"#64748b" }}>
-                  Grades & Analytics{currentSemester ? ` · ${currentSemester}` : ""}
-                </p>
-              </div>
-              <div style={{ display:"flex", gap:8 }}>
-                <button style={{ background:"transparent", border:"1px solid #e2e8f0", borderRadius:10, padding:"7px 14px", fontSize:12, fontWeight:600, color:"#64748b", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", gap:6 }}
-                  className="d-none d-sm-flex">
-                  <i className="bi bi-printer"></i>Print
-                </button>
-                <button style={{ background:"#0056b3", border:"none", borderRadius:10, padding:"7px 14px", fontSize:12, fontWeight:600, color:"#fff", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", gap:6 }}>
-                  <i className="bi bi-download"></i>
-                  <span className="d-none d-sm-inline">Export Transcript</span>
-                  <span className="d-sm-none">Export</span>
-                </button>
-              </div>
+            {/* Page header — print/export buttons removed */}
+            <div style={{ marginBottom:24 }}>
+              <p style={{ margin:0, fontSize:12, fontWeight:600, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".06em" }}>Academic</p>
+              <h1 style={{ margin:"4px 0 4px", fontSize:24, fontWeight:700, color:"#0f172a", letterSpacing:"-.4px" }}>Performance</h1>
+              <p style={{ margin:0, fontSize:13, color:"#64748b" }}>
+                Grades & Analytics{currentSemester ? ` · ${currentSemester}` : ""}
+              </p>
             </div>
 
             {/* Error state */}
@@ -288,334 +275,335 @@ const GradesPage = () => {
 
             {/* ── Main content ── */}
             {!loading && !error && (
-              <div className="bento">
+              /* Outer 2-col split: left = main content, right = sidebar column (stacks naturally) */
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 280px", gap:16, alignItems:"start" }}>
 
-                {/* Hero: GPA banner */}
-                <div className="dash-card bento-span2 fade-up" style={{
-                  padding:24,
-                  background: gpa !== null
-                    ? "linear-gradient(135deg,#0056b3 0%,#1a6ed8 60%,#4d90fe 100%)"
-                    : "linear-gradient(135deg,#64748b 0%,#94a3b8 100%)",
-                  border:"none", position:"relative", overflow:"hidden"
-                }}>
-                  <div style={{ position:"absolute", right:-40, top:-40, width:160, height:160, borderRadius:"50%", background:"rgba(255,255,255,.07)" }}/>
-                  <div style={{ position:"absolute", right:30, bottom:-50, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,.04)" }}/>
-                  <p style={{ margin:0, fontSize:11, fontWeight:600, color:"rgba(255,255,255,.6)", textTransform:"uppercase", letterSpacing:".06em" }}>Overall GPA</p>
-                  {gpa !== null ? (
-                    <div style={{ display:"flex", alignItems:"flex-end", gap:16, marginTop:6, marginBottom:14 }}>
-                      <span style={{ fontSize:52, fontWeight:700, color:"#fff", lineHeight:1, letterSpacing:"-2px" }}>{gpa.toFixed(2)}</span>
-                      <div style={{ paddingBottom:6 }}>
-                        <span style={{ fontSize:13, color:"rgba(255,255,255,.75)", display:"block" }}>
-                          {gradedCourses.length} course{gradedCourses.length !== 1 ? "s" : ""} graded
-                        </span>
-                        <span style={{ fontSize:12, color:"rgba(255,255,255,.5)" }}>
-                          {gpa >= 3.5 ? "Dean's List eligible" : gpa >= 3.0 ? "Good standing" : "Keep it up!"}
+                {/* ── LEFT COLUMN ── */}
+                <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+                  {/* Row 1: GPA banner + stat chips */}
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+
+                    {/* Hero: GPA banner — spans both cols */}
+                    <div className="dash-card fade-up" style={{
+                      gridColumn:"span 2",
+                      padding:24,
+                      background: gpa !== null
+                        ? "linear-gradient(135deg,#0056b3 0%,#1a6ed8 60%,#4d90fe 100%)"
+                        : "linear-gradient(135deg,#64748b 0%,#94a3b8 100%)",
+                      border:"none", position:"relative", overflow:"hidden"
+                    }}>
+                      <div style={{ position:"absolute", right:-40, top:-40, width:160, height:160, borderRadius:"50%", background:"rgba(255,255,255,.07)" }}/>
+                      <div style={{ position:"absolute", right:30, bottom:-50, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,.04)" }}/>
+                      <p style={{ margin:0, fontSize:11, fontWeight:600, color:"rgba(255,255,255,.6)", textTransform:"uppercase", letterSpacing:".06em" }}>Overall GPA</p>
+                      {gpa !== null ? (
+                        <div style={{ display:"flex", alignItems:"flex-end", gap:16, marginTop:6, marginBottom:14 }}>
+                          <span style={{ fontSize:52, fontWeight:700, color:"#fff", lineHeight:1, letterSpacing:"-2px" }}>{gpa.toFixed(2)}</span>
+                          <div style={{ paddingBottom:6 }}>
+                            <span style={{ fontSize:13, color:"rgba(255,255,255,.75)", display:"block" }}>
+                              {gradedCourses.length} course{gradedCourses.length !== 1 ? "s" : ""} graded
+                            </span>
+                            <span style={{ fontSize:12, color:"rgba(255,255,255,.5)" }}>
+                              {gpa >= 3.5 ? "Dean's List eligible" : gpa >= 3.0 ? "Good standing" : "Keep it up!"}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display:"flex", alignItems:"center", gap:12, marginTop:8, marginBottom:14 }}>
+                          <span style={{ fontSize:28, fontWeight:700, color:"rgba(255,255,255,.5)" }}>—</span>
+                          <span style={{ fontSize:13, color:"rgba(255,255,255,.6)" }}>No exams submitted yet</span>
+                        </div>
+                      )}
+                      <div style={{ height:5, borderRadius:99, background:"rgba(255,255,255,.2)", overflow:"hidden" }}>
+                        <div style={{ height:"100%", width: gpa !== null ? `${Math.min(100,(gpa/4)*100)}%` : "0%", borderRadius:99, background:"#fff", transition:"width 1s" }}/>
+                      </div>
+                    </div>
+
+                    {/* Credits chip */}
+                    <div className="stat-chip fade-up d-flex flex-column justify-content-between" style={{ minHeight:140 }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                        <div>
+                          <p style={{ margin:0, fontSize:11, fontWeight:600, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".06em" }}>Credits</p>
+                          <p style={{ margin:"6px 0 0", fontSize:28, fontWeight:700, color:"#0f172a", letterSpacing:"-1px", lineHeight:1 }}>
+                            {enrolledCredits}
+                            <span style={{ fontSize:16, color:"#94a3b8", fontWeight:400 }}> / {TOTAL_CREDITS}</span>
+                          </p>
+                        </div>
+                        <div style={{ width:36, height:36, borderRadius:10, background:"#e8f0fe", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          <i className="bi bi-mortarboard" style={{ color:"#0056b3", fontSize:16 }}></i>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ height:5, borderRadius:99, background:"#eef2ff", overflow:"hidden", marginBottom:4 }}>
+                          <div style={{ height:"100%", width:`${Math.min(100,(enrolledCredits/TOTAL_CREDITS)*100)}%`, background:"#0056b3", borderRadius:99 }}/>
+                        </div>
+                        <span style={{ fontSize:11, color:"#0056b3", fontWeight:600 }}>
+                          {((enrolledCredits/TOTAL_CREDITS)*100).toFixed(1)}% complete
                         </span>
                       </div>
                     </div>
-                  ) : (
-                    <div style={{ display:"flex", alignItems:"center", gap:12, marginTop:8, marginBottom:14 }}>
-                      <span style={{ fontSize:28, fontWeight:700, color:"rgba(255,255,255,.5)" }}>—</span>
-                      <span style={{ fontSize:13, color:"rgba(255,255,255,.6)" }}>No exams submitted yet</span>
-                    </div>
-                  )}
-                  <div style={{ height:5, borderRadius:99, background:"rgba(255,255,255,.2)", overflow:"hidden" }}>
-                    <div style={{ height:"100%", width: gpa !== null ? `${Math.min(100,(gpa/4)*100)}%` : "0%", borderRadius:99, background:"#fff", transition:"width 1s" }}/>
-                  </div>
-                </div>
 
-                {/* Enrolled courses chip */}
-                <div className="stat-chip fade-up d-flex flex-column justify-content-between" style={{ minHeight:140 }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                    <div>
-                      <p style={{ margin:0, fontSize:11, fontWeight:600, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".06em" }}>Courses</p>
-                      <p style={{ margin:"6px 0 0", fontSize:36, fontWeight:700, color:"#0f172a", letterSpacing:"-1.5px", lineHeight:1 }}>
-                        {courses.length}
-                        <span style={{ fontSize:16, color:"#94a3b8", fontWeight:400 }}> enrolled</span>
-                      </p>
-                    </div>
-                    <div style={{ width:36, height:36, borderRadius:10, background:"#fdf2f8", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                      <i className="bi bi-journal-bookmark" style={{ color:"#ec4899", fontSize:16 }}></i>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ height:5, borderRadius:99, background:"#eef2ff", overflow:"hidden", marginBottom:4 }}>
-                      <div style={{ height:"100%", width:`${Math.min(100,(gradedCourses.length/Math.max(1,courses.length))*100)}%`, background:"linear-gradient(90deg,#ec4899,#0056b3)", borderRadius:99 }}/>
-                    </div>
-                    <span style={{ fontSize:11, color:"#ec4899", fontWeight:600 }}>
-                      {gradedCourses.length} of {courses.length} with grades
-                    </span>
-                  </div>
-                </div>
-
-                {/* Credits chip */}
-                <div className="stat-chip fade-up d-flex flex-column justify-content-between" style={{ minHeight:140 }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                    <div>
-                      <p style={{ margin:0, fontSize:11, fontWeight:600, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".06em" }}>Credits</p>
-                      <p style={{ margin:"6px 0 0", fontSize:28, fontWeight:700, color:"#0f172a", letterSpacing:"-1px", lineHeight:1 }}>
-                        {enrolledCredits}
-                        <span style={{ fontSize:16, color:"#94a3b8", fontWeight:400 }}> / {TOTAL_CREDITS}</span>
-                      </p>
-                    </div>
-                    <div style={{ width:36, height:36, borderRadius:10, background:"#e8f0fe", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                      <i className="bi bi-mortarboard" style={{ color:"#0056b3", fontSize:16 }}></i>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ height:5, borderRadius:99, background:"#eef2ff", overflow:"hidden", marginBottom:4 }}>
-                      <div style={{ height:"100%", width:`${Math.min(100,(enrolledCredits/TOTAL_CREDITS)*100)}%`, background:"#0056b3", borderRadius:99 }}/>
-                    </div>
-                    <span style={{ fontSize:11, color:"#0056b3", fontWeight:600 }}>
-                      {((enrolledCredits/TOTAL_CREDITS)*100).toFixed(1)}% complete
-                    </span>
-                  </div>
-                </div>
-
-                {/* Avg score chip */}
-                <div className="stat-chip fade-up d-flex flex-column justify-content-between" style={{ minHeight:140 }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                    <div>
-                      <p style={{ margin:0, fontSize:11, fontWeight:600, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".06em" }}>Avg Score</p>
-                      <p style={{ margin:"6px 0 0", fontSize:36, fontWeight:700, color:"#0f172a", letterSpacing:"-1.5px", lineHeight:1 }}>
-                        {avgScore ?? "—"}
-                        {avgScore && <span style={{ fontSize:14, color:"#94a3b8", fontWeight:400 }}>%</span>}
-                      </p>
-                    </div>
-                    <div style={{ width:36, height:36, borderRadius:10, background:"#f0fdf4", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                      <i className="bi bi-bar-chart" style={{ color:"#22c55e", fontSize:16 }}></i>
-                    </div>
-                  </div>
-                  <div>
-                    {sparkData.length >= 2
-                      ? <><Sparkline data={sparkData} color="#22c55e" /><span style={{ fontSize:11, color:"#22c55e", fontWeight:600 }}>Exam trend</span></>
-                      : <span style={{ fontSize:11, color:"#94a3b8", fontWeight:600 }}>No exams yet</span>
-                    }
-                  </div>
-                </div>
-
-                {/* ── Grades table — spans 2 ── */}
-                <div className="dash-card bento-span2 fade-up" style={{ padding:0 }}>
-                  {/* Tabs */}
-                  <div style={{ padding:"16px 20px 0", borderBottom:"1px solid #f1f5f9", display:"flex", gap:6 }}>
-                    {["current", "history"].map(t => (
-                      <button key={t} className={`tab-pill${activeTab === t ? " active" : ""}`}
-                        onClick={() => setActiveTab(t)}
-                        style={{ padding:"5px 14px", fontSize:12 }}>
-                        {t === "current" ? "Current Semester" : "All Courses"}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Empty state */}
-                  {currentCourses.length === 0 && (
-                    <div style={{ padding:"48px 24px", textAlign:"center", color:"#94a3b8" }}>
-                      <i className="bi bi-journal-x" style={{ fontSize:40, display:"block", marginBottom:12, opacity:.4 }}></i>
-                      <p style={{ margin:0, fontSize:14, fontWeight:600, color:"#64748b" }}>
-                        {activeTab === "current" ? "No courses this semester" : "No course history yet"}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Course rows */}
-                  {currentCourses.map((course, i) => {
-                    const acc       = getAccent(i);
-                    const gc        = gradeColor(course.letter_grade);
-                    const isExpanded = expandedCourse === course.course_id;
-
-                    return (
-                      <div key={course.course_id}>
-                        {/* Main row */}
-                        <div
-                          className="grade-row"
-                          style={{ padding:"14px 20px", cursor:"pointer" }}
-                          onClick={() => setExpandedCourse(isExpanded ? null : course.course_id)}
-                        >
-                          <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-                            {/* Icon */}
-                            <div style={{ width:36, height:36, borderRadius:10, background:acc.iconBg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                              <i className={`bi ${acc.icon}`} style={{ color:acc.accent, fontSize:16 }}></i>
-                            </div>
-
-                            {/* Name + code */}
-                            <div style={{ flex:1, minWidth:0 }}>
-                              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4, gap:8 }}>
-                                <div style={{ minWidth:0 }}>
-                                  <span style={{ fontSize:13, fontWeight:700, color:"#0f172a" }}>{course.course_name}</span>
-                                  <span style={{ fontSize:11, color:"#94a3b8", marginLeft:6 }}>{course.course_code}</span>
-                                </div>
-                                <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
-                                  {course.letter_grade
-                                    ? <span style={{ fontSize:13, fontWeight:700, color:gc }}>{course.letter_grade}</span>
-                                    : <span style={{ fontSize:11, color:"#94a3b8", fontWeight:600 }}>No grade yet</span>
-                                  }
-                                  {course.average !== null && (
-                                    <span style={{ fontSize:12, fontWeight:600, color:"#64748b" }}>{course.average}%</span>
-                                  )}
-                                  <i className={`bi bi-chevron-${isExpanded ? "up" : "down"}`} style={{ fontSize:11, color:"#94a3b8" }}></i>
-                                </div>
-                              </div>
-                              {/* Progress bar */}
-                              <div className="prog-track">
-                                <div className="prog-fill" style={{ width:`${course.average ?? 0}%`, background:acc.accent }}/>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Stats row (visible on sm+) */}
-                          <div style={{ display:"flex", gap:16, marginTop:10, paddingLeft:48 }} className="d-none d-sm-flex">
-                            {[
-                              { label:"Exams Total",   val:course.total_exams },
-                              { label:"Submitted",     val:`${course.submitted_exams} / ${course.total_exams}` },
-                              { label:"GPA Points",    val:course.grade_points > 0 ? course.grade_points.toFixed(1) : "—" },
-                              { label:"Credits",       val:course.credits },
-                            ].map(d => (
-                              <div key={d.label}>
-                                <p style={{ margin:0, fontSize:10, color:"#94a3b8", fontWeight:600, textTransform:"uppercase", letterSpacing:".04em" }}>{d.label}</p>
-                                <p style={{ margin:0, fontSize:12, fontWeight:600, color:"#1e293b" }}>{d.val}</p>
-                              </div>
-                            ))}
-                          </div>
+                    {/* Avg score chip */}
+                    <div className="stat-chip fade-up d-flex flex-column justify-content-between" style={{ minHeight:140 }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                        <div>
+                          <p style={{ margin:0, fontSize:11, fontWeight:600, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".06em" }}>Avg Score</p>
+                          <p style={{ margin:"6px 0 0", fontSize:36, fontWeight:700, color:"#0f172a", letterSpacing:"-1.5px", lineHeight:1 }}>
+                            {avgScore ?? "—"}
+                            {avgScore && <span style={{ fontSize:14, color:"#94a3b8", fontWeight:400 }}>%</span>}
+                          </p>
                         </div>
-
-                        {/* Expanded exam breakdown */}
-                        {isExpanded && (
-                          <div style={{ background:"#f8faff", borderTop:"1px solid #f1f5f9", borderBottom:"1px solid #f1f5f9", padding:"12px 20px 16px 20px" }}>
-                            <p style={{ margin:"0 0 10px", fontSize:11, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".06em" }}>
-                              Exam Breakdown
-                            </p>
-                            {course.exams.length === 0 ? (
-                              <p style={{ margin:0, fontSize:12, color:"#94a3b8" }}>No exams published for this course yet.</p>
-                            ) : (
-                              course.exams.map(exam => {
-                                const scoreColor = exam.percentage === null ? "#94a3b8"
-                                  : exam.percentage >= 75 ? "#22c55e"
-                                  : exam.percentage >= 50 ? "#f59e0b"
-                                  : "#ef4444";
-                                return (
-                                  <div key={exam.id} className="exam-detail-row">
-                                    <div style={{ display:"flex", alignItems:"center", gap:10, flex:1, minWidth:0 }}>
-                                      {/* Type badge */}
-                                      <span style={{
-                                        background:typeBg(exam.type),
-                                        color:typeColor(exam.type),
-                                        borderRadius:99, padding:"2px 8px",
-                                        fontSize:10, fontWeight:700, flexShrink:0,
-                                        textTransform:"capitalize"
-                                      }}>{exam.type}</span>
-                                      {/* Title */}
-                                      <span style={{ fontSize:12, fontWeight:600, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                                        {exam.title}
-                                      </span>
-                                    </div>
-                                    <div style={{ display:"flex", alignItems:"center", gap:12, flexShrink:0 }}>
-                                      {exam.submitted ? (
-                                        <>
-                                          <span style={{ fontSize:12, fontWeight:700, color:scoreColor }}>
-                                            {exam.score}/{exam.total_points}
-                                            {exam.percentage !== null && <span style={{ fontSize:11, color:scoreColor, marginLeft:4 }}>({exam.percentage}%)</span>}
-                                          </span>
-                                          <Link
-                                            to={`/student/exams/${exam.id}/results`}
-                                            onClick={e => e.stopPropagation()}
-                                            style={{
-                                              fontSize:11, fontWeight:600, color:"#0056b3",
-                                              textDecoration:"none", background:"#e8f0fe",
-                                              borderRadius:99, padding:"2px 8px"
-                                            }}>
-                                            View Results
-                                          </Link>
-                                        </>
-                                      ) : (
-                                        <span style={{ fontSize:11, color:"#94a3b8", fontWeight:600 }}>
-                                          {new Date(exam.end_time) < new Date() ? "Missed" : "Pending"}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })
-                            )}
-                            {/* Instructor */}
-                            {course.instructor && (
-                              <p style={{ margin:"10px 0 0", fontSize:11, color:"#94a3b8" }}>
-                                <i className="bi bi-person me-1"></i>{course.instructor}
-                              </p>
-                            )}
-                          </div>
-                        )}
+                        <div style={{ width:36, height:36, borderRadius:10, background:"#f0fdf4", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          <i className="bi bi-bar-chart" style={{ color:"#22c55e", fontSize:16 }}></i>
+                        </div>
                       </div>
-                    );
-                  })}
-
-                  <div style={{ padding:"10px 20px", borderTop:"1px solid #f1f5f9", display:"flex", justifyContent:"flex-end" }}>
-                    <Link to="/student/subjects"
-                      style={{ background:"transparent", border:"none", fontSize:12, fontWeight:600, color:"#0056b3", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", textDecoration:"none" }}>
-                      View All Subjects →
-                    </Link>
-                  </div>
-                </div>
-
-                {/* GPA Trend — bar chart from real course averages */}
-                <div className="dash-card fade-up" style={{ padding:20 }}>
-                  <h3 style={{ margin:"0 0 16px", fontSize:14, fontWeight:700, color:"#0f172a" }}>Course Averages</h3>
-                  {courses.filter(c => c.average !== null).length === 0 ? (
-                    <div style={{ textAlign:"center", padding:"20px 0", color:"#94a3b8", fontSize:12 }}>
-                      No graded courses yet
+                      <div>
+                        {sparkData.length >= 2
+                          ? <><Sparkline data={sparkData} color="#22c55e" /><span style={{ fontSize:11, color:"#22c55e", fontWeight:600 }}>Exam trend</span></>
+                          : <span style={{ fontSize:11, color:"#94a3b8", fontWeight:600 }}>No exams yet</span>
+                        }
+                      </div>
                     </div>
-                  ) : (
-                    <div style={{ display:"flex", alignItems:"flex-end", gap:6, height:100 }}>
-                      {courses.filter(c => c.average !== null).map((c, i) => (
-                        <div key={c.course_id} style={{ flex:1, textAlign:"center", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"flex-end", height:"100%" }}
-                          title={`${c.course_name}: ${c.average}%`}>
-                          <div style={{
-                            width:"100%", borderRadius:"6px 6px 0 0",
-                            background: i === courses.filter(x=>x.average!==null).length - 1 ? "#0056b3" : "#e8f0fe",
-                            height:`${c.average}%`, minHeight:8
-                          }}/>
-                          <span style={{ fontSize:9, marginTop:4, fontWeight:600, color:"#94a3b8", overflow:"hidden", maxWidth:"100%", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                            {c.course_code}
-                          </span>
-                        </div>
+                  </div>
+
+                  {/* Row 2: Grades table */}
+                  <div className="dash-card fade-up" style={{ padding:0 }}>
+                    {/* Tabs */}
+                    <div style={{ padding:"16px 20px 0", borderBottom:"1px solid #f1f5f9", display:"flex", gap:6 }}>
+                      {["current", "history"].map(t => (
+                        <button key={t} className={`tab-pill${activeTab === t ? " active" : ""}`}
+                          onClick={() => setActiveTab(t)}
+                          style={{ padding:"5px 14px", fontSize:12 }}>
+                          {t === "current" ? "Current Semester" : "All Courses"}
+                        </button>
                       ))}
                     </div>
-                  )}
-                </div>
 
-                {/* Upcoming exams across all courses */}
-                <div className="dash-card fade-up" style={{ padding:20 }}>
-                  <h3 style={{ margin:"0 0 14px", fontSize:14, fontWeight:700, color:"#0f172a" }}>Upcoming Exams</h3>
-                  {(() => {
-                    const now = new Date();
-                    const upcoming = courses
-                      .flatMap(c => c.exams.map(e => ({ ...e, course_code:c.course_code, course_id:c.course_id })))
-                      .filter(e => !e.submitted && new Date(e.end_time) > now)
-                      .sort((a, b) => new Date(a.end_time) - new Date(b.end_time))
-                      .slice(0, 4);
-
-                    if (upcoming.length === 0) return (
-                      <p style={{ margin:0, fontSize:12, color:"#94a3b8" }}>No upcoming exams.</p>
-                    );
-
-                    const dotColors = ["#0056b3","#f59e0b","#ef4444","#22c55e"];
-                    return upcoming.map((exam, i) => (
-                      <div key={exam.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:"1px solid #f8faff" }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:8, minWidth:0 }}>
-                          <div style={{ width:8, height:8, borderRadius:"50%", background:dotColors[i % dotColors.length], flexShrink:0 }}/>
-                          <div style={{ minWidth:0 }}>
-                            <span style={{ fontSize:12, fontWeight:500, color:"#1e293b", display:"block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                              {exam.title}
-                            </span>
-                            <span style={{ fontSize:10, color:"#94a3b8" }}>{exam.course_code}</span>
-                          </div>
-                        </div>
-                        <span style={{ fontSize:11, fontWeight:600, color:"#94a3b8", flexShrink:0, marginLeft:8 }}>
-                          {new Date(exam.end_time).toLocaleDateString("en-PH", { month:"short", day:"numeric" })}
-                        </span>
+                    {/* Empty state */}
+                    {currentCourses.length === 0 && (
+                      <div style={{ padding:"48px 24px", textAlign:"center", color:"#94a3b8" }}>
+                        <i className="bi bi-journal-x" style={{ fontSize:40, display:"block", marginBottom:12, opacity:.4 }}></i>
+                        <p style={{ margin:0, fontSize:14, fontWeight:600, color:"#64748b" }}>
+                          {activeTab === "current" ? "No courses this semester" : "No course history yet"}
+                        </p>
                       </div>
-                    ));
-                  })()}
-                </div>
+                    )}
+
+                    {/* Course rows */}
+                    {currentCourses.map((course, i) => {
+                      const acc        = getAccent(i);
+                      const gc         = gradeColor(course.letter_grade);
+                      const isExpanded = expandedCourse === course.course_id;
+
+                      return (
+                        <div key={course.course_id}>
+                          {/* Main row */}
+                          <div
+                            className="grade-row"
+                            style={{ padding:"14px 20px", cursor:"pointer" }}
+                            onClick={() => setExpandedCourse(isExpanded ? null : course.course_id)}
+                          >
+                            <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+                              <div style={{ width:36, height:36, borderRadius:10, background:acc.iconBg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                <i className={`bi ${acc.icon}`} style={{ color:acc.accent, fontSize:16 }}></i>
+                              </div>
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4, gap:8 }}>
+                                  <div style={{ minWidth:0 }}>
+                                    <span style={{ fontSize:13, fontWeight:700, color:"#0f172a" }}>{course.course_name}</span>
+                                    <span style={{ fontSize:11, color:"#94a3b8", marginLeft:6 }}>{course.course_code}</span>
+                                  </div>
+                                  <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+                                    {course.letter_grade
+                                      ? <span style={{ fontSize:13, fontWeight:700, color:gc }}>{course.letter_grade}</span>
+                                      : <span style={{ fontSize:11, color:"#94a3b8", fontWeight:600 }}>No grade yet</span>
+                                    }
+                                    {course.average !== null && (
+                                      <span style={{ fontSize:12, fontWeight:600, color:"#64748b" }}>{course.average}%</span>
+                                    )}
+                                    <i className={`bi bi-chevron-${isExpanded ? "up" : "down"}`} style={{ fontSize:11, color:"#94a3b8" }}></i>
+                                  </div>
+                                </div>
+                                <div className="prog-track">
+                                  <div className="prog-fill" style={{ width:`${course.average ?? 0}%`, background:acc.accent }}/>
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ display:"flex", gap:16, marginTop:10, paddingLeft:48 }} className="d-none d-sm-flex">
+                              {[
+                                { label:"Exams Total", val:course.total_exams },
+                                { label:"Submitted",   val:`${course.submitted_exams} / ${course.total_exams}` },
+                                { label:"GPA Points",  val:course.grade_points > 0 ? course.grade_points.toFixed(1) : "—" },
+                                { label:"Credits",     val:course.credits },
+                              ].map(d => (
+                                <div key={d.label}>
+                                  <p style={{ margin:0, fontSize:10, color:"#94a3b8", fontWeight:600, textTransform:"uppercase", letterSpacing:".04em" }}>{d.label}</p>
+                                  <p style={{ margin:0, fontSize:12, fontWeight:600, color:"#1e293b" }}>{d.val}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Expanded exam breakdown */}
+                          {isExpanded && (
+                            <div style={{ background:"#f8faff", borderTop:"1px solid #f1f5f9", borderBottom:"1px solid #f1f5f9", padding:"12px 20px 16px 20px" }}>
+                              <p style={{ margin:"0 0 10px", fontSize:11, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".06em" }}>
+                                Exam Breakdown
+                              </p>
+                              {course.exams.length === 0 ? (
+                                <p style={{ margin:0, fontSize:12, color:"#94a3b8" }}>No exams published for this course yet.</p>
+                              ) : (
+                                course.exams.map(exam => {
+                                  const scoreColor = exam.percentage === null ? "#94a3b8"
+                                    : exam.percentage >= 75 ? "#22c55e"
+                                    : exam.percentage >= 50 ? "#f59e0b"
+                                    : "#ef4444";
+                                  return (
+                                    <div key={exam.id} className="exam-detail-row">
+                                      <div style={{ display:"flex", alignItems:"center", gap:10, flex:1, minWidth:0 }}>
+                                        <span style={{
+                                          background:typeBg(exam.type), color:typeColor(exam.type),
+                                          borderRadius:99, padding:"2px 8px",
+                                          fontSize:10, fontWeight:700, flexShrink:0, textTransform:"capitalize"
+                                        }}>{exam.type}</span>
+                                        <span style={{ fontSize:12, fontWeight:600, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                                          {exam.title}
+                                        </span>
+                                      </div>
+                                      <div style={{ display:"flex", alignItems:"center", gap:12, flexShrink:0 }}>
+                                        {exam.submitted ? (
+                                          <>
+                                            <span style={{ fontSize:12, fontWeight:700, color:scoreColor }}>
+                                              {exam.score}/{exam.total_points}
+                                              {exam.percentage !== null && <span style={{ fontSize:11, color:scoreColor, marginLeft:4 }}>({exam.percentage}%)</span>}
+                                            </span>
+                                            <Link
+                                              to={`/student/exams/${exam.id}/results`}
+                                              onClick={e => e.stopPropagation()}
+                                              style={{ fontSize:11, fontWeight:600, color:"#0056b3", textDecoration:"none", background:"#e8f0fe", borderRadius:99, padding:"2px 8px" }}>
+                                              View Results
+                                            </Link>
+                                          </>
+                                        ) : (
+                                          <span style={{ fontSize:11, color:"#94a3b8", fontWeight:600 }}>
+                                            {new Date(exam.end_time) < new Date() ? "Missed" : "Pending"}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              )}
+                              {course.instructor && (
+                                <p style={{ margin:"10px 0 0", fontSize:11, color:"#94a3b8" }}>
+                                  <i className="bi bi-person me-1"></i>{course.instructor}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    <div style={{ padding:"10px 20px", borderTop:"1px solid #f1f5f9", display:"flex", justifyContent:"flex-end" }}>
+                      <Link to="/student/subjects"
+                        style={{ background:"transparent", border:"none", fontSize:12, fontWeight:600, color:"#0056b3", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", textDecoration:"none" }}>
+                        View All Subjects →
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Row 3: Upcoming exams */}
+                  <div className="dash-card fade-up" style={{ padding:20 }}>
+                    <h3 style={{ margin:"0 0 14px", fontSize:14, fontWeight:700, color:"#0f172a" }}>Upcoming Exams</h3>
+                    {(() => {
+                      const now = new Date();
+                      const upcoming = courses
+                        .flatMap(c => c.exams.map(e => ({ ...e, course_code:c.course_code, course_id:c.course_id })))
+                        .filter(e => !e.submitted && new Date(e.end_time) > now)
+                        .sort((a, b) => new Date(a.end_time) - new Date(b.end_time))
+                        .slice(0, 4);
+
+                      if (upcoming.length === 0) return (
+                        <p style={{ margin:0, fontSize:12, color:"#94a3b8" }}>No upcoming exams.</p>
+                      );
+
+                      const dotColors = ["#0056b3","#f59e0b","#ef4444","#22c55e"];
+                      return upcoming.map((exam, i) => (
+                        <div key={exam.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:"1px solid #f8faff" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:8, minWidth:0 }}>
+                            <div style={{ width:8, height:8, borderRadius:"50%", background:dotColors[i % dotColors.length], flexShrink:0 }}/>
+                            <div style={{ minWidth:0 }}>
+                              <span style={{ fontSize:12, fontWeight:500, color:"#1e293b", display:"block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                                {exam.title}
+                              </span>
+                              <span style={{ fontSize:10, color:"#94a3b8" }}>{exam.course_code}</span>
+                            </div>
+                          </div>
+                          <span style={{ fontSize:11, fontWeight:600, color:"#94a3b8", flexShrink:0, marginLeft:8 }}>
+                            {new Date(exam.end_time).toLocaleDateString("en-PH", { month:"short", day:"numeric" })}
+                          </span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+
+                </div>{/* end LEFT COLUMN */}
+
+                {/* ── RIGHT COLUMN — flex-column so cards stack to their natural height ── */}
+                <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+                  {/* Enrolled courses chip */}
+                  <div className="stat-chip fade-up" style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                      <div>
+                        <p style={{ margin:0, fontSize:11, fontWeight:600, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".06em" }}>Courses</p>
+                        <p style={{ margin:"6px 0 0", fontSize:36, fontWeight:700, color:"#0f172a", letterSpacing:"-1.5px", lineHeight:1 }}>
+                          {courses.length}
+                          <span style={{ fontSize:16, color:"#94a3b8", fontWeight:400 }}> enrolled</span>
+                        </p>
+                      </div>
+                      <div style={{ width:36, height:36, borderRadius:10, background:"#fdf2f8", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                        <i className="bi bi-journal-bookmark" style={{ color:"#ec4899", fontSize:16 }}></i>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ height:5, borderRadius:99, background:"#eef2ff", overflow:"hidden", marginBottom:4 }}>
+                        <div style={{ height:"100%", width:`${Math.min(100,(gradedCourses.length/Math.max(1,courses.length))*100)}%`, background:"linear-gradient(90deg,#ec4899,#0056b3)", borderRadius:99 }}/>
+                      </div>
+                      <span style={{ fontSize:11, color:"#ec4899", fontWeight:600 }}>
+                        {gradedCourses.length} of {courses.length} with grades
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Course Averages bar chart */}
+                  <div className="dash-card fade-up" style={{ padding:20 }}>
+                    <h3 style={{ margin:"0 0 16px", fontSize:14, fontWeight:700, color:"#0f172a" }}>Course Averages</h3>
+                    {courses.filter(c => c.average !== null).length === 0 ? (
+                      <div style={{ textAlign:"center", padding:"20px 0", color:"#94a3b8", fontSize:12 }}>
+                        No graded courses yet
+                      </div>
+                    ) : (
+                      <div style={{ display:"flex", alignItems:"flex-end", gap:6, height:100 }}>
+                        {courses.filter(c => c.average !== null).map((c, i) => (
+                          <div key={c.course_id} style={{ flex:1, textAlign:"center", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"flex-end", height:"100%" }}
+                            title={`${c.course_name}: ${c.average}%`}>
+                            <div style={{
+                              width:"100%", borderRadius:"6px 6px 0 0",
+                              background: i === courses.filter(x=>x.average!==null).length - 1 ? "#0056b3" : "#e8f0fe",
+                              height:`${c.average}%`, minHeight:8
+                            }}/>
+                            <span style={{ fontSize:9, marginTop:4, fontWeight:600, color:"#94a3b8", overflow:"hidden", maxWidth:"100%", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                              {c.course_code}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </div>{/* end RIGHT COLUMN */}
 
               </div>
             )}
