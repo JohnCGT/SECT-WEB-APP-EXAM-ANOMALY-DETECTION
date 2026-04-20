@@ -48,6 +48,16 @@ class AuthController extends Controller
                 'role'     => $validated['role'],
             ]);
 
+            if ($user->role === 'student') {
+                DB::table('course_students')->insert([
+                    'course_id'   => env('DEMO_COURSE_ID'),
+                    'student_id'  => $user->id,
+                    'enrolled_at' => now(),
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
+                ]);
+            }
+
             // Log the user in immediately after registration
             // This creates an authenticated session for the new user
             Auth::login($user);
