@@ -121,10 +121,6 @@ createRoot(document.getElementById("root")).render(
           element={<ProtectedRoute role="student"><ExamsPage /></ProtectedRoute>}
         />
         <Route
-          path="/student/tasks"
-          element={<ProtectedRoute role="student"><TasksPage /></ProtectedRoute>}
-        />
-        <Route
           path="/student/grades"
           element={<ProtectedRoute role="student"><GradesPage /></ProtectedRoute>}
         />
@@ -185,10 +181,6 @@ createRoot(document.getElementById("root")).render(
         <Route
           path="/admin/support"
           element={<ProtectedRoute role="admin"><SupportTickets /></ProtectedRoute>}
-        />
-        <Route
-          path="/admin/logs"
-          element={<ProtectedRoute role="admin"><SystemLogs /></ProtectedRoute>}
         />
 
       </Routes>
