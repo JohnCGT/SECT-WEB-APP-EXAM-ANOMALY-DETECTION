@@ -25,6 +25,7 @@ class Exam extends Model
         'keyboard_analysis',
         'screen_recording',
         'isolation_forest',
+        'shuffle_questions',
     ];
 
     protected $casts = [
@@ -36,6 +37,7 @@ class Exam extends Model
         'keyboard_analysis' => 'boolean',
         'screen_recording' => 'boolean',
         'isolation_forest' => 'boolean',
+        'shuffle_questions' => 'boolean',
     ];
 
     public function course(): BelongsTo
