@@ -25,7 +25,6 @@ import InstructorSupport from "./pages/instructor/InstructorSupport";
 import Dashboard from "./pages/student/Dashboard";
 import SubjectPage from "./pages/student/SubjectPage";
 import ExamsPage from "./pages/student/ExamsPage";
-import TasksPage from "./pages/student/TasksPage";
 import GradesPage from "./pages/student/GradesPage";
 import StudentAccountSettings from "./pages/student/StudentAccountSettings";
 import StudentProfile from "./pages/student/StudentProfile";
@@ -43,7 +42,6 @@ import AdminCourseManagement from "./pages/admin/AdminCourseManagement";
 import ExamManagement from "./pages/admin/ExamManagement";
 import AnomalyReports from "./pages/admin/AnomalyReports";
 import SupportTickets from "./pages/admin/SupportTickets";
-import SystemLogs from "./pages/admin/SystemLogs";
 
 // Bootstrap
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -123,10 +121,6 @@ createRoot(document.getElementById("root")).render(
           element={<ProtectedRoute role="student"><ExamsPage /></ProtectedRoute>}
         />
         <Route
-          path="/student/tasks"
-          element={<ProtectedRoute role="student"><TasksPage /></ProtectedRoute>}
-        />
-        <Route
           path="/student/grades"
           element={<ProtectedRoute role="student"><GradesPage /></ProtectedRoute>}
         />
@@ -187,10 +181,6 @@ createRoot(document.getElementById("root")).render(
         <Route
           path="/admin/support"
           element={<ProtectedRoute role="admin"><SupportTickets /></ProtectedRoute>}
-        />
-        <Route
-          path="/admin/logs"
-          element={<ProtectedRoute role="admin"><SystemLogs /></ProtectedRoute>}
         />
 
       </Routes>
