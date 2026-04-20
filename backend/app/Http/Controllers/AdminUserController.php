@@ -59,7 +59,7 @@ class AdminUserController extends Controller
         // Auto-enroll new students into the default demo course
         if ($user->role === 'student') {
             \Illuminate\Support\Facades\DB::table('course_students')->insert([
-                'course_id'   => env('DEMO_COURSE_ID'),
+                'course_id'   => env('DEMO_COURSE_ID', 1),
                 'student_id'  => $user->id,
                 'enrolled_at' => now(),
                 'created_at'  => now(),
