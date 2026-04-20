@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
@@ -48,9 +49,11 @@ class AuthController extends Controller
                 'role'     => $validated['role'],
             ]);
 
-            if ($user->role === 'student') {
+            $courseId = env('DEMO_COURSE_ID');
+
+            if ($courseId && $user->role === 'student') {
                 DB::table('course_students')->insert([
-                    'course_id'   => env('DEMO_COURSE_ID'),
+                    'course_id'   => $courseId,
                     'student_id'  => $user->id,
                     'enrolled_at' => now(),
                     'created_at'  => now(),
