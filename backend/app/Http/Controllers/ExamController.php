@@ -68,7 +68,7 @@ class ExamController extends Controller
             'start_time' => $request->start_time,
             'end_time' => $request->end_time,
             'duration_minutes' => $request->duration_minutes,
-            'status' => 'draft', // New exams start as 'draft' until published
+            'status' => $request->status ?? 'published',
         ]);
 
         // Return success response with the created exam and its course
@@ -132,7 +132,7 @@ class ExamController extends Controller
             'end_time' => 'sometimes|date|after:start_time', // Must be after start_time
             'duration_minutes' => 'sometimes|integer|min:1', // Update duration if provided
             'status' => 'sometimes|in:draft,scheduled,active,completed', // Update status if provided
-            
+
             // Proctoring feature toggles (optional)
             'face_detection' => 'sometimes|boolean', // Enable/disable face detection
             'tab_switching_monitor' => 'sometimes|boolean', // Monitor tab switches
@@ -179,5 +179,100 @@ class ExamController extends Controller
         return response()->json([
             'message' => 'Exam deleted successfully'
         ], 200); // 200 = OK
+    }
+
+    /**
+     * GET /exams/{id}/submissions
+     */
+    public function submissions(Request $request, $id)
+    {
+        $exam = \App\Models\Exam::where('id', $id)
+            ->where('instructor_id', $request->user()->id)
+            ->firstOrFail();
+
+        $enrolledStudents = \Illuminate\Support\Facades\DB::table('course_students')
+            ->where('course_id', $exam->course_id)
+            ->pluck('student_id')
+            ->toArray();
+
+        $submissions = \App\Models\ExamSubmission::where('exam_id', $id)
+            ->with('student:id,name,email')
+            ->get()
+            ->keyBy('student_id');
+
+        $results = \App\Models\ExamResult::where('exam_id', $id)
+            ->get()
+            ->keyBy('submission_id');
+
+        $essayQIds = \App\Models\Question::where('exam_id', $id)
+            ->where('type', 'essay')
+            ->pluck('id')
+            ->toArray();
+
+        $students = \App\Models\User::whereIn('id', $enrolledStudents)
+            ->select('id', 'name', 'email')
+            ->get()
+            ->keyBy('id');
+
+        $rows = [];
+
+        foreach ($students as $studentId => $student) {
+            $sub    = $submissions->get($studentId);
+            $result = $sub ? $results->get($sub->id) : null;
+
+            $essayCount    = 0;
+            $gradedCount   = 0;
+            $ungradedCount = 0;
+
+            if ($sub && !empty($essayQIds)) {
+                $raw     = $sub->answers;
+                $answers = is_string($raw) ? json_decode($raw, true) : (array) ($raw ?? []);
+
+                foreach ($answers as $a) {
+                    if (!in_array($a['question_id'] ?? null, $essayQIds)) continue;
+                    if (empty($a['student_answer'])) continue;
+
+                    $essayCount++;
+                    if (($a['points_earned'] ?? null) !== null) {
+                        $gradedCount++;
+                    } else {
+                        $ungradedCount++;
+                    }
+                }
+            }
+
+            $rows[] = [
+                'id'             => $sub?->id,
+                'student_id'     => $studentId,
+                'student'        => $student,
+                'status'         => $sub ? $sub->status : 'not_started',
+                'score'          => $sub?->score,
+                'total_points'   => $sub?->total_points ?? $exam->total_points,
+                'started_at'     => $sub?->started_at,
+                'submitted_at'   => $sub?->submitted_at,
+                'cpi_score'      => $result?->cpi_score,
+                'cpi_label'      => $result?->cpi_label,
+                'is_flagged'     => $result?->is_flagged ?? false,
+                'essay_count'    => $essayCount,
+                'graded_count'   => $gradedCount,
+                'ungraded_count' => $ungradedCount,
+            ];
+        }
+
+        usort($rows, function ($a, $b) {
+            $order = ['submitted' => 0, 'in_progress' => 1, 'not_started' => 2];
+            $oa = $order[$a['status']] ?? 3;
+            $ob = $order[$b['status']] ?? 3;
+
+            if ($oa !== $ob) return $oa - $ob;
+
+            if ($a['status'] === 'submitted' && $b['status'] === 'submitted') {
+                return strcmp($b['submitted_at'] ?? '', $a['submitted_at'] ?? '');
+            }
+
+            return strcmp($a['student']['name'] ?? '', $b['student']['name'] ?? '');
+        });
+
+        return response()->json(['submissions' => $rows]);
     }
 }

@@ -4,13 +4,13 @@ import { Link } from "react-router-dom";
 /**
  * BottomNav — fixed bottom navigation for mobile (hidden on lg+).
  * Props:
- *   active: one of "Home" | "Subjects" | "Tasks" | "Grades" | "Settings"
+ *   active: one of "Home" | "Subjects" | "Exams" | "Grades" | "Settings"
  */
 const BottomNav = ({ active }) => {
   const items = [
     { to: "/student",                  icon: "bi-speedometer2",     label: "Home"     },
     { to: "/student/subjects",         icon: "bi-journal-bookmark", label: "Subjects" },
-    { to: "/student/tasks",            icon: "bi-pencil-square",    label: "Tasks"    },
+    { to: "/student/exams",            icon: "bi-pencil-square",    label: "Exams" },
     { to: "/student/grades",           icon: "bi-graph-up-arrow",   label: "Grades"   },
     { to: "/student/account-settings", icon: "bi-gear",             label: "Settings" },
   ];

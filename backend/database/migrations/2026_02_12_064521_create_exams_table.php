@@ -19,7 +19,7 @@ return new class extends Migration
             $table->dateTime('end_time');
             $table->integer('duration_minutes'); // Exam duration
             $table->integer('total_points')->default(100);
-            $table->enum('status', ['draft', 'scheduled', 'active', 'completed'])->default('draft');
+            $table->enum('status', ['draft', 'published', 'scheduled', 'active', 'completed'])->default('published');
             
             // Monitoring settings
             $table->boolean('face_detection')->default(true);

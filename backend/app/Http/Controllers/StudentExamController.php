@@ -36,14 +36,203 @@ class StudentExamController extends Controller
     }
 
     // ── Private helper: case-insensitive, whitespace-trimmed answer comparison
-    // Fixes the strict === comparison bug in submit() that caused correct answers
-    // to be graded as wrong when casing or whitespace differed.
     private function answersMatch(?string $studentAnswer, ?string $correctAnswer): bool
     {
         if ($studentAnswer === null || $correctAnswer === null) {
             return false;
         }
         return strtolower(trim($studentAnswer)) === strtolower(trim($correctAnswer));
+    }
+
+    /**
+     * GET /student/grades
+     *
+     * Returns per-course grade summary derived from exam submissions,
+     * plus overall GPA and cumulative stats.
+     */
+    public function grades(Request $request)
+    {
+        $student = $this->getStudent($request);
+
+        $courses = $student->enrolledCourses()
+            ->with([
+                'instructor:id,name',
+                'exams' => function ($query) {
+                    $query->where('status', '!=', 'draft')
+                        ->withCount('questions');
+                },
+                'exams.submissions' => function ($query) use ($student) {
+                    $query->where('student_id', $student->id)
+                        ->where('status', 'submitted');
+                },
+            ])
+            ->get();
+
+        $courseGrades = $courses->map(function ($course) {
+            $exams = $course->exams;
+
+            $submitted = $exams->filter(fn($e) =>
+                $e->submissions->isNotEmpty()
+            );
+
+            // Per-exam breakdown
+            $examBreakdown = $exams->map(function ($exam) {
+                $sub = $exam->submissions->first();
+                $pct = null;
+                if ($sub && $exam->total_points > 0) {
+                    $pct = round(($sub->score / $exam->total_points) * 100, 1);
+                }
+                return [
+                    'id'           => $exam->id,
+                    'title'        => $exam->title,
+                    'type'         => $exam->type,
+                    'total_points' => $exam->total_points,
+                    'end_time'     => $exam->end_time,
+                    'submitted'    => $sub !== null,
+                    'score'        => $sub?->score,
+                    'percentage'   => $pct,
+                    'submitted_at' => $sub?->submitted_at,
+                ];
+            })->values();
+
+            // Overall course score: average of submitted exam percentages
+            $average = null;
+            if ($submitted->count() > 0) {
+                $total = $submitted->sum(function ($exam) {
+                    $sub = $exam->submissions->first();
+                    if (!$sub || $exam->total_points == 0) return 0;
+                    return ($sub->score / $exam->total_points) * 100;
+                });
+                $average = round($total / $submitted->count(), 1);
+            }
+
+            return [
+                'course_id'       => $course->id,
+                'course_name'     => $course->name,
+                'course_code'     => $course->code,
+                'semester'        => $course->semester,
+                'credits'         => $course->credits ?? 3,
+                'instructor'      => $course->instructor?->name,
+                'total_exams'     => $exams->count(),
+                'submitted_exams' => $submitted->count(),
+                'average'         => $average,
+                'letter_grade'    => $this->letterGrade($average),
+                'grade_points'    => $this->gradePoints($average),
+                'exams'           => $examBreakdown,
+            ];
+        });
+
+        // GPA = sum(grade_points * credits) / sum(credits) — only courses with a grade
+        $gradedCourses = $courseGrades->filter(fn($c) => $c['average'] !== null);
+
+        $totalWeightedPoints = $gradedCourses->sum(fn($c) =>
+            $c['grade_points'] * $c['credits']
+        );
+        $totalCredits = $gradedCourses->sum(fn($c) => $c['credits']);
+
+        $gpa = $totalCredits > 0
+            ? round($totalWeightedPoints / $totalCredits, 2)
+            : null;
+
+        // Total credits enrolled (all courses, not just graded)
+        $enrolledCredits = $courseGrades->sum(fn($c) => $c['credits']);
+
+        return response()->json([
+            'gpa'              => $gpa,
+            'enrolled_credits' => $enrolledCredits,
+            'graded_credits'   => $totalCredits,
+            'courses'          => $courseGrades->values(),
+        ]);
+    }
+
+    private function letterGrade(?float $pct): ?string
+    {
+        if ($pct === null) return null;
+        if ($pct >= 97) return 'A+';
+        if ($pct >= 93) return 'A';
+        if ($pct >= 90) return 'A-';
+        if ($pct >= 87) return 'B+';
+        if ($pct >= 83) return 'B';
+        if ($pct >= 80) return 'B-';
+        if ($pct >= 77) return 'C+';
+        if ($pct >= 73) return 'C';
+        if ($pct >= 70) return 'C-';
+        if ($pct >= 60) return 'D';
+        return 'F';
+    }
+
+    private function gradePoints(?float $pct): float
+    {
+        if ($pct === null) return 0.0;
+        if ($pct >= 97) return 4.0;
+        if ($pct >= 93) return 4.0;
+        if ($pct >= 90) return 3.7;
+        if ($pct >= 87) return 3.3;
+        if ($pct >= 83) return 3.0;
+        if ($pct >= 80) return 2.7;
+        if ($pct >= 77) return 2.3;
+        if ($pct >= 73) return 2.0;
+        if ($pct >= 70) return 1.7;
+        if ($pct >= 60) return 1.0;
+        return 0.0;
+    }
+
+    /**
+     * GET /student/exams
+     *
+     * Returns all exams across every course the authenticated student
+     * is enrolled in, each with their submission status if any.
+     * Used by the new ExamsPage.jsx.
+     */
+    public function allExams(Request $request)
+    {
+        $student = $this->getStudent($request);
+
+        // Collect all course IDs the student is enrolled in
+        $courseIds = $student->enrolledCourses()->pluck('courses.id');
+
+        $exams = Exam::whereIn('course_id', $courseIds)
+            ->with([
+                'course:id,name,code',
+                'submissions' => function ($query) use ($student) {
+                    $query->where('student_id', $student->id)
+                          ->latest()
+                          ->limit(1);
+                },
+            ])
+            ->withCount('questions')
+            ->orderBy('start_time', 'asc')
+            ->get()
+            ->map(function ($exam) {
+                $sub = $exam->submissions->first();
+
+                return [
+                    'id'               => $exam->id,
+                    'title'            => $exam->title,
+                    'description'      => $exam->description,
+                    'type'             => $exam->type,
+                    'start_time'       => $exam->start_time,
+                    'end_time'         => $exam->end_time,
+                    'duration_minutes' => $exam->duration_minutes,
+                    'total_points'     => $exam->total_points,
+                    'questions_count'  => $exam->questions_count,
+                    'course'           => $exam->course ? [
+                        'id'   => $exam->course->id,
+                        'name' => $exam->course->name,
+                        'code' => $exam->course->code,
+                    ] : null,
+                    'submission' => $sub ? [
+                        'id'           => $sub->id,
+                        'status'       => $sub->status,
+                        'score'        => $sub->score,
+                        'total_points' => $sub->total_points,
+                        'started_at'   => $sub->started_at,
+                        'submitted_at' => $sub->submitted_at,
+                    ] : null,
+                ];
+            });
+
+        return response()->json(['exams' => $exams]);
     }
 
     /**
@@ -110,7 +299,6 @@ class StudentExamController extends Controller
             return response()->json(['message' => 'This exam has ended.'], 403);
         }
 
-        // --- NEW CHECK START ---
         // Check if exam has essay questions
         $hasEssay = $exam->questions->contains('type', 'essay');
 
@@ -126,7 +314,6 @@ class StudentExamController extends Controller
                 ], 403);
             }
         }
-        // --- NEW CHECK END ---
 
         $existing = ExamSubmission::where('exam_id', $examId)
             ->where('student_id', $student->id)
@@ -160,6 +347,17 @@ class StudentExamController extends Controller
             ];
         });
 
+        if ($exam->shuffle_questions) {
+            $seed = crc32($submission->id . '_' . $examId);
+            mt_srand($seed);
+            $arr = $questions->values()->all();
+            for ($i = count($arr) - 1; $i > 0; $i--) {
+                $j = mt_rand(0, $i);
+                [$arr[$i], $arr[$j]] = [$arr[$j], $arr[$i]];
+            }
+            $questions = collect($arr);
+        }
+
         return response()->json([
             'exam' => [
                 'id'               => $exam->id,
@@ -182,11 +380,11 @@ class StudentExamController extends Controller
     /**
      * POST /student/exams/{examId}/submit
      *
-     * BUG FIX 1: Changed strict === comparison to answersMatch() which uses
-     * case-insensitive, trimmed comparison. This fixes cases where:
-     *   - "True" !== "true" (casing mismatch)
-     *   - "Option A " !== "Option A" (trailing whitespace from DB)
-     *   - "v" !== "v " (whitespace stored in correct_answer)
+     * FIX: Essays are stored with points_earned = NULL and is_correct = null
+     * at submission time. This is the only way to distinguish "not yet graded
+     * by instructor" (null) from "instructor awarded 0 points" (0).
+     * Previously storing 0 caused EssayGradingController to treat all essays
+     * as already graded on first load.
      */
     public function submit(Request $request, $examId)
     {
@@ -210,25 +408,24 @@ class StudentExamController extends Controller
                 ? (string) $answers[$question->id]
                 : null;
 
-            $isCorrect    = false;
-            $pointsEarned = 0;
+            $isCorrect    = null;  // default for essay
+            $pointsEarned = null;  // default for essay (null = awaiting instructor grade)
 
             if (in_array($question->type, ['multiple_choice', 'true_false'])) {
-                // FIX: use answersMatch() instead of strict ===
-                // This handles casing differences (e.g. "true" vs "True")
-                // and whitespace differences (e.g. "v " vs "v")
+                // Auto-grade MC and T/F immediately
                 $isCorrect    = $this->answersMatch($studentAnswer, (string) $question->correct_answer);
                 $pointsEarned = $isCorrect ? $question->points : 0;
+                $score       += $pointsEarned;
             }
-
-            $score += $pointsEarned;
+            // Essays: points_earned stays NULL — instructor must grade manually.
+            // They do NOT contribute to score until graded.
 
             $gradedAnswers[] = [
                 'question_id'     => $question->id,
                 'student_answer'  => $studentAnswer,
                 'correct_answer'  => $question->correct_answer,
-                'is_correct'      => $isCorrect,       // PHP bool → JSON true/false
-                'points_earned'   => $pointsEarned,
+                'is_correct'      => $isCorrect,
+                'points_earned'   => $pointsEarned,   // null for essays
                 'points_possible' => $question->points,
             ];
         }
@@ -236,8 +433,8 @@ class StudentExamController extends Controller
         $submission->update([
             'status'       => 'submitted',
             'submitted_at' => now(),
-            'score'        => $score,
-            'answers'      => $gradedAnswers, // stored as JSON array
+            'score'        => $score,   // only MC/TF score for now; essays add to it when graded
+            'answers'      => $gradedAnswers,
         ]);
 
         // ── Trigger ML processing in the background ───────────────────────────
@@ -268,14 +465,6 @@ class StudentExamController extends Controller
 
     /**
      * GET /student/exams/{examId}/results
-     *
-     * BUG FIX 2: $submission->answers must be decoded as an array before
-     * using collect()->firstWhere(). If the ExamSubmission model does NOT
-     * cast 'answers' to 'array', $submission->answers is a raw JSON string
-     * and collect() iterates over characters — firstWhere() always returns
-     * null, so every question falls back to 'is_correct' => false.
-     *
-     * Fix: explicitly json_decode if the value is still a string.
      */
     public function results(Request $request, $examId)
     {
@@ -289,10 +478,6 @@ class StudentExamController extends Controller
 
         $exam = $submission->exam;
 
-        // FIX: ensure $answers is always a PHP array, not a JSON string.
-        // Laravel auto-casts json columns to array IF the model declares
-        // protected $casts = ['answers' => 'array'].
-        // If it doesn't, we get a raw string back and collect() breaks.
         $raw     = $submission->answers;
         $answers = is_string($raw) ? json_decode($raw, true) : (array) ($raw ?? []);
 
@@ -301,26 +486,18 @@ class StudentExamController extends Controller
         foreach ($exam->questions as $question) {
             $answerData = collect($answers)->firstWhere('question_id', $question->id);
 
-            // Re-derive is_correct from the stored answers for MC/TF in case
-            // the grading at submit time had the strict === bug.
-            // For essays, keep whatever the instructor set.
-            $storedIsCorrect = $answerData['is_correct'] ?? null;
-
             if ($question->type !== 'essay') {
-                $storedStudentAnswer  = $answerData['student_answer'] ?? null;
-                $storedCorrectAnswer  = $answerData['correct_answer'] ?? $question->correct_answer;
-                // Re-derive using the same trimmed/lowercased comparison
-                $derivedIsCorrect = $this->answersMatch(
+                $storedStudentAnswer = $answerData['student_answer'] ?? null;
+                $storedCorrectAnswer = $answerData['correct_answer'] ?? $question->correct_answer;
+                $isCorrect    = $this->answersMatch(
                     $storedStudentAnswer !== null ? (string) $storedStudentAnswer : null,
                     (string) $storedCorrectAnswer
                 );
-                // Use derived value — this self-heals old submissions graded with the old bug
-                $isCorrect    = $derivedIsCorrect;
-                $pointsEarned = $derivedIsCorrect ? $question->points : 0;
+                $pointsEarned = $isCorrect ? $question->points : 0;
             } else {
-                // Essay: trust whatever is stored (manual grading)
-                $isCorrect    = $storedIsCorrect;
-                $pointsEarned = $answerData['points_earned'] ?? 0;
+                // Essay: use whatever the instructor set (may still be null = pending)
+                $isCorrect    = $answerData['is_correct']    ?? null;
+                $pointsEarned = $answerData['points_earned'] ?? null;
             }
 
             $questionResults[] = [
@@ -335,6 +512,7 @@ class StudentExamController extends Controller
                 'correct_answer' => $question->correct_answer,
                 'is_correct'     => $isCorrect,
                 'points_earned'  => $pointsEarned,
+                'feedback'       => $answerData['feedback'] ?? null,
             ];
         }
 
@@ -349,7 +527,7 @@ class StudentExamController extends Controller
                 'started_at'   => $submission->started_at,
                 'submitted_at' => $submission->submitted_at,
             ],
-            'exam'      => [
+            'exam' => [
                 'id'          => $exam->id,
                 'title'       => $exam->title,
                 'description' => $exam->description,

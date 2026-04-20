@@ -16,7 +16,6 @@ const GLOBAL_CSS = `
     --card-sh:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,86,179,.06);
   }
 
-  /* Exam topbar — glass */
   .exam-topbar{
     background:rgba(255,255,255,0.88);
     backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
@@ -28,11 +27,9 @@ const GLOBAL_CSS = `
     padding:10px 20px;gap:12px;
   }
 
-  /* Progress bar */
   .progress-rail{height:3px;background:#e2e8f0;overflow:hidden;}
   .progress-fill{height:100%;background:#0056b3;transition:width .4s cubic-bezier(.4,0,.2,1);}
 
-  /* Timer */
   .timer{
     font-family:'DM Mono',monospace;font-size:22px;font-weight:500;
     letter-spacing:-0.5px;line-height:1;
@@ -41,7 +38,6 @@ const GLOBAL_CSS = `
   .timer.amber {color:#f59e0b;}
   .timer.red   {color:#ef4444;}
 
-  /* Question nav dot */
   .q-dot{
     width:36px;height:36px;border-radius:9px;border:none;
     font-size:12px;font-weight:700;cursor:pointer;
@@ -53,14 +49,12 @@ const GLOBAL_CSS = `
   .q-dot.answered{background:#e8f0fe;color:#0056b3;border:1px solid #bfdbfe;}
   .q-dot.current{background:#0056b3;color:#fff;box-shadow:0 3px 10px rgba(0,86,179,.35);}
 
-  /* Question card */
   .q-card{
     background:var(--card-bg);border-radius:var(--card-br);
     box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);
     overflow:hidden;
   }
 
-  /* MC option button */
   .mc-opt{
     display:flex;align-items:center;gap:14px;
     padding:13px 16px;border-radius:11px;
@@ -80,7 +74,6 @@ const GLOBAL_CSS = `
   }
   .mc-opt.selected .mc-letter{background:#0056b3;color:#fff;}
 
-  /* TF button */
   .tf-btn{
     flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
     padding:14px;border-radius:11px;border:1.5px solid #e2e8f0;
@@ -92,7 +85,6 @@ const GLOBAL_CSS = `
   .tf-btn.false-sel{border-color:#ef4444;background:#fef2f2;color:#ef4444;}
   .tf-btn:hover:not(.true-sel):not(.false-sel){border-color:#93c5fd;background:#f0f7ff;color:#0056b3;}
 
-  /* Essay textarea */
   .essay-ta{
     width:100%;border:1.5px solid #e2e8f0;border-radius:11px;
     padding:14px;font-size:14px;color:#1e293b;outline:none;
@@ -101,7 +93,6 @@ const GLOBAL_CSS = `
   }
   .essay-ta:focus{border-color:#0056b3;box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
 
-  /* Submit button */
   .submit-btn{
     display:flex;align-items:center;gap:7px;
     background:#0056b3;color:#fff;border:none;
@@ -113,7 +104,6 @@ const GLOBAL_CSS = `
   .submit-btn:hover{opacity:.85;}
   .submit-btn:disabled{opacity:.5;cursor:not-allowed;}
 
-  /* Nav button */
   .nav-btn{
     display:flex;align-items:center;gap:6px;
     border:1.5px solid #e2e8f0;background:#fff;color:#64748b;
@@ -128,14 +118,12 @@ const GLOBAL_CSS = `
   .nav-btn.success{background:#22c55e;color:#fff;border-color:#22c55e;}
   .nav-btn.success:hover{background:#16a34a;border-color:#16a34a;}
 
-  /* Sidebar navigator card */
   .nav-card{
     background:#fff;border-radius:var(--card-br);
     box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);
     padding:18px;position:sticky;top:80px;
   }
 
-  /* Mobile nav drawer */
   .mobile-drawer{
     background:#fff;border-bottom:1px solid #e2e8f0;
     padding:14px 16px;
@@ -149,15 +137,19 @@ const TakeExamPage = () => {
   const { examId } = useParams();
   const navigate   = useNavigate();
 
-  const [loading, setLoading]                     = useState(true);
-  const [submitting, setSubmitting]               = useState(false);
-  const [exam, setExam]                           = useState(null);
-  const [questions, setQuestions]                 = useState([]);
-  const [answers, setAnswers]                     = useState({});
-  const [currentIdx, setCurrentIdx]               = useState(0);
-  const [timeLeft, setTimeLeft]                   = useState(null);
-  const [showNav, setShowNav]                     = useState(false);
-  const [isTypingTestRequired, setIsTypingTestRequired] = useState(false); 
+  const [loading, setLoading]           = useState(true);
+  const [submitting, setSubmitting]     = useState(false);
+  const [exam, setExam]                 = useState(null);
+  const [questions, setQuestions]       = useState([]);
+  const [answers, setAnswers]           = useState({});
+  const [currentIdx, setCurrentIdx]     = useState(0);
+  const [timeLeft, setTimeLeft]         = useState(null);
+  const [showNav, setShowNav]           = useState(false);
+
+  // 'idle' | 'missing' | 'exists' | 'recalculating'
+  const [baselineStatus, setBaselineStatus] = useState('idle');
+  // Stores the recorded_at date when baseline exists, for display in TypingTest
+  const [baselineRecordedAt, setBaselineRecordedAt] = useState(null);
 
   const timerRef     = useRef(null);
   const collectorRef = useRef(null);
@@ -174,7 +166,7 @@ const TakeExamPage = () => {
       .fire({ icon:severity==="high"?"error":"warning", title:labels[type]??"Suspicious activity detected", text:"This has been logged and will be reviewed." });
   }, []);
 
-  // Extracted into a reusable fetchExamData so it can be re-called after baseline is saved
+  // Core exam loader — also used after baseline is confirmed/saved
   const fetchExamData = useCallback(async () => {
     setLoading(true);
     try {
@@ -196,11 +188,20 @@ const TakeExamPage = () => {
         if (el) collectorRef.current.attachToAnswerField(el, parseInt(qId));
       }
 
-      setIsTypingTestRequired(false); // Ensure test gate is hidden on success
+      // Clear any baseline gate state on successful exam start
+      setBaselineStatus('idle');
     } catch (err) {
-      // Gatekeeper: backend blocked start because no typing baseline exists yet
       if (err.response?.status === 403 && err.response.data?.requires_typing_test) {
-        setIsTypingTestRequired(true);
+        // Check if the student truly has no baseline or if they can choose to reuse theirs
+        try {
+          const statusRes = await API.get('/student/typing-baseline/status');
+          const { has_baseline, recorded_at } = statusRes.data;
+          setBaselineRecordedAt(recorded_at);
+          setBaselineStatus(has_baseline ? 'exists' : 'missing');
+        } catch {
+          // Fallback: treat as missing if status check fails
+          setBaselineStatus('missing');
+        }
       } else {
         await Swal.fire("Cannot Start Exam", err.response?.data?.message || "Failed to start exam.", "error");
         navigate(-1);
@@ -215,17 +216,24 @@ const TakeExamPage = () => {
     return () => { clearInterval(timerRef.current); collectorRef.current?.stop(); };
   }, [fetchExamData]);
 
-  // Called by TypingTest component once the student finishes the baseline
+  // Called by TypingTest when the student finishes recording a new baseline
   const handleBaselineComplete = async (ikis) => {
     try {
       setLoading(true);
       await API.post("/student/typing-baseline", { flight_times_ms: ikis });
-      // Baseline saved — retry starting the exam
+      // Baseline saved — proceed to start the exam
       fetchExamData();
     } catch (err) {
       Swal.fire("Error", "Failed to save typing baseline.", "error");
       setLoading(false);
     }
+  };
+
+  // Called by TypingTest when student chooses to reuse their existing baseline
+  const handleSkipAndStart = () => {
+    // Backend should allow start since baseline already exists;
+    // just re-attempt the exam start call directly
+    fetchExamData();
   };
 
   const handleQuestionChange = useCallback((newIdx) => {
@@ -301,11 +309,17 @@ const TakeExamPage = () => {
   );
 
   // ── Render: typing test gate ──
-  if (isTypingTestRequired) {
+  // Shows when the exam start was blocked due to missing/unverified baseline
+  if (baselineStatus === 'missing' || baselineStatus === 'exists' || baselineStatus === 'recalculating') {
     return (
       <div style={{ background:"#f0f4fb", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
         <div style={{ maxWidth:600, width:"100%" }}>
-          <TypingTest onComplete={handleBaselineComplete} />
+          <TypingTest
+            onComplete={handleBaselineComplete}
+            onSkipAndStart={handleSkipAndStart}
+            hasExistingBaseline={baselineStatus === 'exists'}
+            recordedAt={baselineRecordedAt}
+          />
         </div>
       </div>
     );
@@ -322,7 +336,6 @@ const TakeExamPage = () => {
         {/* ── Fixed exam topbar ── */}
         <div className="exam-topbar">
           <div className="exam-topbar-inner">
-            {/* Left: exam title + progress */}
             <div style={{ minWidth:0 }}>
               <p style={{ margin:0, fontSize:13, fontWeight:700, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                 {exam?.title}
@@ -332,7 +345,6 @@ const TakeExamPage = () => {
               </p>
             </div>
 
-            {/* Center: timer */}
             <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
               <i className="bi bi-clock" style={{ fontSize:14, color:timeLeft !== null && timeLeft <= 60 ? "#ef4444" : "#64748b" }}></i>
               <span className={`timer ${timerClass()}`}>{formatTime(timeLeft)}</span>
@@ -341,9 +353,7 @@ const TakeExamPage = () => {
               )}
             </div>
 
-            {/* Right: controls */}
             <div style={{ display:"flex", gap:8, alignItems:"center", flexShrink:0 }}>
-              {/* Mobile nav toggle */}
               <button onClick={() => setShowNav(v => !v)} style={{
                 background: showNav ? "#e8f0fe" : "#f1f5f9",
                 border:"none", borderRadius:9, padding:"7px 10px",
@@ -360,7 +370,6 @@ const TakeExamPage = () => {
             </div>
           </div>
 
-          {/* Progress rail */}
           <div className="progress-rail">
             <div className="progress-fill" style={{ width:`${pctDone}%` }} />
           </div>
@@ -384,7 +393,6 @@ const TakeExamPage = () => {
                 );
               })}
             </div>
-            {/* Legend */}
             <div style={{ display:"flex", gap:14, marginTop:10, flexWrap:"wrap" }}>
               {[
                 { cls:"current",    label:"Current"    },
@@ -413,7 +421,6 @@ const TakeExamPage = () => {
             <div className="q-card fade-up" style={{ order:1 }}>
               {currentQ && (
                 <div style={{ padding:"24px 24px 28px" }}>
-                  {/* Q header */}
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
                     <span style={{ background:"#e8f0fe", color:"#0056b3", borderRadius:99, padding:"4px 14px", fontSize:12, fontWeight:700 }}>
                       Question {currentIdx + 1} of {questions.length}
@@ -423,12 +430,10 @@ const TakeExamPage = () => {
                     </span>
                   </div>
 
-                  {/* Question text */}
                   <h2 style={{ margin:"0 0 24px", fontSize:16, fontWeight:700, color:"#0f172a", lineHeight:1.65 }}>
                     {currentQ.question_text}
                   </h2>
 
-                  {/* Multiple Choice */}
                   {currentQ.type === "multiple_choice" && (
                     <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:8 }}>
                       {(currentQ.options || []).map((opt, oi) => {
@@ -444,7 +449,6 @@ const TakeExamPage = () => {
                     </div>
                   )}
 
-                  {/* True / False */}
                   {currentQ.type === "true_false" && (
                     <div style={{ display:"flex", gap:12, marginBottom:8 }}>
                       {["True","False"].map(val => {
@@ -460,7 +464,6 @@ const TakeExamPage = () => {
                     </div>
                   )}
 
-                  {/* Essay */}
                   {currentQ.type === "essay" && (
                     <div style={{ marginBottom:8 }}>
                       <textarea
@@ -480,7 +483,6 @@ const TakeExamPage = () => {
                     </div>
                   )}
 
-                  {/* Navigation */}
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:28, paddingTop:20, borderTop:"1px solid #f1f5f9" }}>
                     <button className="nav-btn" onClick={() => handleQuestionChange(Math.max(0, currentIdx-1))}
                       disabled={currentIdx === 0}>
@@ -501,7 +503,7 @@ const TakeExamPage = () => {
               )}
             </div>
 
-            {/* ── Desktop sidebar: question navigator ── */}
+            {/* ── Desktop sidebar ── */}
             <div className="nav-card d-none d-lg-block" style={{ order:2 }}>
               <p style={{ margin:"0 0 12px", fontSize:11, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".06em" }}>
                 Questions
@@ -533,7 +535,6 @@ const TakeExamPage = () => {
                 ))}
               </div>
 
-              {/* Progress summary */}
               <div style={{ marginTop:16, paddingTop:16, borderTop:"1px solid #f1f5f9" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
                   <span style={{ fontSize:11, fontWeight:600, color:"#94a3b8" }}>Progress</span>
