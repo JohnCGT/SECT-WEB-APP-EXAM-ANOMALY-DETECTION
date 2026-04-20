@@ -49,7 +49,7 @@ class AuthController extends Controller
                 'role'     => $validated['role'],
             ]);
 
-            $courseId = env('DEMO_COURSE_ID');
+            $courseId = env('DEMO_COURSE_ID', 1);
 
             if ($courseId && $user->role === 'student') {
                 DB::table('course_students')->insert([
