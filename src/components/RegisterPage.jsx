@@ -3,12 +3,12 @@ import { Link, useNavigate } from "react-router-dom";
 import API, { fetchCsrfToken } from "../api";
 import Swal from 'sweetalert2';
 
-const RegisterPage = () => {
+const RegisterPage = ({ role: fixedRole }) => {
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
-    role: "student",
+    role: fixedRole || "student",
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -16,7 +16,6 @@ const RegisterPage = () => {
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
-    // Clear field error on change
     setErrors({ ...errors, [e.target.name]: null });
   };
 
@@ -26,23 +25,19 @@ const RegisterPage = () => {
     setErrors({});
 
     try {
-      // Step 1: Fetch CSRF cookie — required by Sanctum before any POST
       await fetchCsrfToken();
 
-      // Step 2: Send register request
       const res = await API.post('/register', {
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
         password: form.password,
-        role: form.role,
+        role: fixedRole || form.role,
       });
 
       const { user } = res.data;
 
-      // Step 3: Persist user so protected routes don't bounce back
       localStorage.setItem('user', JSON.stringify(user));
 
-      // Step 4: Show success alert
       await Swal.fire({
         icon: 'success',
         title: 'Registration Successful!',
@@ -51,7 +46,6 @@ const RegisterPage = () => {
         showConfirmButton: false,
       });
 
-      // Step 5: Redirect based on role
       if (user.role === 'admin') {
         navigate('/admin');
       } else if (user.role === 'instructor') {
@@ -63,7 +57,6 @@ const RegisterPage = () => {
     } catch (err) {
       console.error('Register error:', err);
 
-      // Handle Laravel validation errors (422)
       if (err.response?.status === 422) {
         setErrors(err.response.data.errors || {});
         await Swal.fire({
@@ -83,10 +76,18 @@ const RegisterPage = () => {
     }
   };
 
+  const loginLink = fixedRole === 'instructor'
+    ? '/instructor/login'
+    : '/';
+
+  const roleLabel = fixedRole
+    ? fixedRole.charAt(0).toUpperCase() + fixedRole.slice(1) + ' '
+    : '';
+
   return (
     <div className="d-flex vh-100 justify-content-center align-items-center bg-light">
       <div className="card shadow p-4" style={{ maxWidth: "420px", width: "100%" }}>
-        <h2 className="text-center mb-4">Register</h2>
+        <h2 className="text-center mb-4">{roleLabel}Register</h2>
 
         <form onSubmit={handleSubmit}>
           {/* Name */}
@@ -142,22 +143,24 @@ const RegisterPage = () => {
             {errors.password && <div className="invalid-feedback">{errors.password[0]}</div>}
           </div>
 
-          {/* Role */}
-          <div className="mb-3">
-            <label htmlFor="role" className="form-label">Role</label>
-            <select
-              className={`form-select ${errors.role ? 'is-invalid' : ''}`}
-              id="role"
-              name="role"
-              value={form.role}
-              onChange={handleChange}
-              required
-              disabled={loading}
-            >
-              <option value="student">Student</option>
-            </select>
-            {errors.role && <div className="invalid-feedback">{errors.role[0]}</div>}
-          </div>
+          {/* Role — only shown if not fixed */}
+          {!fixedRole && (
+            <div className="mb-3">
+              <label htmlFor="role" className="form-label">Role</label>
+              <select
+                className={`form-select ${errors.role ? 'is-invalid' : ''}`}
+                id="role"
+                name="role"
+                value={form.role}
+                onChange={handleChange}
+                required
+                disabled={loading}
+              >
+                <option value="student">Student</option>
+              </select>
+              {errors.role && <div className="invalid-feedback">{errors.role[0]}</div>}
+            </div>
+          )}
 
           <button
             type="submit"
@@ -169,7 +172,7 @@ const RegisterPage = () => {
         </form>
 
         <p className="text-center mt-3">
-          Already have an account? <Link to="/">Login here</Link>
+          Already have an account? <Link to={loginLink}>Login here</Link>
         </p>
       </div>
     </div>

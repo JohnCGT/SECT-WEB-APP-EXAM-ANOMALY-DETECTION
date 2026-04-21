@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API, { fetchCsrfToken } from "../api";
-import axios from "axios";
 import Swal from 'sweetalert2';
 
-const LoginPage = () => {
+const LoginPage = ({ role: fixedRole }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,10 +16,8 @@ const LoginPage = () => {
     setError("");
 
     try {
-      // Step 1: Fetch CSRF cookie — Sanctum requires this before any POST
       await fetchCsrfToken();
 
-      // Step 2: Send login request
       const res = await API.post('/login', {
         email: email.trim().toLowerCase(),
         password,
@@ -28,11 +25,19 @@ const LoginPage = () => {
 
       const { user } = res.data;
 
-      // Step 3: Persist user info so protected routes don't bounce back
-      // while the async /me session check is still in flight
+      // If a fixedRole is set, reject logins from other roles
+      if (fixedRole && user.role !== fixedRole) {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Access Denied',
+          text: `This login page is for ${fixedRole}s only.`,
+        });
+        setLoading(false);
+        return;
+      }
+
       localStorage.setItem('user', JSON.stringify(user));
 
-      // Step 4: Show success toast
       const Toast = Swal.mixin({
         toast: true,
         position: 'top-end',
@@ -46,7 +51,6 @@ const LoginPage = () => {
         title: `Welcome back, ${user.name}!`,
       });
 
-      // Step 5: Redirect based on role
       if (user.role === 'admin') {
         navigate('/admin');
       } else if (user.role === 'instructor') {
@@ -70,10 +74,19 @@ const LoginPage = () => {
     }
   };
 
+  // Determine register link and label based on fixedRole
+  const registerLink = fixedRole === 'instructor'
+    ? '/instructor/register'
+    : '/register'; // student default; admin has no public register
+
+  const roleLabel = fixedRole
+    ? fixedRole.charAt(0).toUpperCase() + fixedRole.slice(1) + ' '
+    : '';
+
   return (
     <div className="d-flex vh-100 justify-content-center align-items-center bg-light">
       <div className="card shadow p-4" style={{ maxWidth: "400px", width: "100%" }}>
-        <h2 className="text-center mb-4">Login</h2>
+        <h2 className="text-center mb-4">{roleLabel}Login</h2>
 
         {error && (
           <div className="alert alert-danger" role="alert">
@@ -121,9 +134,12 @@ const LoginPage = () => {
           </button>
         </form>
 
-        <p className="text-center mt-3">
-          Don't have an account? <Link to="/register">Register here</Link>
-        </p>
+        {/* Show register link only for student and instructor */}
+        {fixedRole !== 'admin' && (
+          <p className="text-center mt-3">
+            Don't have an account? <Link to={registerLink}>Register here</Link>
+          </p>
+        )}
       </div>
     </div>
   );
