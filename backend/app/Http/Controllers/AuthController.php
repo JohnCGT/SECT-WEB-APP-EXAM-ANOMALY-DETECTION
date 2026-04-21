@@ -31,10 +31,10 @@ class AuthController extends Controller
                     'required',
                     'string',
                     'min:8',
-                    'regex:/[a-z]/',      // at least one lowercase
-                    'regex:/[A-Z]/',      // at least one uppercase
-                    'regex:/[0-9]/',      // at least one number
-                    'regex:/[@$!%*#?&]/', // at least one special char
+                    // 'regex:/[a-z]/',      // at least one lowercase
+                    // 'regex:/[A-Z]/',      // at least one uppercase
+                    // 'regex:/[0-9]/',      // at least one number
+                    // 'regex:/[@$!%*#?&]/', // at least one special char
                 ],
                 'role' => 'required|in:admin,instructor,student',
             ]);

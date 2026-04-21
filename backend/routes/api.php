@@ -21,10 +21,15 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 // ── Public ────────────────────────────────────────────────────────────────────
-Route::middleware(['throttle:6,1'])->group(function () {
+//
+// THROTTLE: Currently DISABLED for register & login.
+// To RE-ENABLE: uncomment the two Route::middleware lines and the closing });
+// To DISABLE:   comment them out again (as they are now)
+//
+// Route::middleware(['throttle:6,1'])->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login',    [AuthController::class, 'login']);
-});
+// });
 
 // ── Protected ─────────────────────────────────────────────────────────────────
 Route::middleware(['auth:sanctum'])->group(function () {
@@ -72,6 +77,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     // ── Support Tickets ───────────────────────────────────────────────────────
+    //
+    // THROTTLE: Currently ENABLED for support ticket creation (5 requests/min).
+    // To DISABLE: comment out the Route::middleware line and its closing });
+    //             and un-indent the Route::post line inside it
+    // To RE-ENABLE: uncomment them (as they are now)
+    //
     Route::middleware(['throttle:5,1'])->group(function () {
         Route::post('/support/tickets', [SupportTicketController::class, 'store']);
     });
@@ -115,6 +126,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
     //   keyboard-shortcut  → One-Class SVM
     //   response-time      → Z-Score Method
     //   keystroke-dynamics → Hidden Markov Model
+    //
+    // THROTTLE: Currently ENABLED for anomaly ingestion (60 requests/min).
+    // To DISABLE: comment out the ->middleware(['throttle:60,1']) line
+    // To RE-ENABLE: uncomment it (as it is now)
+    //
     Route::middleware(['throttle:60,1'])
         ->prefix('student/exams/{examId}/anomalies')
         ->group(function () {
