@@ -11,7 +11,7 @@ const NAV_ITEMS = [
   { to: "/instructor/exams",            icon: "bi-file-earmark-text",    label: "Exams"     },
   { to: "/instructor/students",         icon: "bi-people",               label: "Students"  },
   { to: "/instructor/alerts",           icon: "bi-exclamation-triangle", label: "Alerts"    },
-  { to: "/instructor/reports",          icon: "bi-bar-chart",            label: "Reports"   },
+  // { to: "/instructor/reports",          icon: "bi-bar-chart",            label: "Reports"   },
   { to: "/instructor/support",          icon: "bi-headset",              label: "Support"   },
   { to: "/instructor/account-settings", icon: "bi-gear",                 label: "Settings"  },
 ];
