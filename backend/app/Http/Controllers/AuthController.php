@@ -29,8 +29,8 @@ class AuthController extends Controller
                 'email'    => 'required|email|unique:users,email',
                 'password' => [
                     'required',
-                    'string',
-                    'min:8',
+                    // 'string',
+                    // 'min:8',
                     // 'regex:/[a-z]/',      // at least one lowercase
                     // 'regex:/[A-Z]/',      // at least one uppercase
                     // 'regex:/[0-9]/',      // at least one number

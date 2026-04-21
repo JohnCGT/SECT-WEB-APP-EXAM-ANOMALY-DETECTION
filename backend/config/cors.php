@@ -25,6 +25,7 @@ return [
     'allowed_origins' => [
         'https://sectexam.app',
         'https://www.sectexam.app',
+        'http://localhost:5173',
     ],
 
     'allowed_origins_patterns' => [],
