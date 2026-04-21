@@ -1367,7 +1367,7 @@ const ExamDetail = () => {
                           <th className="text-center"><i className="bi bi-keyboard"></i> Keys</th>
                           <th className="text-center"><i className="bi bi-clock"></i> Response</th>
                           <th className="text-center"><i className="bi bi-activity"></i> Keystroke</th>
-                          <th>ACTIONS</th>
+                          {/* <th>ACTIONS</th> */}
                         </tr>
                       </thead>
                       <tbody>
@@ -1403,11 +1403,11 @@ const ExamDetail = () => {
                             <td className="text-center">{s.keyboard_shortcut_count}</td>
                             <td className="text-center">{s.response_time_anomaly_count}</td>
                             <td className="text-center">{s.keystroke_anomaly_count}</td>
-                            <td>
+                            {/* <td>
                               <button className="btn btn-sm btn-outline-primary" onClick={() => openStudentDetail(s.submission_id)}>
                                 <i className="bi bi-eye me-1"></i>Details
                               </button>
-                            </td>
+                            </td> */}
                           </tr>
                         ))}
                       </tbody>
