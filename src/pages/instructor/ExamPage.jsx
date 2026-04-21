@@ -53,9 +53,8 @@ const ExamPage = () => {
 
   const handleLogout = async () => {
     try { await API.post("/logout"); } catch {}
-    localStorage.removeItem(CACHE_KEY);
     localStorage.removeItem("user");
-    navigate("/");
+    navigate("/instructor/login");
   };
 
   useEffect(() => {

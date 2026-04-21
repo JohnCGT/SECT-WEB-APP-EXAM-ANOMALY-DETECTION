@@ -60,7 +60,7 @@ export default function CoursesPage() {
   const handleLogout = async () => {
     try { await API.post("/logout"); } catch {}
     localStorage.removeItem("user");
-    navigate("/");
+    navigate("/instructor/login");
   };
 
   /* ── Validation ── */
