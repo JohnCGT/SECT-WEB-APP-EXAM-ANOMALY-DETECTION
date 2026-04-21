@@ -1,5 +1,7 @@
 <?php
 
+// backend/app/Models/ExamSubmission.php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -18,13 +20,18 @@ class ExamSubmission extends Model
     protected $casts = [
         'started_at'   => 'datetime',
         'submitted_at' => 'datetime',
+        'answers'      => 'array',
     ];
 
     public function exam(): BelongsTo    { return $this->belongsTo(Exam::class); }
     public function student(): BelongsTo { return $this->belongsTo(User::class, 'student_id'); }
     public function answers(): HasMany   { return $this->hasMany(ExamAnswer::class, 'submission_id'); }
 
-    // ── Anomaly relationships ──────────────────────────────────────────────
+    // ── FIX: was missing — AdminDashboardController::exams() uses this ──────
+    public function examResult(): HasOne { return $this->hasOne(ExamResult::class, 'submission_id'); }
+    // ────────────────────────────────────────────────────────────────────────
+
+    // Anomaly relationships
     public function anomalySummary(): HasOne        { return $this->hasOne(ExamAnomalySummary::class, 'submission_id'); }
     public function tabSwitchLogs(): HasMany         { return $this->hasMany(TabSwitchLog::class, 'submission_id'); }
     public function keyboardShortcutLogs(): HasMany  { return $this->hasMany(KeyboardShortcutLog::class, 'submission_id'); }

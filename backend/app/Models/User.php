@@ -1,7 +1,5 @@
 <?php
 
-// backend/app/Models/User.php
-
 namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -17,7 +15,10 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'status',   // ← added: 'active' | 'suspended'
+        'status',
+        'phone',
+        'course',
+        'year_level',
     ];
 
     protected $hidden = [
@@ -32,8 +33,8 @@ class User extends Authenticatable
     public function isStudent()    { return $this->role === 'student'; }
 
     /* ── Status helpers ── */
-    public function isActive()     { return ($this->status ?? 'active') === 'active'; }
-    public function isSuspended()  { return $this->status === 'suspended'; }
+    public function isActive()    { return ($this->status ?? 'active') === 'active'; }
+    public function isSuspended() { return $this->status === 'suspended'; }
 
     /* ── Instructor: courses they teach ── */
     public function courses()

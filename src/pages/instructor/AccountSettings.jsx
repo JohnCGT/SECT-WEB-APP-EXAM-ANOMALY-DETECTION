@@ -1,413 +1,458 @@
-import React from "react";
-import { Link } from "react-router-dom";
+// src/pages/instructor/AccountSettings.jsx
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import API from "../../api";
+import Swal from "sweetalert2";
+import InstructorAlertBell from "../../components/InstructorAlertBell";
+
+/* ─── Shared sidebar config ──────────────────────────────────────────────── */
+const NAV_ITEMS = [
+  { to: "/instructor",                  icon: "bi-speedometer2",         label: "Dashboard" },
+  { to: "/instructor/courses",          icon: "bi-book",                 label: "Courses"   },
+  { to: "/instructor/exams",            icon: "bi-file-earmark-text",    label: "Exams"     },
+  { to: "/instructor/students",         icon: "bi-people",               label: "Students"  },
+  { to: "/instructor/alerts",           icon: "bi-exclamation-triangle", label: "Alerts"    },
+  { to: "/instructor/reports",          icon: "bi-bar-chart",            label: "Reports"   },
+  { to: "/instructor/support",          icon: "bi-headset",              label: "Support"   },
+  { to: "/instructor/account-settings", icon: "bi-gear",                 label: "Settings"  },
+];
 
 const AccountSettings = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [user,       setUser]       = useState(null);
+  const [activeTab,  setActiveTab]  = useState("general");
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [savingPw,   setSavingPw]   = useState(false);
+
+  /* ── General form state ── */
+  const [infoForm, setInfoForm] = useState({
+    name: "", email: "", phone: "", department: "Computer Science", office: "", consultation_hours: "",
+  });
+
+  /* ── Password form state ── */
+  const [pwForm,        setPwForm]        = useState({ current_password: "", password: "", password_confirmation: "" });
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw,     setShowNewPw]     = useState(false);
+
+  /* ── Notification toggles (local only — extend with API as needed) ── */
+  const [notifToggles, setNotifToggles] = useState({
+    examAlerts: true, cheatingAlerts: true, submissions: true, systemUpdates: false,
+  });
+
+  /* ── Monitoring toggles ── */
+  const [monitorToggles, setMonitorToggles] = useState({
+    tabSwitching: true, keyboardPatterns: true, isolationForest: true, oneClassSVM: true,
+  });
+  const [sensitivity, setSensitivity] = useState(3);
+
+  /* ── Boot ── */
+  useEffect(() => {
+    API.get("/me").then((r) => {
+      const u = r.data.user;
+      setUser(u);
+      setInfoForm((f) => ({
+        ...f,
+        name:  u.name  || "",
+        email: u.email || "",
+        phone: u.phone || "",
+      }));
+    }).catch(() => {});
+  }, []);
+
+  /* ── Handlers ── */
+  const handleLogout = async () => {
+    try { await API.post("/logout"); } catch {}
+    localStorage.removeItem("user");
+    navigate("/");
+  };
+
+  const handleSaveInfo = async (e) => {
+    e.preventDefault();
+    setSavingInfo(true);
+    try {
+      await API.patch("/admin/profile", { name: infoForm.name, email: infoForm.email });
+      Swal.fire({ icon: "success", title: "Saved!", timer: 1400, showConfirmButton: false });
+      setUser((u) => ({ ...u, name: infoForm.name, email: infoForm.email }));
+    } catch (err) {
+      Swal.fire("Error", err.response?.data?.message || "Failed to save changes.", "error");
+    } finally { setSavingInfo(false); }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (pwForm.password !== pwForm.password_confirmation) {
+      Swal.fire("Mismatch", "New passwords do not match.", "warning"); return;
+    }
+    setSavingPw(true);
+    try {
+      await API.patch("/admin/profile", pwForm);
+      Swal.fire({ icon: "success", title: "Password updated!", timer: 1400, showConfirmButton: false });
+      setPwForm({ current_password: "", password: "", password_confirmation: "" });
+    } catch (err) {
+      Swal.fire("Error", err.response?.data?.message || "Failed to update password.", "error");
+    } finally { setSavingPw(false); }
+  };
+
+  const isActive = (to) =>
+    to === "/instructor" ? location.pathname === to : location.pathname.startsWith(to);
+
+  const TABS = [
+    { key: "general",      label: "General",              icon: "bi-person" },
+    { key: "security",     label: "Security",             icon: "bi-shield-lock" },
+    { key: "notifications",label: "Notifications",        icon: "bi-bell" },
+    { key: "monitoring",   label: "Monitoring Settings",  icon: "bi-camera-video" },
+  ];
+
+  /* ══════════════════════════════════════════════════════════════
+     RENDER
+  ══════════════════════════════════════════════════════════════ */
   return (
     <div className="d-flex flex-column min-vh-100">
-      {/* Top Navbar */}
-      <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
+
+      {/* ── Navbar ── */}
+      <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm sticky-top">
         <div className="container-fluid">
           <a className="navbar-brand fw-bold text-primary" href="#">SECT Instructor</a>
-          
-          {/* Search Bar */}
-          <form className="d-flex mx-auto" style={{ width: '40%' }}>
-            <input 
-              className="form-control" 
-              type="search" 
-              placeholder="Search..." 
-              aria-label="Search"
-            />
-          </form>
-
-          {/* Account Dropdown */}
-          <div className="dropdown">
-            <button 
-              className="btn btn-light dropdown-toggle d-flex align-items-center" 
-              type="button" 
-              id="accountDropdown" 
-              data-bs-toggle="dropdown" 
-              aria-expanded="false"
-            >
-              <span className="me-2 fw-bold">Welcome, Instructor Name</span>
-            </button>
-            <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="accountDropdown">
-              <li><Link className="dropdown-item" to="/instructor/account-settings">Account Settings</Link></li>
-              <li><Link className="dropdown-item" to="/instructor/profile">Profile</Link></li>
-              <li><hr className="dropdown-divider" /></li>
-              <li><Link className="dropdown-item" to="/">Logout</Link></li>
-            </ul>
+          <div className="d-flex align-items-center gap-2 ms-auto">
+            <InstructorAlertBell />
+            <div className="dropdown">
+              <button className="btn btn-light dropdown-toggle fw-bold" type="button" data-bs-toggle="dropdown">
+                <i className="bi bi-person-circle me-2"></i>{user?.name || "Instructor"}
+              </button>
+              <ul className="dropdown-menu dropdown-menu-end">
+                <li><Link className="dropdown-item" to="/instructor/account-settings"><i className="bi bi-gear me-2"></i>Account Settings</Link></li>
+                <li><Link className="dropdown-item" to="/instructor/profile"><i className="bi bi-person me-2"></i>Profile</Link></li>
+                <li><hr className="dropdown-divider" /></li>
+                <li><button className="dropdown-item text-danger" onClick={handleLogout}><i className="bi bi-box-arrow-right me-2"></i>Logout</button></li>
+              </ul>
+            </div>
           </div>
         </div>
       </nav>
 
-      {/* Main Layout with Sidebar */}
       <div className="d-flex flex-grow-1">
-        {/* Sidebar */}
-        <nav
-            className="text-black d-flex justify-content-center"
-            style={{ width: '110px', minHeight: '100%' }}
-        >
-            <ul className="nav flex-column p-3 align-items-center">
-                <li className="nav-item mb-3">
-                    <Link
-                        className="nav-link text-white active bg-primary rounded fs-6 fw-semibold d-flex flex-column align-items-center py-3"
-                        to="/instructor"
-                    >
-                        <i className="bi bi-speedometer2 fs-4 mb-1"></i>
-                        <span>Dashboard</span>
-                    </Link>
-                </li>
-                <li className="nav-item mb-3">
-                    <Link
-                        className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        to="/instructor/exams"
-                    >
-                        <i className="bi bi-file-earmark-text fs-3 mb-1"></i>
-                        <span>Exams</span>
-                    </Link>
-                </li>
-                <li className="nav-item mb-3">
-                    <Link
-                        className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        to="/instructor/students"
-                    >
-                        <i className="bi bi-people fs-3 mb-1"></i>
-                        <span>Students</span>
-                    </Link>
-                </li>
-                <li className="nav-item mb-3">
-                    <Link
-                        className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        to="/instructor/alerts"
-                    >
-                        <i className="bi bi-exclamation-triangle fs-3 mb-1"></i>
-                        <span>Alerts</span>
-                    </Link>
-                </li>
-                <li className="nav-item mb-3">
-                    <Link
-                        className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        to="/instructor/reports"
-                    >
-                        <i className="bi bi-bar-chart fs-3 mb-1"></i>
-                        <span>Reports</span>
-                    </Link>
-                </li>              
-                <li className="nav-item mb-3">
-                    <Link
-                        className="nav-link text-black fw-semibold d-flex flex-column align-items-center py-3"
-                        to="/instructor/account-settings"
-                    >
-                        <i className="bi bi-file-earmark-text fs-3 mb-1"></i>
-                        <span>Settings</span>
-                    </Link>  
-                </li>
-            </ul>
+
+        {/* ── Sidebar ── */}
+        <nav className="bg-white border-end d-flex flex-column align-items-center py-3" style={{ width: 72, minHeight: "100%" }}>
+          {NAV_ITEMS.map(({ to, icon, label }) => (
+            <Link key={to} to={to}
+              className={`nav-link d-flex flex-column align-items-center py-2 px-1 mb-2 rounded ${
+                isActive(to) ? "text-primary bg-primary bg-opacity-10 fw-bold" : "text-secondary"
+              }`}
+              style={{ fontSize: 10, width: 56, textAlign: "center" }} title={label}>
+              <i className={`bi ${icon} fs-5 mb-1`}></i>
+              <span>{label}</span>
+            </Link>
+          ))}
         </nav>
 
-        {/* Main Content */}
+        {/* ── Main ── */}
         <div className="flex-grow-1 p-4 bg-light">
-          <h4 className="mb-4">Account Settings</h4>
 
-          {/* Settings Navigation */}
-          <div className="card shadow-sm border-0 mb-4">
-            <div className="card-body">
-              <ul className="nav nav-tabs" role="tablist">
-                <li className="nav-item">
-                  <a className="nav-link active" data-bs-toggle="tab" href="#general">General</a>
-                </li>
-                <li className="nav-item">
-                  <a className="nav-link" data-bs-toggle="tab" href="#security">Security</a>
-                </li>
-                <li className="nav-item">
-                  <a className="nav-link" data-bs-toggle="tab" href="#notifications">Notifications</a>
-                </li>
-                <li className="nav-item">
-                  <a className="nav-link" data-bs-toggle="tab" href="#monitoring">Monitoring Settings</a>
-                </li>
+          <div className="mb-4">
+            <h4 className="mb-0 fw-bold">Account Settings</h4>
+            <p className="text-muted mb-0 small">Manage your profile, security, and preferences</p>
+          </div>
+
+          {/* Inner tab nav + content */}
+          <div className="card shadow-sm border-0">
+            <div className="card-header bg-white border-bottom-0 pt-3 pb-0">
+              <ul className="nav nav-tabs border-0">
+                {TABS.map(({ key, label, icon }) => (
+                  <li key={key} className="nav-item">
+                    <button
+                      className={`nav-link ${activeTab === key ? "active fw-semibold" : "text-muted"}`}
+                      onClick={() => setActiveTab(key)}
+                    >
+                      <i className={`bi ${icon} me-2`}></i>{label}
+                    </button>
+                  </li>
+                ))}
               </ul>
+            </div>
 
-              <div className="tab-content mt-4">
-                {/* General Settings Tab */}
-                <div id="general" className="tab-pane fade show active">
-                  <h6 className="fw-bold mb-3">Personal Information</h6>
-                  <form>
+            <div className="card-body p-4">
+
+              {/* ── GENERAL ── */}
+              {activeTab === "general" && (
+                <>
+                  <h6 className="fw-semibold mb-3">Personal Information</h6>
+                  <form onSubmit={handleSaveInfo}>
                     <div className="row mb-3">
                       <div className="col-md-6">
-                        <label className="form-label">First Name</label>
-                        <input type="text" className="form-control" value="Maria Elena" />
+                        <label className="form-label fw-semibold small">Full Name</label>
+                        <input type="text" className="form-control"
+                          value={infoForm.name}
+                          onChange={(e) => setInfoForm((f) => ({ ...f, name: e.target.value }))} />
                       </div>
                       <div className="col-md-6">
-                        <label className="form-label">Last Name</label>
-                        <input type="text" className="form-control" value="Santos" />
+                        <label className="form-label fw-semibold small">Email Address</label>
+                        <input type="email" className="form-control"
+                          value={infoForm.email}
+                          onChange={(e) => setInfoForm((f) => ({ ...f, email: e.target.value }))} />
                       </div>
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Email Address</label>
-                      <input type="email" className="form-control" value="maria.santos@university.edu.ph" />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Phone Number</label>
-                      <input type="tel" className="form-control" value="+63 912 345 6789" />
                     </div>
                     <div className="row mb-3">
                       <div className="col-md-6">
-                        <label className="form-label">Department</label>
-                        <select className="form-select">
-                          <option selected>Computer Science</option>
+                        <label className="form-label fw-semibold small">Phone Number</label>
+                        <input type="tel" className="form-control"
+                          placeholder="+63 912 345 6789"
+                          value={infoForm.phone}
+                          onChange={(e) => setInfoForm((f) => ({ ...f, phone: e.target.value }))} />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold small">Department</label>
+                        <select className="form-select"
+                          value={infoForm.department}
+                          onChange={(e) => setInfoForm((f) => ({ ...f, department: e.target.value }))}>
+                          <option>Computer Science</option>
                           <option>Information Technology</option>
                           <option>Engineering</option>
                           <option>Mathematics</option>
                         </select>
                       </div>
+                    </div>
+                    <div className="row mb-4">
                       <div className="col-md-6">
-                        <label className="form-label">Office Location</label>
-                        <input type="text" className="form-control" value="Room 305, Engineering Building" />
+                        <label className="form-label fw-semibold small">Office Location</label>
+                        <input type="text" className="form-control"
+                          placeholder="Room 305, Engineering Building"
+                          value={infoForm.office}
+                          onChange={(e) => setInfoForm((f) => ({ ...f, office: e.target.value }))} />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold small">Consultation Hours</label>
+                        <input type="text" className="form-control"
+                          placeholder="Mon-Fri, 2:00 PM - 4:00 PM"
+                          value={infoForm.consultation_hours}
+                          onChange={(e) => setInfoForm((f) => ({ ...f, consultation_hours: e.target.value }))} />
                       </div>
                     </div>
-                    <div className="mb-3">
-                      <label className="form-label">Consultation Hours</label>
-                      <input type="text" className="form-control" value="Mon-Fri, 2:00 PM - 4:00 PM" />
-                    </div>
-                    <button type="submit" className="btn btn-primary">Save Changes</button>
+                    <button type="submit" className="btn btn-primary" disabled={savingInfo}>
+                      {savingInfo
+                        ? <><span className="spinner-border spinner-border-sm me-2" />Saving…</>
+                        : <><i className="bi bi-check-lg me-2" />Save Changes</>}
+                    </button>
                   </form>
-                </div>
+                </>
+              )}
 
-                {/* Security Settings Tab */}
-                <div id="security" className="tab-pane fade">
-                  <h6 className="fw-bold mb-3">Change Password</h6>
-                  <form>
-                    <div className="mb-3">
-                      <label className="form-label">Current Password</label>
-                      <input type="password" className="form-control" placeholder="Enter current password" />
+              {/* ── SECURITY ── */}
+              {activeTab === "security" && (
+                <>
+                  <h6 className="fw-semibold mb-3">Change Password</h6>
+                  <form onSubmit={handleChangePassword} className="mb-4">
+                    <div className="row g-3 mb-4">
+                      <div className="col-md-12">
+                        <label className="form-label fw-semibold small">Current Password</label>
+                        <div className="input-group">
+                          <input type={showCurrentPw ? "text" : "password"} className="form-control"
+                            placeholder="Enter current password"
+                            value={pwForm.current_password}
+                            onChange={(e) => setPwForm((f) => ({ ...f, current_password: e.target.value }))} />
+                          <button type="button" className="btn btn-outline-secondary"
+                            onClick={() => setShowCurrentPw((v) => !v)}>
+                            <i className={`bi bi-eye${showCurrentPw ? "-slash" : ""}`}></i>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold small">New Password</label>
+                        <div className="input-group">
+                          <input type={showNewPw ? "text" : "password"} className="form-control"
+                            placeholder="Min. 8 characters"
+                            value={pwForm.password}
+                            onChange={(e) => setPwForm((f) => ({ ...f, password: e.target.value }))} />
+                          <button type="button" className="btn btn-outline-secondary"
+                            onClick={() => setShowNewPw((v) => !v)}>
+                            <i className={`bi bi-eye${showNewPw ? "-slash" : ""}`}></i>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold small">Confirm New Password</label>
+                        <input type="password" className="form-control"
+                          placeholder="Repeat new password"
+                          value={pwForm.password_confirmation}
+                          onChange={(e) => setPwForm((f) => ({ ...f, password_confirmation: e.target.value }))} />
+                      </div>
                     </div>
-                    <div className="mb-3">
-                      <label className="form-label">New Password</label>
-                      <input type="password" className="form-control" placeholder="Enter new password" />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Confirm New Password</label>
-                      <input type="password" className="form-control" placeholder="Confirm new password" />
-                    </div>
-                    <button type="submit" className="btn btn-primary">Update Password</button>
+                    <button type="submit" className="btn btn-primary" disabled={savingPw}>
+                      {savingPw
+                        ? <><span className="spinner-border spinner-border-sm me-2" />Updating…</>
+                        : <><i className="bi bi-lock me-2" />Update Password</>}
+                    </button>
                   </form>
 
-                  <hr className="my-4" />
+                  <hr />
 
-                  <h6 className="fw-bold mb-3">Two-Factor Authentication</h6>
-                  <div className="card bg-light border-0">
-                    <div className="card-body">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <div>
-                          <strong>Two-Factor Authentication</strong>
-                          <p className="text-muted mb-0 small">Add an extra layer of security to your account</p>
-                        </div>
-                        <div className="form-check form-switch">
-                          <input className="form-check-input" type="checkbox" id="2fa" />
-                          <label className="form-check-label" htmlFor="2fa"></label>
-                        </div>
+                  <h6 className="fw-semibold mb-3">Two-Factor Authentication</h6>
+                  <div className="card bg-light border-0 mb-4">
+                    <div className="card-body d-flex justify-content-between align-items-center">
+                      <div>
+                        <div className="fw-semibold">Two-Factor Authentication</div>
+                        <p className="text-muted mb-0 small">Add an extra layer of security to your account</p>
+                      </div>
+                      <div className="form-check form-switch mb-0">
+                        <input className="form-check-input" type="checkbox" id="2fa" style={{ width: 40, height: 22 }} />
                       </div>
                     </div>
                   </div>
 
-                  <hr className="my-4" />
-
-                  <h6 className="fw-bold mb-3">Login History</h6>
+                  <h6 className="fw-semibold mb-3">Login History</h6>
                   <div className="table-responsive">
                     <table className="table table-hover">
                       <thead className="table-light">
-                        <tr>
-                          <th>DATE & TIME</th>
-                          <th>IP ADDRESS</th>
-                          <th>DEVICE</th>
-                          <th>LOCATION</th>
-                        </tr>
+                        <tr><th>DATE & TIME</th><th>IP ADDRESS</th><th>DEVICE</th><th>LOCATION</th></tr>
                       </thead>
                       <tbody>
-                        <tr>
-                          <td>Feb 05, 2026 - 8:30 AM</td>
-                          <td>192.168.1.100</td>
-                          <td>Windows PC - Chrome</td>
-                          <td>Manila, Philippines</td>
-                        </tr>
-                        <tr>
-                          <td>Feb 04, 2026 - 2:15 PM</td>
-                          <td>192.168.1.100</td>
-                          <td>Windows PC - Chrome</td>
-                          <td>Manila, Philippines</td>
-                        </tr>
-                        <tr>
-                          <td>Feb 03, 2026 - 9:00 AM</td>
-                          <td>192.168.1.101</td>
-                          <td>Android - Chrome Mobile</td>
-                          <td>Quezon City, Philippines</td>
-                        </tr>
+                        {[
+                          { date: "Feb 05, 2026 – 8:30 AM", ip: "192.168.1.100", device: "Windows PC – Chrome",    loc: "Manila, PH"      },
+                          { date: "Feb 04, 2026 – 2:15 PM", ip: "192.168.1.100", device: "Windows PC – Chrome",    loc: "Manila, PH"      },
+                          { date: "Feb 03, 2026 – 9:00 AM", ip: "192.168.1.101", device: "Android – Chrome Mobile",loc: "Quezon City, PH" },
+                        ].map((r) => (
+                          <tr key={r.date}>
+                            <td className="small">{r.date}</td>
+                            <td className="small text-muted">{r.ip}</td>
+                            <td className="small text-muted">{r.device}</td>
+                            <td className="small text-muted">{r.loc}</td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
-                </div>
+                </>
+              )}
 
-                {/* Notification Settings Tab */}
-                <div id="notifications" className="tab-pane fade">
-                  <h6 className="fw-bold mb-3">Email Notifications</h6>
-                  <div className="card bg-light border-0 mb-3">
+              {/* ── NOTIFICATIONS ── */}
+              {activeTab === "notifications" && (
+                <>
+                  <h6 className="fw-semibold mb-3">Email Notifications</h6>
+                  <div className="card bg-light border-0 mb-4">
                     <div className="card-body">
-                      <div className="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                          <strong>Exam Alerts</strong>
-                          <p className="text-muted mb-0 small">Receive notifications when exams start or end</p>
+                      {[
+                        { key: "examAlerts",     label: "Exam Alerts",         sub: "Receive notifications when exams start or end"          },
+                        { key: "cheatingAlerts", label: "Cheating Alerts",     sub: "Get notified when suspicious behavior is detected"       },
+                        { key: "submissions",    label: "Student Submissions",  sub: "Notify when students complete their exams"              },
+                        { key: "systemUpdates",  label: "System Updates",      sub: "Receive notifications about maintenance and updates"     },
+                      ].map(({ key, label, sub }, idx, arr) => (
+                        <div key={key} className={`d-flex justify-content-between align-items-center ${idx < arr.length - 1 ? "mb-3 pb-3 border-bottom" : ""}`}>
+                          <div>
+                            <div className="fw-semibold small">{label}</div>
+                            <div className="text-muted" style={{ fontSize: 12 }}>{sub}</div>
+                          </div>
+                          <div className="form-check form-switch mb-0">
+                            <input className="form-check-input" type="checkbox"
+                              checked={notifToggles[key]}
+                              onChange={() => setNotifToggles((t) => ({ ...t, [key]: !t[key] }))}
+                              style={{ width: 40, height: 22 }} />
+                          </div>
                         </div>
-                        <div className="form-check form-switch">
-                          <input className="form-check-input" type="checkbox" id="examAlerts" defaultChecked />
-                        </div>
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                          <strong>Cheating Alerts</strong>
-                          <p className="text-muted mb-0 small">Get notified when suspicious behavior is detected</p>
-                        </div>
-                        <div className="form-check form-switch">
-                          <input className="form-check-input" type="checkbox" id="cheatingAlerts" defaultChecked />
-                        </div>
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                          <strong>Student Submissions</strong>
-                          <p className="text-muted mb-0 small">Notify when students complete their exams</p>
-                        </div>
-                        <div className="form-check form-switch">
-                          <input className="form-check-input" type="checkbox" id="submissions" defaultChecked />
-                        </div>
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center">
-                        <div>
-                          <strong>System Updates</strong>
-                          <p className="text-muted mb-0 small">Receive notifications about system maintenance and updates</p>
-                        </div>
-                        <div className="form-check form-switch">
-                          <input className="form-check-input" type="checkbox" id="systemUpdates" />
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
 
-                  <h6 className="fw-bold mb-3 mt-4">Notification Preferences</h6>
+                  <h6 className="fw-semibold mb-3">Notification Preferences</h6>
                   <div className="card bg-light border-0">
                     <div className="card-body">
-                      <div className="mb-3">
-                        <label className="form-label">Alert Frequency</label>
-                        <select className="form-select">
-                          <option selected>Real-time</option>
-                          <option>Hourly Digest</option>
-                          <option>Daily Summary</option>
-                        </select>
-                      </div>
-                      <div className="mb-3">
-                        <label className="form-label">CPI Threshold for Alerts</label>
-                        <input type="number" className="form-control" value="50" />
-                        <small className="text-muted">Alert me when student CPI exceeds this percentage</small>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Monitoring Settings Tab */}
-                <div id="monitoring" className="tab-pane fade">
-                  <h6 className="fw-bold mb-3">Default Exam Monitoring Settings</h6>
-                  <p className="text-muted">These settings will be applied to all new exams by default</p>
-                  
-                  <div className="card bg-light border-0 mb-3">
-                    <div className="card-body">
-                      <div className="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                          <strong>Face Detection</strong>
-                          <p className="text-muted mb-0 small">Monitor student presence through webcam</p>
+                      <div className="row g-3">
+                        <div className="col-md-6">
+                          <label className="form-label fw-semibold small">Alert Frequency</label>
+                          <select className="form-select">
+                            <option>Real-time</option>
+                            <option>Hourly Digest</option>
+                            <option>Daily Summary</option>
+                          </select>
                         </div>
-                        <div className="form-check form-switch">
-                          <input className="form-check-input" type="checkbox" id="faceDetection" defaultChecked />
-                        </div>
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                          <strong>Tab Switching Detection</strong>
-                          <p className="text-muted mb-0 small">Track when students switch browser tabs</p>
-                        </div>
-                        <div className="form-check form-switch">
-                          <input className="form-check-input" type="checkbox" id="tabSwitching" defaultChecked />
-                        </div>
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                          <strong>Mouse Activity Tracking</strong>
-                          <p className="text-muted mb-0 small">Monitor mouse movement patterns</p>
-                        </div>
-                        <div className="form-check form-switch">
-                          <input className="form-check-input" type="checkbox" id="mouseTracking" defaultChecked />
-                        </div>
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                          <strong>Keyboard Pattern Analysis</strong>
-                          <p className="text-muted mb-0 small">Analyze typing patterns and speed</p>
-                        </div>
-                        <div className="form-check form-switch">
-                          <input className="form-check-input" type="checkbox" id="keyboardPatterns" defaultChecked />
-                        </div>
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center">
-                        <div>
-                          <strong>Screen Recording</strong>
-                          <p className="text-muted mb-0 small">Record student screen during exam</p>
-                        </div>
-                        <div className="form-check form-switch">
-                          <input className="form-check-input" type="checkbox" id="screenRecording" />
+                        <div className="col-md-6">
+                          <label className="form-label fw-semibold small">CPI Threshold for Alerts</label>
+                          <div className="input-group">
+                            <input type="number" className="form-control" defaultValue={50} min={0} max={100} />
+                            <span className="input-group-text">%</span>
+                          </div>
+                          <div className="form-text">Alert when student CPI exceeds this value.</div>
                         </div>
                       </div>
                     </div>
                   </div>
+                </>
+              )}
 
-                  <h6 className="fw-bold mb-3 mt-4">Anomaly Detection Algorithms</h6>
-                  <div className="card bg-light border-0">
+              {/* ── MONITORING ── */}
+              {activeTab === "monitoring" && (
+                <>
+                  <h6 className="fw-semibold mb-1">Default Exam Monitoring Settings</h6>
+                  <p className="text-muted small mb-3">These settings apply to all new exams by default.</p>
+
+                  <div className="card bg-light border-0 mb-4">
                     <div className="card-body">
-                      <div className="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                          <strong>Isolation Forest Algorithm</strong>
-                          <p className="text-muted mb-0 small">Primary anomaly detection method</p>
+                      {[
+                        { key: "tabSwitching",    label: "Tab Switching Detection",   sub: "Track when students switch browser tabs" },
+                        { key: "keyboardPatterns",label: "Keyboard Pattern Analysis",  sub: "Analyze typing patterns and speed"      },
+                      ].map(({ key, label, sub }, idx, arr) => (
+                        <div key={key} className={`d-flex justify-content-between align-items-center ${idx < arr.length - 1 ? "mb-3 pb-3 border-bottom" : ""}`}>
+                          <div>
+                            <div className="fw-semibold small">{label}</div>
+                            <div className="text-muted" style={{ fontSize: 12 }}>{sub}</div>
+                          </div>
+                          <div className="form-check form-switch mb-0">
+                            <input className="form-check-input" type="checkbox"
+                              checked={monitorToggles[key]}
+                              onChange={() => setMonitorToggles((t) => ({ ...t, [key]: !t[key] }))}
+                              style={{ width: 40, height: 22 }} />
+                          </div>
                         </div>
-                        <div className="form-check form-switch">
-                          <input className="form-check-input" type="checkbox" id="isolationForest" defaultChecked />
-                        </div>
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center">
-                        <div>
-                          <strong>One-Class SVM Algorithm</strong>
-                          <p className="text-muted mb-0 small">Secondary validation method</p>
-                        </div>
-                        <div className="form-check form-switch">
-                          <input className="form-check-input" type="checkbox" id="oneClassSVM" defaultChecked />
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
 
-                  <h6 className="fw-bold mb-3 mt-4">Detection Sensitivity</h6>
-                  <div className="card bg-light border-0">
+                  <h6 className="fw-semibold mb-3">Anomaly Detection Algorithms</h6>
+                  <div className="card bg-light border-0 mb-4">
                     <div className="card-body">
-                      <label className="form-label">Anomaly Detection Sensitivity</label>
-                      <input type="range" className="form-range" min="1" max="5" defaultValue="3" />
+                      {[
+                        { key: "isolationForest", label: "Isolation Forest (IF)",  sub: "Primary anomaly detection method"   },
+                        { key: "oneClassSVM",     label: "One-Class SVM",          sub: "Secondary validation method"        },
+                      ].map(({ key, label, sub }, idx, arr) => (
+                        <div key={key} className={`d-flex justify-content-between align-items-center ${idx < arr.length - 1 ? "mb-3 pb-3 border-bottom" : ""}`}>
+                          <div>
+                            <div className="fw-semibold small">{label}</div>
+                            <div className="text-muted" style={{ fontSize: 12 }}>{sub}</div>
+                          </div>
+                          <div className="form-check form-switch mb-0">
+                            <input className="form-check-input" type="checkbox"
+                              checked={monitorToggles[key]}
+                              onChange={() => setMonitorToggles((t) => ({ ...t, [key]: !t[key] }))}
+                              style={{ width: 40, height: 22 }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <h6 className="fw-semibold mb-3">Detection Sensitivity</h6>
+                  <div className="card bg-light border-0 mb-4">
+                    <div className="card-body">
+                      <label className="form-label fw-semibold small">
+                        Sensitivity: <span className="text-primary">{["", "Low", "Low-Medium", "Medium", "Medium-High", "High"][sensitivity]}</span>
+                      </label>
+                      <input type="range" className="form-range" min={1} max={5}
+                        value={sensitivity} onChange={(e) => setSensitivity(Number(e.target.value))} />
                       <div className="d-flex justify-content-between">
-                        <small className="text-muted">Low (Fewer alerts)</small>
+                        <small className="text-muted">Low (fewer alerts)</small>
                         <small className="text-muted">Medium</small>
-                        <small className="text-muted">High (More alerts)</small>
+                        <small className="text-muted">High (more alerts)</small>
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-4">
-                    <button className="btn btn-primary">Save Monitoring Settings</button>
-                  </div>
-                </div>
-              </div>
+                  <button className="btn btn-primary">
+                    <i className="bi bi-check-lg me-2"></i>Save Monitoring Settings
+                  </button>
+                </>
+              )}
+
             </div>
           </div>
         </div>

@@ -6,12 +6,13 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
     /**
      * Register a new user
-     * 
+     *
      * This method handles user registration with validation and automatic login.
      * It accepts user details, validates them, creates a new user record, and logs them in.
      */
@@ -30,9 +31,9 @@ class AuthController extends Controller
                     'required',
                     'string',
                     'min:8',
-                    'regex:/[a-z]/',       // at least one lowercase
-                    'regex:/[A-Z]/',       // at least one uppercase
-                    'regex:/[0-9]/',       // at least one number
+                    'regex:/[a-z]/',      // at least one lowercase
+                    'regex:/[A-Z]/',      // at least one uppercase
+                    'regex:/[0-9]/',      // at least one number
                     'regex:/[@$!%*#?&]/', // at least one special char
                 ],
                 'role' => 'required|in:admin,instructor,student',
@@ -48,6 +49,16 @@ class AuthController extends Controller
                 'role'     => $validated['role'],
             ]);
 
+            if ($user->role === 'student') {
+                DB::table('course_students')->insertOrIgnore([
+                    'course_id'   => (int) env('DEMO_COURSE_ID', 1),
+                    'student_id'  => $user->id,
+                    'enrolled_at' => now(),
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
+                ]);
+            }
+
             // Log the user in immediately after registration
             // This creates an authenticated session for the new user
             Auth::login($user);
@@ -59,12 +70,7 @@ class AuthController extends Controller
             // Return success response with user data (excluding password)
             return response()->json([
                 'message' => 'Registration successful!',
-                'user' => [
-                    'id'    => $user->id,
-                    'name'  => $user->name,
-                    'email' => $user->email,
-                    'role'  => $user->role,
-                ],
+                'user'    => $this->formatUser($user),
             ], 201); // 201 = Created
 
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -85,7 +91,7 @@ class AuthController extends Controller
 
     /**
      * Login user
-     * 
+     *
      * This method authenticates a user with email and password.
      * It verifies credentials and creates an authenticated session.
      */
@@ -122,12 +128,7 @@ class AuthController extends Controller
             // Return success response with user data
             return response()->json([
                 'message' => 'Login successful',
-                'user' => [
-                    'id'    => $user->id,
-                    'name'  => $user->name,
-                    'email' => $user->email,
-                    'role'  => $user->role,
-                ],
+                'user'    => $this->formatUser($user),
             ], 200); // 200 = OK
 
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -148,7 +149,7 @@ class AuthController extends Controller
 
     /**
      * Logout user
-     * 
+     *
      * This method logs out the currently authenticated user.
      * It destroys the session and invalidates the CSRF token.
      */
@@ -173,7 +174,7 @@ class AuthController extends Controller
 
     /**
      * Get authenticated user
-     * 
+     *
      * This method returns the currently authenticated user's information.
      * It's used to check if a user is logged in and get their details.
      */
@@ -192,12 +193,25 @@ class AuthController extends Controller
 
         // Return the authenticated user's data
         return response()->json([
-            'user' => [
-                'id'    => $user->id,
-                'name'  => $user->name,
-                'email' => $user->email,
-                'role'  => $user->role,
-            ],
+            'user' => $this->formatUser($user),
         ], 200); // 200 = OK
+    }
+
+    /**
+     * Consistent user shape returned by register, login, and me.
+     * Centralised here so all three endpoints stay in sync automatically.
+     */
+    private function formatUser(User $user): array
+    {
+        return [
+            'id'         => $user->id,
+            'name'       => $user->name,
+            'email'      => $user->email,
+            'role'       => $user->role,
+            'status'     => $user->status ?? 'active',
+            'phone'      => $user->phone,
+            'course'     => $user->course,
+            'year_level' => $user->year_level,
+        ];
     }
 }

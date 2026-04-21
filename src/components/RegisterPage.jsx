@@ -155,8 +155,6 @@ const RegisterPage = () => {
               disabled={loading}
             >
               <option value="student">Student</option>
-              <option value="instructor">Instructor</option>
-              <option value="admin">Admin</option>
             </select>
             {errors.role && <div className="invalid-feedback">{errors.role[0]}</div>}
           </div>

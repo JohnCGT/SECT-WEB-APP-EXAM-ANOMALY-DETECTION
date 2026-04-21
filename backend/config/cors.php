@@ -22,7 +22,10 @@ return [
     | Add your React dev server URLs here
     |--------------------------------------------------------------------------
     */
-    'allowed_origins' => ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'],
+    'allowed_origins' => [
+        'https://sectexam.app',
+        'https://www.sectexam.app',
+    ],
 
     'allowed_origins_patterns' => [],
 

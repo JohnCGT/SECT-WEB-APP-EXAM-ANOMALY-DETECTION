@@ -37,7 +37,7 @@ class StudentCourseController extends Controller
                 // Eager load exams with filtering
                 'exams' => function ($q) {
                     // Only include exams with these specific statuses
-                    $q->whereIn('status', ['scheduled', 'active', 'completed'])
+                    $q->whereIn('status', ['published', 'scheduled', 'active', 'completed'])
                       // Select only necessary exam fields to reduce data transfer
                       ->select(
                           'id', 'course_id', 'title', 'type',
@@ -99,7 +99,7 @@ class StudentCourseController extends Controller
                 // Eager load exams with filtering
                 'exams' => function ($q) {
                     // Only include exams that are scheduled, active, or completed
-                    $q->whereIn('status', ['scheduled', 'active', 'completed'])
+                    $q->whereIn('status', ['published', 'scheduled', 'active', 'completed'])
                       // Order by start time (earliest first)
                       ->orderBy('start_time');
                 },
