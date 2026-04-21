@@ -53,9 +53,17 @@ createRoot(document.getElementById("root")).render(
     <BrowserRouter>
       <Routes>
 
-        {/* ── Public ───────────────────────────────────────────────────────── */}
-        <Route path="/"          element={<LoginPage />} />
-        <Route path="/register"  element={<RegisterPage />} />
+        {/* ── Public: Student (default) ─────────────────────────────────────── */}
+        <Route path="/"         element={<LoginPage role="student" />} />
+        <Route path="/register" element={<RegisterPage role="student" />} />
+
+        {/* ── Public: Instructor ───────────────────────────────────────────── */}
+        <Route path="/instructor/login"    element={<LoginPage role="instructor" />} />
+        <Route path="/instructor/register" element={<RegisterPage role="instructor" />} />
+
+        {/* ── Public: Admin ────────────────────────────────────────────────── */}
+        <Route path="/admin/login" element={<LoginPage role="admin" />} />
+        {/* No public register for admin */}
 
         {/* ── Instructor ───────────────────────────────────────────────────── */}
         <Route
