@@ -42,30 +42,36 @@ class AuthController extends Controller
             // Create new user in the database
             // Email is converted to lowercase for consistency
             // Password is hashed using bcrypt before storage
-            $user = User::create([
-                'name'     => $validated['name'],
-                'email'    => strtolower($validated['email']),
-                'password' => Hash::make($validated['password']),
-                'role'     => $validated['role'],
-            ]);
+            // Wrapped in a DB transaction so if anything fails, the user is NOT saved to the database
+            $user = DB::transaction(function () use ($validated, $request) {
 
-            if ($user->role === 'student') {
-                DB::table('course_students')->insertOrIgnore([
-                    'course_id'   => (int) env('DEMO_COURSE_ID', 1),
-                    'student_id'  => $user->id,
-                    'enrolled_at' => now(),
-                    'created_at'  => now(),
-                    'updated_at'  => now(),
+                $user = User::create([
+                    'name'     => $validated['name'],
+                    'email'    => strtolower($validated['email']),
+                    'password' => Hash::make($validated['password']),
+                    'role'     => $validated['role'],
                 ]);
-            }
 
-            // Log the user in immediately after registration
-            // This creates an authenticated session for the new user
-            Auth::login($user);
+                if ($user->role === 'student') {
+                    DB::table('course_students')->insertOrIgnore([
+                        'course_id'   => (int) env('DEMO_COURSE_ID', 1),
+                        'student_id'  => $user->id,
+                        'enrolled_at' => now(),
+                        'created_at'  => now(),
+                        'updated_at'  => now(),
+                    ]);
+                }
 
-            // Regenerate session to prevent fixation attacks
-            // This creates a new session ID to enhance security
-            $request->session()->regenerate();
+                // Log the user in immediately after registration
+                // This creates an authenticated session for the new user
+                Auth::login($user);
+
+                // Regenerate session to prevent fixation attacks
+                // This creates a new session ID to enhance security
+                $request->session()->regenerate();
+
+                return $user;
+            });
 
             // Return success response with user data (excluding password)
             return response()->json([
