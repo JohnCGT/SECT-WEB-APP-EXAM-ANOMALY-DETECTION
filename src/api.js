@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://sectexam.app/';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://sectexam.app'; // ← removed trailing slash
 
 const API = axios.create({
-    baseURL: `${BASE_URL}/api`,
+    baseURL: `${BASE_URL}/api`, // was: `${BASE_URL}/api` → was producing `https://sectexam.app//api`
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -12,7 +12,7 @@ const API = axios.create({
 });
 
 export const fetchCsrfToken = () =>
-    axios.get(`${BASE_URL}/sanctum/csrf-cookie`, {
+    axios.get(`${BASE_URL}/sanctum/csrf-cookie`, { // now correctly: `https://sectexam.app/sanctum/csrf-cookie`
         withCredentials: true,
     });
 
