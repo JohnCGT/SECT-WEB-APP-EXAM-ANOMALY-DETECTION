@@ -16,7 +16,8 @@ const NAV_ITEMS = [
   { to: "/instructor/account-settings", icon: "bi-gear",                 label: "Settings"  },
 ];
 
-const BLANK_FORM = { name: "", code: "", description: "" };
+// ── Added semester and credits to blank form ──
+const BLANK_FORM = { name: "", code: "", description: "", semester: "", credits: 3 };
 
 export default function CoursesPage() {
   const navigate = useNavigate();
@@ -66,8 +67,11 @@ export default function CoursesPage() {
   /* ── Validation ── */
   const validate = () => {
     const e = {};
-    if (!form.name.trim()) e.name = "Course name is required.";
-    if (!form.code.trim()) e.code = "Course code is required.";
+    if (!form.name.trim())   e.name    = "Course name is required.";
+    if (!form.code.trim())   e.code    = "Course code is required.";
+    const cr = Number(form.credits);
+    if (!form.credits || isNaN(cr) || cr < 1 || cr > 6)
+      e.credits = "Credits must be between 1 and 6.";
     setErrors(e);
     return !Object.keys(e).length;
   };
@@ -81,10 +85,17 @@ export default function CoursesPage() {
     setShowModal(true);
   };
 
+  // ── Include semester and credits when opening edit ──
   const openEdit = (course) => {
     setModalMode("edit");
     setSelected(course);
-    setForm({ name:course.name, code:course.code, description:course.description||"" });
+    setForm({
+      name:        course.name,
+      code:        course.code,
+      description: course.description || "",
+      semester:    course.semester    || "",
+      credits:     course.credits     ?? 3,
+    });
     setErrors({});
     setShowModal(true);
   };
@@ -157,12 +168,7 @@ export default function CoursesPage() {
     } catch { setSearchResults([]); }
   };
 
-  /* ── Enroll student ──
-     Backend CourseStudentController@store expects:
-       { mode: "existing", email: string }   ← enroll existing account by email
-       { mode: "new", name, new_email, password }  ← create + enroll new account
-     We always use "existing" here since we searched for the student first.
-  ── */
+  /* ── Enroll student ── */
   const handleEnroll = async (student) => {
     if (!expandedCourse) return;
     const already = (enrolledMap[expandedCourse] || []).find(s => s.id === student.id);
@@ -332,11 +338,23 @@ export default function CoursesPage() {
                           {course.code}
                         </div>
                         <div className="flex-grow-1">
-                          <div className="d-flex align-items-center gap-2 mb-1">
+                          <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
                             <h6 className="mb-0 fw-semibold">{course.name}</h6>
                             <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
                               {course.code}
                             </span>
+                            {/* ── New: semester badge ── */}
+                            {course.semester && (
+                              <span className="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25">
+                                <i className="bi bi-calendar3 me-1"></i>{course.semester}
+                              </span>
+                            )}
+                            {/* ── New: credits badge ── */}
+                            {course.credits != null && (
+                              <span className="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">
+                                {course.credits} cr
+                              </span>
+                            )}
                           </div>
                           {course.description && <p className="text-muted small mb-1">{course.description}</p>}
                           <div className="d-flex gap-3">
@@ -473,7 +491,7 @@ export default function CoursesPage() {
         </div>
       </div>
 
-      {/* ── Course Modal (React-controlled, no Bootstrap JS dependency) ── */}
+      {/* ── Course Modal ── */}
       {showModal && (
         <div className="modal show d-block" style={{backgroundColor:"rgba(0,0,0,0.5)"}}
           onClick={e => { if (e.target === e.currentTarget && !saving) setShowModal(false); }}>
@@ -487,6 +505,8 @@ export default function CoursesPage() {
                 <button type="button" className="btn-close" onClick={() => setShowModal(false)} disabled={saving}/>
               </div>
               <div className="modal-body">
+
+                {/* Course Name */}
                 <div className="mb-3">
                   <label className="form-label fw-semibold">Course Name <span className="text-danger">*</span></label>
                   <input type="text"
@@ -498,6 +518,8 @@ export default function CoursesPage() {
                     disabled={saving}/>
                   {errors.name && <div className="invalid-feedback">{errors.name}</div>}
                 </div>
+
+                {/* Course Code */}
                 <div className="mb-3">
                   <label className="form-label fw-semibold">Course Code <span className="text-danger">*</span></label>
                   <input type="text"
@@ -509,6 +531,38 @@ export default function CoursesPage() {
                     disabled={saving}/>
                   {errors.code && <div className="invalid-feedback">{errors.code}</div>}
                 </div>
+
+                {/* ── New: Semester + Credits side-by-side ── */}
+                <div className="row g-3 mb-3">
+                  <div className="col-8">
+                    <label className="form-label fw-semibold">
+                      Semester <span className="text-muted fw-normal">(optional)</span>
+                    </label>
+                    <input type="text"
+                      className="form-control"
+                      placeholder="e.g. Fall 2026"
+                      value={form.semester}
+                      onChange={e => setForm(f => ({...f, semester: e.target.value}))}
+                      maxLength={50}
+                      disabled={saving}/>
+                  </div>
+                  <div className="col-4">
+                    <label className="form-label fw-semibold">
+                      Credits <span className="text-danger">*</span>
+                    </label>
+                    <input type="number"
+                      className={`form-control ${errors.credits?"is-invalid":""}`}
+                      placeholder="3"
+                      value={form.credits}
+                      onChange={e => setForm(f => ({...f, credits: e.target.value}))}
+                      min={1}
+                      max={6}
+                      disabled={saving}/>
+                    {errors.credits && <div className="invalid-feedback">{errors.credits}</div>}
+                  </div>
+                </div>
+
+                {/* Description */}
                 <div className="mb-1">
                   <label className="form-label fw-semibold">Description <span className="text-muted fw-normal">(optional)</span></label>
                   <textarea className="form-control" rows={3}
@@ -519,6 +573,7 @@ export default function CoursesPage() {
                     disabled={saving}/>
                   <div className="form-text text-end">{form.description.length}/500</div>
                 </div>
+
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-outline-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>

@@ -142,15 +142,15 @@ async function generateStudentPDF(data) {
     }
     y += 22;
     doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(...MUTED);
-    doc.text("CPI = (0.35 x SVM) + (0.25 x IsoForest-Tab) + (0.25 x IsoForest-RT) + (0.15 x HMM)", ML, y);
+    doc.text("CPI = (0.40 x SVM) + (0.30 x IsoForest-Tab) + (0.15 x IsoForest-RT) + (0.15 x HMM)", ML, y);
     y += 5;
     doc.autoTable({
       startY:y, margin:{left:ML,right:MR}, tableWidth:CW,
       head:[["Algorithm","Raw Score","Flag","Event Count","Weight"]],
       body:[
-        ["One-Class SVM",          integrity.svm_score     != null ? integrity.svm_score.toFixed(4)     : "-", integrity.svm_flagged     ? "Flagged":"OK", `Shortcuts: ${integrity.keyboard_shortcut_count}`,       "0.35"],
-        ["Isolation Forest (Tab)", integrity.iso_tab_score != null ? integrity.iso_tab_score.toFixed(4) : "-", integrity.iso_tab_flagged ? "Flagged":"OK", `Tab switches: ${integrity.tab_switch_count}`,            "0.25"],
-        ["Isolation Forest (RT)",  integrity.rt_score      != null ? integrity.rt_score.toFixed(4)      : "-", integrity.rt_flagged      ? "Flagged":"OK", `Response anomalies: ${integrity.response_time_anomaly_count}`, "0.25"],
+        ["One-Class SVM",          integrity.svm_score     != null ? integrity.svm_score.toFixed(4)     : "-", integrity.svm_flagged     ? "Flagged":"OK", `Shortcuts: ${integrity.keyboard_shortcut_count}`,       "0.40"],
+        ["Isolation Forest (Tab)", integrity.iso_tab_score != null ? integrity.iso_tab_score.toFixed(4) : "-", integrity.iso_tab_flagged ? "Flagged":"OK", `Tab switches: ${integrity.tab_switch_count}`,            "0.30"],
+        ["Isolation Forest (RT)",  integrity.rt_score      != null ? integrity.rt_score.toFixed(4)      : "-", integrity.rt_flagged      ? "Flagged":"OK", `Response anomalies: ${integrity.response_time_anomaly_count}`, "0.15"],
         ["Hidden Markov Model",    integrity.hmm_score     != null ? integrity.hmm_score.toFixed(4)     : "-", integrity.hmm_flagged     ? "Flagged":"OK", `Keystroke anomalies: ${integrity.keystroke_anomaly_count}`,     "0.15"],
       ],
       headStyles:{fillColor:PURPLE,textColor:255,fontSize:7,fontStyle:"bold"},
