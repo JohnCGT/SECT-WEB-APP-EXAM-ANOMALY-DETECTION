@@ -54,11 +54,15 @@ const LoginPage = ({ role: fixedRole }) => {
       const { user } = data;
 
       if (fixedRole && user.role !== fixedRole) {
+        // Destroy the server session immediately so no lingering auth exists
+        try { await API.post("/logout"); } catch (_) {}
+        localStorage.removeItem("user");
+
         await Swal.fire({
           icon: "error", title: "Access Denied",
           text: `This login page is for ${fixedRole}s only.`,
         });
-        return;
+        return;  // Stays on the current page, no redirect
       }
 
       localStorage.setItem("user", JSON.stringify(user));
