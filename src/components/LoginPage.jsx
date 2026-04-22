@@ -182,11 +182,6 @@ const LoginPage = ({ role: fixedRole }) => {
               </p>
             )}
 
-            <p className="auth-system-note">
-              <i className="bi bi-shield-lock" />
-              SECT v2.0 · All sessions are monitored
-            </p>
-
           </div>
         </div>
 

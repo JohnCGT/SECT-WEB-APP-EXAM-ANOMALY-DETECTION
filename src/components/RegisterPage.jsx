@@ -218,11 +218,6 @@ const RegisterPage = ({ role: fixedRole }) => {
               <Link to={loginLink} className="auth-link">Sign in here</Link>
             </p>
 
-            <p className="auth-system-note">
-              <i className="bi bi-shield-lock" />
-              SECT v2.0 · All sessions are monitored
-            </p>
-
           </div>
         </div>
 
