@@ -77,7 +77,7 @@ const ExamPage = () => {
             }
           } catch { localStorage.removeItem(CACHE_KEY); }
         }
-  
+
         const userRes = await API.get("/me");
         setUser(userRes.data.user);
         setLoading(false);
@@ -346,6 +346,17 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
     start_time:"", end_time:"", duration_minutes:60,
   });
   const [submitting, setSubmitting] = useState(false);
+  const [freshCourses, setFreshCourses] = useState([]); // ← added
+
+  // ← added: fetch fresh courses every time modal opens
+  useEffect(() => {
+    if (!show) return;
+    API.get("/courses")
+      .then(res => setFreshCourses(res.data.courses || []))
+      .catch(() => setFreshCourses(courses));
+  }, [show]);
+
+  const displayCourses = freshCourses.length > 0 ? freshCourses : courses; // ← added
 
   const handleStartOrDuration = (field, value) => {
     const updated = { ...formData, [field]:value };
@@ -372,7 +383,7 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
   };
 
   if (!show) return null;
-  const hasCourses = courses.length > 0;
+  const hasCourses = displayCourses.length > 0; // ← was: courses.length > 0
 
   return (
     <div className="modal show d-block" style={{backgroundColor:"rgba(0,0,0,0.5)"}}
@@ -403,7 +414,8 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
                     onChange={e => setFormData({...formData,course_id:e.target.value})}
                     required disabled={submitting||!hasCourses}>
                     <option value="">{hasCourses?"Select a course…":"No courses available"}</option>
-                    {courses.map(c => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+                    {displayCourses.map(c => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+                    {/* ← was: courses.map(...) */}
                   </select>
                 </div>
                 <div className="col-md-8">
