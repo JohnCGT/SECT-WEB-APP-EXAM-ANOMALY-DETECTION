@@ -66,11 +66,18 @@ const ExamPage = () => {
           try {
             const { data, timestamp } = JSON.parse(cached);
             if (Date.now() - timestamp < CACHE_DURATION) {
-              setUser(data.user); setCourses(data.courses); setExams(data.exams);
-              setLoading(false); setDataLoading(false); return;
+              const meRes = await API.get("/me");
+              const freshUser = meRes.data.user;
+              if (data.user.id !== freshUser.id) {
+                localStorage.removeItem(CACHE_KEY); // ← stale cache, fall through
+              } else {
+                setUser(data.user); setCourses(data.courses); setExams(data.exams);
+                setLoading(false); setDataLoading(false); return;
+              }
             }
           } catch { localStorage.removeItem(CACHE_KEY); }
         }
+  
         const userRes = await API.get("/me");
         setUser(userRes.data.user);
         setLoading(false);
