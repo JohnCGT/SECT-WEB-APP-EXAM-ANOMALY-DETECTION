@@ -59,7 +59,7 @@ const Homepage = () => {
   const handleLogout = async () => {
     try { await API.post("/logout"); } catch {}
     localStorage.removeItem("user");
-    navigate("/instructor/login");
+    window.location.href = "/instructor/login";
   };
 
   const stats = {
