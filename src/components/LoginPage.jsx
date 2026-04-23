@@ -42,6 +42,8 @@ const LoginPage = ({ role: fixedRole }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError("");
+    localStorage.removeItem("user");
 
     try {
       await fetchCsrfToken();
