@@ -22,9 +22,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# Custom ignores
-backend/.env
-backend/config/cors.php
-vite.config.js
-src/api.js
