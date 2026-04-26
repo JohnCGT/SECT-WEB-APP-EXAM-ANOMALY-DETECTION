@@ -152,7 +152,6 @@ const Dashboard = () => {
 
   const handleLogout = async () => {
     try { await API.post("/logout"); } catch {}
-    localStorage.removeItem("user");
     navigate("/");
   };
 

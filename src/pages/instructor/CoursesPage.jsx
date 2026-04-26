@@ -60,8 +60,6 @@ export default function CoursesPage() {
   /* ── Logout ── */
   const handleLogout = async () => {
     try { await API.post("/logout"); } catch {}
-    localStorage.removeItem("user");
-    localStorage.removeItem("examPageData");
     window.location.href = "/instructor/login";
   };
 

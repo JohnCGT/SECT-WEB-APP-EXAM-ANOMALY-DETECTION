@@ -58,7 +58,6 @@ const Homepage = () => {
 
   const handleLogout = async () => {
     try { await API.post("/logout"); } catch {}
-    localStorage.removeItem("user");
     window.location.href = "/instructor/login";
   };
 

@@ -117,7 +117,6 @@ function AvatarDropdown() {
   }, []);
   const handleLogout = async () => {
     try { await api("POST", "/logout"); } catch {}
-    localStorage.removeItem("user");
     navigate("/");
   };
   return (

@@ -206,7 +206,7 @@ const CourseExamPage = () => {
 
   const handleLogout = async () => {
     try { await API.post("/logout"); } catch {}
-    localStorage.removeItem("user"); navigate("/");
+    navigate("/");
   };
 
   if (loading) return (

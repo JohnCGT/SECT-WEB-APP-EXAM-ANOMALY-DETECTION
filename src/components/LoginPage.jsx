@@ -42,7 +42,6 @@ const LoginPage = ({ role: fixedRole }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    localStorage.removeItem("user");
 
     try {
       await fetchCsrfToken();
@@ -57,16 +56,14 @@ const LoginPage = ({ role: fixedRole }) => {
       if (fixedRole && user.role !== fixedRole) {
         // Destroy the server session immediately so no lingering auth exists
         try { await API.post("/logout"); } catch (_) {}
-        localStorage.removeItem("user");
 
         await Swal.fire({
           icon: "error", title: "Access Denied",
           text: `This login page is for ${fixedRole}s only.`,
         });
-        return;  // Stays on the current page, no redirect
+        return; // Stays on the current page, no redirect
       }
 
-      localStorage.setItem("user", JSON.stringify(user));
       await toastMixin.fire({ icon: "success", title: `Welcome back, ${user.name}!` });
       navigate(ROLE_ROUTES[user.role] ?? "/");
 
@@ -214,8 +211,8 @@ const MobileHeader = () => (
       <div className="mobile-hero-stats">
         {[
           { value: "Online",  label: "Examination" },
-          { value: "Anomaly",    label: "Detection" },
-          { value: "User",       label: "Monitoring" },
+          { value: "Anomaly", label: "Detection"   },
+          { value: "User",    label: "Monitoring"  },
         ].map(({ value, label }) => (
           <div key={label} className="mobile-stat-chip">
             <span className="mobile-stat-value">{value}</span>
@@ -328,12 +325,6 @@ const STYLES = `
     height: -webkit-fill-available;
   }
 
-  /* ════════════════════════════════════════════
-     VISIBILITY GUARDS
-     Mobile layout shown only on ≤768 px.
-     Desktop layout shown only on ≥769 px.
-  ════════════════════════════════════════════ */
-
   .mobile-page  { display: none; }
   .desktop-page { display: flex; min-height: 100vh; min-height: 100dvh; }
 
@@ -342,11 +333,6 @@ const STYLES = `
     .desktop-page { display: none; }
   }
 
-  /* ════════════════════════════════════════════
-     MOBILE LAYOUT
-  ════════════════════════════════════════════ */
-
-  /* ── Hero banner ─────────────────────────── */
   .mobile-hero {
     background: var(--blue);
     padding: 28px 20px 36px;
@@ -357,7 +343,6 @@ const STYLES = `
     overflow: hidden;
   }
 
-  /* Subtle dot-grid texture on hero */
   .mobile-hero::after {
     content: '';
     position: absolute; inset: 0;
@@ -395,7 +380,6 @@ const STYLES = `
     letter-spacing: .05em; text-transform: uppercase; margin-top: 3px;
   }
 
-  /* Stats row inside mobile hero */
   .mobile-hero-stats {
     display: flex; gap: 8px;
   }
@@ -419,11 +403,9 @@ const STYLES = `
     text-transform: uppercase; letter-spacing: .05em; font-weight: 500;
   }
 
-  /* ── Form area ───────────────────────────── */
   .mobile-form-wrap {
     flex: 1;
     overflow-y: auto;
-    /* Pull the card up to overlap the hero banner */
     margin-top: -20px;
     padding: 0 16px 32px;
     padding-bottom: max(32px, env(safe-area-inset-bottom));
@@ -437,7 +419,6 @@ const STYLES = `
     transform: translateY(0) !important;
   }
 
-  /* Card that overlaps hero */
   .mobile-card {
     background: #fff;
     border-radius: 20px;
@@ -445,7 +426,6 @@ const STYLES = `
     padding: 28px 20px 24px;
   }
 
-  /* ── Very small phones (≤360px) ─────────── */
   @media (max-width: 360px) {
     .mobile-hero       { padding: 20px 16px 30px; }
     .mobile-form-wrap  { padding: 0 12px 24px; }
@@ -453,16 +433,11 @@ const STYLES = `
     .mobile-wordmark   { font-size: 1.25rem; }
   }
 
-  /* ════════════════════════════════════════════
-     DESKTOP LAYOUT  (≥769px — unchanged)
-  ════════════════════════════════════════════ */
-
   .desktop-page {
     background: var(--blue-xlt);
     font-family: var(--sans);
   }
 
-  /* ── Brand panel ─────────────────────────── */
   .auth-brand-panel {
     width: 46%;
     background: var(--blue);
@@ -549,7 +524,6 @@ const STYLES = `
     text-transform: uppercase; letter-spacing: .05em; font-weight: 500;
   }
 
-  /* ── Form panel ──────────────────────────── */
   .auth-form-panel {
     flex: 1; display: flex;
     align-items: center; justify-content: center;
@@ -564,19 +538,12 @@ const STYLES = `
 
   .auth-form-card { width: 100%; max-width: 400px; }
 
-  /* ── Tablet (769–1024px) ─────────────────── */
   @media (min-width: 769px) and (max-width: 1024px) {
     .auth-brand-panel { width: 40%; padding: 2.5rem 2rem; }
     .auth-wordmark    { font-size: 2rem; }
     .auth-form-panel  { padding: 2rem 1.5rem; }
   }
 
-  /* ════════════════════════════════════════════
-     SHARED FORM ELEMENTS
-     Used by both mobile card and desktop panel.
-  ════════════════════════════════════════════ */
-
-  /* Form header */
   .auth-form-header { margin-bottom: 2rem; }
 
   .auth-role-badge {
@@ -596,7 +563,6 @@ const STYLES = `
 
   .auth-form-sub { margin-top: .45rem; font-size: .84rem; color: var(--slate); }
 
-  /* Fields */
   .auth-form  { display: flex; flex-direction: column; gap: 1.1rem; }
   .auth-field { display: flex; flex-direction: column; gap: .4rem; }
 
@@ -615,10 +581,8 @@ const STYLES = `
   .auth-input {
     width: 100%; background: #fff;
     border: 1px solid rgba(0,86,179,.15); border-radius: 10px;
-    /* Tall enough for comfortable thumb tapping (min 44px) */
     padding: .78rem .9rem .78rem 2.5rem;
     font-family: var(--sans);
-    /* 16px prevents iOS auto-zoom on focus */
     font-size: 16px;
     color: var(--text-dark); outline: none;
     transition: border-color .2s, box-shadow .2s;
@@ -636,7 +600,6 @@ const STYLES = `
   .auth-input-error { border-color: #ef4444 !important; }
   .auth-error-msg   { font-size: .78rem; color: #ef4444; }
 
-  /* Button */
   .auth-btn {
     display: flex; align-items: center; justify-content: center; gap: 8px;
     width: 100%; padding: .88rem; margin-top: .5rem;
@@ -646,7 +609,6 @@ const STYLES = `
     cursor: pointer;
     box-shadow: 0 4px 14px rgba(0,86,179,.30);
     transition: background .2s, box-shadow .2s, transform .1s;
-    /* Prevent double-tap zoom on mobile */
     touch-action: manipulation;
   }
 
@@ -659,7 +621,6 @@ const STYLES = `
   .auth-btn:active:not(:disabled) { transform: translateY(0); }
   .auth-btn:disabled { opacity: .6; cursor: not-allowed; }
 
-  /* Spinner */
   .auth-spinner {
     width: 15px; height: 15px;
     border: 2px solid rgba(255,255,255,.35);
@@ -670,7 +631,6 @@ const STYLES = `
 
   @keyframes auth-spin { to { transform: rotate(360deg); } }
 
-  /* Footer link */
   .auth-form-footer {
     text-align: center; margin-top: 1.5rem;
     font-size: .88rem; color: var(--slate);
