@@ -3,6 +3,24 @@
  *
  * ── Changes in this version ───────────────────────────────────────────────────
  *
+ *  MOBILE-FIX  Keystroke dynamics now work on mobile virtual keyboards.
+ *              iOS/Android soft keyboards often suppress keydown/keyup events,
+ *              so the collector previously captured nothing on mobile.
+ *              An `input` event listener is now attached alongside keyup.
+ *              It activates ONLY when a real keyup did not fire within 5 ms,
+ *              meaning desktop behaviour is completely unaffected — the keyup
+ *              path always wins on PC.
+ *              How it works:
+ *                • Every single-character insertion (delta === +1) fires the
+ *                  input handler when keyup was absent.
+ *                • A synthetic dwell of 80 ms (median tap-hold on mobile) is
+ *                  pushed to dwellTimes.
+ *                • Real flight times between taps are recorded via lastKeyUp.
+ *                • Deletions and large pastes are ignored (paste already handled
+ *                  by state.onPaste).
+ *                • The input listener is cleaned up in stop() alongside the
+ *                  other field listeners.
+ *
  *  FIX-IDLE  Keystroke dynamics now flush automatically after typing stops.
  *            Replaced the 30-second periodic interval with a per-keystroke
  *            idle-debounce timer (TYPING_IDLE_MS = 2000 ms by default).
@@ -40,7 +58,9 @@
  *  FIX-F — onWarning type string uses underscores
  */
 
-const TYPING_IDLE_MS = 2_000; // flush keystroke buffer this long after last keyup
+const TYPING_IDLE_MS      = 2_000; // flush keystroke buffer this long after last keyup
+const SYNTHETIC_DWELL_MS  = 80;    // synthetic dwell for mobile tap (median tap-hold duration)
+const KEYUP_GUARD_MS      = 5;     // if keyup fired within this window, input fallback skips
 
 export class AnomalyCollector {
   #examId     = null;
@@ -111,6 +131,7 @@ export class AnomalyCollector {
     for (const [el, state] of this.#fieldListeners) {
       el.removeEventListener('keydown', state.onKeydown);
       el.removeEventListener('keyup',   state.onKeyup);
+      el.removeEventListener('input',   state.onInput);   // MOBILE-FIX
       el.removeEventListener('paste',   state.onPaste);
       el.removeEventListener('blur',    state.onBlur);
     }
@@ -159,6 +180,10 @@ export class AnomalyCollector {
       totalChars:   0,
       pasteCount:   0,
       sessionStart: Date.now(),
+
+      // MOBILE-FIX: guards and length tracker for input-event fallback
+      _lastKeyupAt:  null,
+      _lastInputLen: fieldEl.value ? fieldEl.value.length : 0,
     };
 
     state.onKeydown = (e) => {
@@ -177,7 +202,41 @@ export class AnomalyCollector {
       state.lastKeyUp = Date.now();
       if (e.key.length === 1) state.totalChars++;
 
+      // MOBILE-FIX: stamp the time so the input fallback knows keyup fired
+      state._lastKeyupAt = Date.now();
+
       // FIX-IDLE: reset the idle debounce on every keyup
+      this.#resetIdleTimer(fieldEl, state);
+    };
+
+    // MOBILE-FIX: virtual keyboards on iOS/Android often suppress keydown/keyup.
+    // The `input` event fires reliably on all platforms whenever the value changes.
+    // We use it ONLY when a real keyup did NOT fire within KEYUP_GUARD_MS (5 ms),
+    // so PC behaviour is completely unaffected — the keyup path always wins on desktop.
+    state.onInput = (_e) => {
+      const now = Date.now();
+
+      // Desktop guard: if a real keyup just fired, the keyup path already handled it
+      if (state._lastKeyupAt !== null && now - state._lastKeyupAt <= KEYUP_GUARD_MS) return;
+
+      const newLen = fieldEl.value ? fieldEl.value.length : 0;
+      const delta  = newLen - state._lastInputLen;
+      state._lastInputLen = newLen;
+
+      // Only treat single-character insertions as synthetic keystrokes.
+      // Deletions (delta < 0) and large pastes (delta > 1) are ignored here —
+      // pastes are already handled by state.onPaste.
+      if (delta !== 1) return;
+
+      // Synthesise a dwell using the median tap-hold duration on mobile
+      state.dwellTimes.push(SYNTHETIC_DWELL_MS);
+
+      if (state.lastKeyUp !== null) {
+        state.flightTimes.push(now - state.lastKeyUp);
+      }
+      state.lastKeyUp = now;
+      state.totalChars++;
+
       this.#resetIdleTimer(fieldEl, state);
     };
 
@@ -186,6 +245,10 @@ export class AnomalyCollector {
       const text = (e.clipboardData || window.clipboardData)?.getData('text') ?? '';
       state.pasteCount++;
       state.totalChars += text.length;
+
+      // MOBILE-FIX: update length tracker so the input fallback doesn't
+      // double-count the characters that were just pasted
+      state._lastInputLen = fieldEl.value ? fieldEl.value.length : 0;
 
       this.#post('keyboard-shortcut', {
         keys:        'Paste',
@@ -212,6 +275,7 @@ export class AnomalyCollector {
 
     fieldEl.addEventListener('keydown', state.onKeydown);
     fieldEl.addEventListener('keyup',   state.onKeyup);
+    fieldEl.addEventListener('input',   state.onInput);   // MOBILE-FIX
     fieldEl.addEventListener('paste',   state.onPaste);
     fieldEl.addEventListener('blur',    state.onBlur);
     this.#fieldListeners.set(fieldEl, state);
@@ -264,6 +328,8 @@ export class AnomalyCollector {
       state.totalChars   = 0;
       state.pasteCount   = 0;
       state.sessionStart = Date.now();
+      // MOBILE-FIX: reset length tracker on full reset
+      state._lastInputLen = 0;
     } else {
       // Idle flush: clear keystroke buffers only, preserve cumulative counters
       state.dwellTimes  = [];
