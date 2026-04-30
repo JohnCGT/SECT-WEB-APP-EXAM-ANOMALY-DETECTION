@@ -1,4 +1,3 @@
-// src/pages/instructor/CourseDetail.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import API from "../../api";
@@ -12,14 +11,219 @@ const NAV_ITEMS = [
   { to: "/instructor/exams",            icon: "bi-file-earmark-text",    label: "Exams"     },
   { to: "/instructor/students",         icon: "bi-people",               label: "Students"  },
   { to: "/instructor/alerts",           icon: "bi-exclamation-triangle", label: "Alerts"    },
-  // { to: "/instructor/reports",          icon: "bi-bar-chart",            label: "Reports"   },
   { to: "/instructor/support",          icon: "bi-headset",              label: "Support"   },
   { to: "/instructor/account-settings", icon: "bi-gear",                 label: "Settings"  },
 ];
 
-/* ════════════════════════════════════════════
-   COURSE DETAIL PAGE  —  /instructor/courses/:id
-════════════════════════════════════════════ */
+const STATUS_STYLE = {
+  active:    { bg: "#f0fdf4", color: "#15803d", label: "Active"    },
+  scheduled: { bg: "#fff7ed", color: "#c2410c", label: "Scheduled" },
+  completed: { bg: "#f0f9ff", color: "#0369a1", label: "Completed" },
+  draft:     { bg: "#f1f5f9", color: "#64748b", label: "Draft"     },
+};
+
+/* ─── Shared CSS ─────────────────────────────────────────────────────────── */
+const SHARED_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
+  *,*::before,*::after{box-sizing:border-box;}
+  body,html{margin:0;padding:0;background:#f0f4fb;font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  :root{
+    --blue:#0056b3;--blue-mid:#1a6ed8;--blue-lite:#e8f0fe;
+    --slate:#64748b;--slate-lt:#94a3b8;
+    --card-bg:#ffffff;--card-br:16px;
+    --card-sh:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,86,179,.06);
+  }
+  .dash-card{
+    background:var(--card-bg);border-radius:var(--card-br);
+    box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);
+    overflow:hidden;
+  }
+  .glass-sidebar{
+    background:rgba(255,255,255,0.60);
+    backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+    border-right:1px solid rgba(255,255,255,0.80);box-shadow:4px 0 24px rgba(0,86,179,.07);
+  }
+  .nav-pill{
+    display:flex;flex-direction:column;align-items:center;
+    padding:10px 8px;border-radius:12px;gap:4px;
+    font-size:11px;font-weight:600;text-decoration:none;
+    color:var(--slate);transition:background .15s,color .15s,transform .15s;width:100%;
+  }
+  .nav-pill:hover{background:var(--blue-lite);color:var(--blue);transform:translateY(-1px);}
+  .nav-pill.active{background:var(--blue);color:#fff;box-shadow:0 4px 14px rgba(0,86,179,.35);}
+  .nav-pill i{font-size:18px;}
+  .topbar{
+    background:rgba(255,255,255,0.80);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border-bottom:1px solid rgba(0,86,179,.08);position:sticky;top:0;z-index:200;height:56px;
+    display:flex;align-items:center;padding:0 20px;gap:12px;
+  }
+  .dash-avatar{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  .fade-up{animation:fadeUp .4s ease both;}
+  /* Tabs */
+  .dash-tabs{display:flex;gap:4px;border-bottom:2px solid #f1f5f9;margin-bottom:20px;overflow-x:auto;scrollbar-width:none;padding-bottom:0;}
+  .dash-tabs::-webkit-scrollbar{display:none;}
+  .dash-tab{
+    padding:10px 16px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;
+    color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;
+    transition:color .15s,border-color .15s;border-radius:8px 8px 0 0;font-family:'DM Sans',sans-serif;
+    display:flex;align-items:center;gap:6px;
+  }
+  .dash-tab:hover{color:#0056b3;background:#f8faff;}
+  .dash-tab.active{color:#0056b3;border-bottom-color:#0056b3;background:#e8f0fe;}
+  /* Table */
+  .dash-table{width:100%;border-collapse:collapse;font-family:'DM Sans',sans-serif;}
+  .dash-table th{padding:10px 16px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.06em;white-space:nowrap;border-bottom:1px solid #f1f5f9;background:#f8faff;}
+  .dash-table td{padding:12px 16px;border-bottom:1px solid #f1f5f9;vertical-align:middle;font-size:13px;}
+  .dash-table tbody tr{transition:background .15s;}
+  .dash-table tbody tr:hover{background:#f8faff;}
+  .dash-table tbody tr:last-child td{border-bottom:none;}
+  /* Buttons */
+  .dash-btn-primary{
+    background:var(--blue);color:#fff;border:none;border-radius:10px;
+    padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;
+    font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
+    transition:opacity .15s,transform .15s;text-decoration:none;
+  }
+  .dash-btn-primary:hover{opacity:.87;transform:translateY(-1px);color:#fff;}
+  .dash-btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+  .dash-btn-success{
+    background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;
+    border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;
+    cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
+    transition:all .15s;text-decoration:none;
+  }
+  .dash-btn-success:hover{background:#15803d;color:#fff;}
+  .dash-btn-ghost{
+    background:#fff;border:1px solid rgba(0,86,179,.15);color:#64748b;
+    border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;
+    cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
+    transition:all .15s;text-decoration:none;
+  }
+  .dash-btn-ghost:hover{background:#f1f5f9;color:#1e293b;}
+  .action-btn{
+    width:30px;height:30px;border-radius:8px;border:1px solid rgba(0,86,179,.12);
+    background:#fff;display:inline-flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:all .15s;font-size:13px;text-decoration:none;color:#64748b;
+  }
+  .action-btn:hover{background:var(--blue-lite);border-color:var(--blue);color:var(--blue);}
+  .action-btn.del:hover{background:#fef2f2;border-color:#ef4444;color:#ef4444;}
+  /* Badge */
+  .badge-pill{
+    display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;
+    font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  }
+  /* Stat grid */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:20px;}
+  .stat-mini{
+    background:#fff;border-radius:14px;border:1px solid rgba(0,86,179,.06);
+    box-shadow:0 1px 3px rgba(0,0,0,.04);padding:14px 14px;text-align:center;
+  }
+  /* Course header band */
+  .course-hdr-band{
+    background:rgba(255,255,255,0.90);backdrop-filter:blur(12px);
+    border-bottom:1px solid rgba(0,86,179,.08);padding:20px 24px 0;
+    position:sticky;top:56px;z-index:100;
+  }
+  /* Modal */
+  .dash-modal-overlay{
+    position:fixed;inset:0;background:rgba(15,23,42,.45);
+    backdrop-filter:blur(4px);z-index:1055;
+    display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;
+  }
+  .dash-modal{
+    background:#fff;border-radius:20px;width:100%;max-width:500px;
+    box-shadow:0 24px 64px rgba(0,0,0,.18);overflow:hidden;
+    display:flex;flex-direction:column;max-height:calc(100vh - 32px);
+    animation:fadeUp .25s ease;
+  }
+  .dash-modal-hdr{padding:20px 24px 16px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;}
+  .dash-modal-body{overflow-y:auto;padding:20px 24px;flex:1;}
+  .dash-modal-ftr{padding:14px 24px;border-top:1px solid #f1f5f9;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;}
+  .form-lbl{font-size:11px;font-weight:700;color:#64748b;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;display:block;}
+  .form-ctrl{
+    width:100%;border:1px solid rgba(0,86,179,.15);border-radius:10px;
+    padding:9px 13px;font-size:13px;color:#1e293b;outline:none;
+    font-family:'DM Sans',sans-serif;background:#f8faff;
+    transition:border-color .2s,box-shadow .2s;
+  }
+  .form-ctrl:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
+  .form-ctrl:disabled{opacity:.6;cursor:not-allowed;}
+  .search-dropdown{
+    position:absolute;top:calc(100% + 4px);left:0;right:0;
+    background:#fff;border-radius:12px;border:1px solid rgba(0,86,179,.12);
+    box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:100;max-height:220px;overflow-y:auto;
+  }
+  .search-dropdown-item{
+    display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;
+    transition:background .12s;border-bottom:1px solid #f8faff;
+  }
+  .search-dropdown-item:last-child{border-bottom:none;}
+  .search-dropdown-item:hover{background:#f8faff;}
+  /* Mode toggle */
+  .mode-toggle{display:flex;gap:0;border-radius:10px;overflow:hidden;border:1px solid rgba(0,86,179,.15);}
+  .mode-btn{
+    flex:1;padding:8px 14px;border:none;cursor:pointer;font-size:13px;font-weight:600;
+    font-family:'DM Sans',sans-serif;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px;
+    background:#f8faff;color:#64748b;
+  }
+  .mode-btn:first-child{border-right:1px solid rgba(0,86,179,.15);}
+  .mode-btn.active{background:var(--blue);color:#fff;}
+  /* Enrolled filter pills */
+  .filter-pill{
+    padding:5px 12px;border-radius:99px;font-size:12px;font-weight:700;cursor:pointer;
+    border:none;font-family:'DM Sans',sans-serif;transition:all .15s;
+  }
+  /* Bottom nav */
+  .instructor-bottom-nav{
+    position:fixed;bottom:0;left:0;right:0;height:64px;
+    background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);
+    border-top:1px solid rgba(0,86,179,0.10);
+    display:flex;align-items:stretch;z-index:1030;
+    box-shadow:0 -4px 24px rgba(0,86,179,0.08);
+  }
+  .bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:600;gap:3px;text-decoration:none;transition:color .2s;}
+  .bnav-item i{font-size:19px;}
+  @media(max-width:767px){
+    .course-hdr-band{position:static;}
+    .stats-grid{grid-template-columns:repeat(3,1fr);}
+    .overview-grid{grid-template-columns:1fr!important;}
+  }
+  @media(max-width:480px){
+    .stats-grid{grid-template-columns:repeat(2,1fr);}
+  }
+`;
+
+/* ─── Bottom Nav ─────────────────────────────────────────────────────────── */
+const InstructorBottomNav = ({ active }) => {
+  const items = [
+    { to: "/instructor",                  icon: "bi-speedometer2", label: "Home"     },
+    { to: "/instructor/courses",          icon: "bi-book",         label: "Courses"  },
+    { to: "/instructor/students",         icon: "bi-people",       label: "Students" },
+    { to: "/instructor/account-settings", icon: "bi-gear",         label: "Settings" },
+  ];
+  return (
+    <nav className="instructor-bottom-nav d-lg-none">
+      {items.map(({ to, icon, label }) => (
+        <Link key={to} to={to} className="bnav-item"
+          style={{ color: active === label ? "#0056b3" : "#94a3b8", borderTop: active === label ? "2px solid #0056b3" : "2px solid transparent" }}>
+          <i className={`bi ${icon}`}></i>{label}
+        </Link>
+      ))}
+    </nav>
+  );
+};
+
+/* ─── Mini Avatar ──────────────────────────────────────────────────────────── */
+const MiniAvatar = ({ name, size = 32, bg = "#0056b3" }) => (
+  <div style={{ width: size, height: size, borderRadius: "50%", background: bg, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: size * 0.38, flexShrink: 0 }}>
+    {name?.charAt(0)?.toUpperCase() || "?"}
+  </div>
+);
+
+/* ════════════════════════════════════════════════════════════════════════════
+   COURSE DETAIL PAGE
+════════════════════════════════════════════════════════════════════════════ */
 const CourseDetail = () => {
   const { id }     = useParams();
   const navigate   = useNavigate();
@@ -32,16 +236,14 @@ const CourseDetail = () => {
   const [loading,   setLoading]   = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
 
-  const [showAddModal,   setShowAddModal]   = useState(false);
-  const [studentSearch,  setStudentSearch]  = useState("");
-  const [examSearch,     setExamSearch]     = useState("");
-  const [examFilter,     setExamFilter]     = useState("all");
+  const [showAddModal,  setShowAddModal]  = useState(false);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [examSearch,    setExamSearch]    = useState("");
+  const [examFilter,    setExamFilter]    = useState("all");
 
-  /* ── Active sidebar helper ── */
-  const isActive = (to) =>
+  const isNavActive = (to) =>
     to === "/instructor" ? location.pathname === to : location.pathname.startsWith(to);
 
-  /* ── Boot ── */
   useEffect(() => {
     API.get("/me").then((r) => setUser(r.data.user)).catch(() => {});
     fetchAll();
@@ -59,47 +261,38 @@ const CourseDetail = () => {
     } catch {
       Swal.fire("Error!", "Failed to load course details.", "error");
       navigate("/instructor/courses");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  /* ── Exam handlers ── */
   const handleDeleteExam = async (examId) => {
     const result = await Swal.fire({
-      title: "Delete this exam?", text: "This cannot be undone.", icon: "warning",
-      showCancelButton: true, confirmButtonColor: "#d33", confirmButtonText: "Yes, delete it!",
+      title:"Delete this exam?", text:"This cannot be undone.", icon:"warning",
+      showCancelButton:true, confirmButtonColor:"#d33", confirmButtonText:"Yes, delete it!",
     });
     if (!result.isConfirmed) return;
     try {
       await API.delete(`/exams/${examId}`);
-      setExams((prev) => prev.filter((e) => e.id !== examId));
-      Swal.fire({ icon: "success", title: "Deleted!", timer: 1400, showConfirmButton: false });
-    } catch {
-      Swal.fire("Error!", "Failed to delete exam.", "error");
-    }
+      setExams(prev => prev.filter(e => e.id !== examId));
+      Swal.fire({ icon:"success", title:"Deleted!", timer:1400, showConfirmButton:false });
+    } catch { Swal.fire("Error!", "Failed to delete exam.", "error"); }
   };
 
-  /* ── Student handlers ── */
   const handleStudentAdded = (newStudent) => {
-    setStudents((prev) => [...prev, newStudent]);
+    setStudents(prev => [...prev, newStudent]);
     setShowAddModal(false);
   };
 
   const handleRemoveStudent = async (studentId, studentName) => {
     const result = await Swal.fire({
-      title: `Remove ${studentName}?`,
-      text: "This unenrolls them from the course. Their account won't be deleted.",
-      icon: "warning", showCancelButton: true, confirmButtonColor: "#d33", confirmButtonText: "Yes, remove!",
+      title:`Remove ${studentName}?`, text:"This unenrolls them from the course. Their account won't be deleted.",
+      icon:"warning", showCancelButton:true, confirmButtonColor:"#d33", confirmButtonText:"Yes, remove!",
     });
     if (!result.isConfirmed) return;
     try {
       await API.delete(`/courses/${id}/students/${studentId}`);
-      setStudents((prev) => prev.filter((s) => s.id !== studentId));
-      Swal.fire({ icon: "success", title: "Removed!", timer: 1400, showConfirmButton: false });
-    } catch {
-      Swal.fire("Error!", "Failed to remove student.", "error");
-    }
+      setStudents(prev => prev.filter(s => s.id !== studentId));
+      Swal.fire({ icon:"success", title:"Removed!", timer:1400, showConfirmButton:false });
+    } catch { Swal.fire("Error!", "Failed to remove student.", "error"); }
   };
 
   const handleLogout = async () => {
@@ -107,509 +300,477 @@ const CourseDetail = () => {
     navigate("/instructor/login");
   };
 
-  /* ── Derived ── */
-  const getStatusBadge = (status) => ({
-    active:    "bg-success",
-    scheduled: "bg-warning text-dark",
-    completed: "bg-info",
-    draft:     "bg-secondary",
-  }[status] ?? "bg-secondary");
-
+  /* Derived */
   const examStats = useMemo(() => ({
     total:       exams.length,
-    active:      exams.filter((e) => e.status === "active").length,
-    scheduled:   exams.filter((e) => e.status === "scheduled").length,
-    completed:   exams.filter((e) => e.status === "completed").length,
+    active:      exams.filter(e => e.status === "active").length,
+    scheduled:   exams.filter(e => e.status === "scheduled").length,
+    completed:   exams.filter(e => e.status === "completed").length,
     totalPoints: exams.reduce((sum, e) => sum + (e.total_points || 0), 0),
   }), [exams]);
 
   const filteredStudents = useMemo(() => {
     if (!studentSearch.trim()) return students;
     const q = studentSearch.toLowerCase();
-    return students.filter((s) =>
-      s.name?.toLowerCase().includes(q) || s.email?.toLowerCase().includes(q)
-    );
+    return students.filter(s => s.name?.toLowerCase().includes(q) || s.email?.toLowerCase().includes(q));
   }, [students, studentSearch]);
 
   const filteredExams = useMemo(() => {
     let list = exams;
-    if (examFilter !== "all") list = list.filter((e) => e.status === examFilter);
+    if (examFilter !== "all") list = list.filter(e => e.status === examFilter);
     if (examSearch.trim()) {
       const q = examSearch.toLowerCase();
-      list = list.filter((e) => e.title?.toLowerCase().includes(q) || e.type?.toLowerCase().includes(q));
+      list = list.filter(e => e.title?.toLowerCase().includes(q) || e.type?.toLowerCase().includes(q));
     }
     return list;
   }, [exams, examFilter, examSearch]);
 
-  /* ── Loading ── */
+  const initial   = user?.name?.charAt(0)?.toUpperCase() ?? "I";
+  const firstName = user?.name?.split(" ")[0] ?? "Instructor";
+
   if (loading) return (
-    <div className="d-flex justify-content-center align-items-center min-vh-100">
-      <div className="spinner-border text-primary" role="status" />
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#f0f4fb" }}>
+      <style>{SHARED_CSS}</style>
+      <div className="spinner-border" style={{ color: "#0056b3" }} />
     </div>
   );
 
-  /* ══════════════════════════════════════════════════════════════
-     RENDER
-  ══════════════════════════════════════════════════════════════ */
-  return (
-    <div className="d-flex flex-column min-vh-100">
+  const TABS = [
+    { key:"overview",  icon:"bi-grid-1x2",          label:"Overview"                      },
+    { key:"exams",     icon:"bi-file-earmark-text",  label:`Exams (${exams.length})`       },
+    { key:"students",  icon:"bi-people",             label:`Students (${students.length})` },
+  ];
 
-      {/* ── Navbar ── */}
-      <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm sticky-top">
-        <div className="container-fluid">
-          <a className="navbar-brand fw-bold text-primary" href="#">SECT Instructor</a>
-          <div className="d-flex align-items-center gap-2 ms-auto">
+  const EXAM_FILTERS = ["all","active","scheduled","completed","draft"];
+
+  return (
+    <>
+      <style>{SHARED_CSS}</style>
+      <div style={{ background: "#f0f4fb", minHeight: "100vh" }}>
+
+        {/* ── Topbar ── */}
+        <div className="topbar">
+          <span style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 700, fontSize: 15, color: "#0056b3", letterSpacing: "-.3px", flexShrink: 0 }}>
+            SECT Instructor
+          </span>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
             <InstructorAlertBell />
             <div className="dropdown">
-              <button className="btn btn-light dropdown-toggle fw-bold" type="button" data-bs-toggle="dropdown">
-                <i className="bi bi-person-circle me-2"></i>{user?.name || "Instructor"}
+              <button className="d-flex align-items-center gap-2 dropdown-toggle"
+                style={{ background: "transparent", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: 10 }}
+                data-bs-toggle="dropdown">
+                <div className="dash-avatar">{initial}</div>
+                <span className="d-none d-sm-inline" style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{firstName}</span>
               </button>
-              <ul className="dropdown-menu dropdown-menu-end">
-                <li><Link className="dropdown-item" to="/instructor/account-settings"><i className="bi bi-gear me-2"></i>Account Settings</Link></li>
-                <li><Link className="dropdown-item" to="/instructor/profile"><i className="bi bi-person me-2"></i>Profile</Link></li>
+              <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0" style={{ borderRadius: 12, fontSize: 13 }}>
+                <li><Link className="dropdown-item" to="/instructor/account-settings">Account Settings</Link></li>
+                <li><Link className="dropdown-item" to="/instructor/profile">Profile</Link></li>
                 <li><hr className="dropdown-divider" /></li>
-                <li><button className="dropdown-item text-danger" onClick={handleLogout}><i className="bi bi-box-arrow-right me-2"></i>Logout</button></li>
+                <li><button className="dropdown-item text-danger" onClick={handleLogout}
+                  style={{ border: "none", background: "none", width: "100%", textAlign: "left" }}>Logout</button></li>
               </ul>
             </div>
           </div>
         </div>
-      </nav>
 
-      <div className="d-flex flex-grow-1">
+        <div className="d-flex">
 
-        {/* ── Sidebar ── */}
-        <nav className="bg-white border-end d-flex flex-column align-items-center py-3" style={{ width: 72, minHeight: "100%" }}>
-          {NAV_ITEMS.map(({ to, icon, label }) => (
-            <Link key={to} to={to}
-              className={`nav-link d-flex flex-column align-items-center py-2 px-1 mb-2 rounded ${
-                isActive(to) ? "text-primary bg-primary bg-opacity-10 fw-bold" : "text-secondary"
-              }`}
-              style={{ fontSize: 10, width: 56, textAlign: "center" }} title={label}>
-              <i className={`bi ${icon} fs-5 mb-1`}></i>
-              <span>{label}</span>
-            </Link>
-          ))}
-        </nav>
+          {/* ── Sidebar ── */}
+          <nav className="glass-sidebar d-none d-lg-flex flex-column align-items-center py-4 gap-1"
+            style={{ width: 80, minHeight: "calc(100vh - 56px)", position: "sticky", top: 56, alignSelf: "flex-start", flexShrink: 0 }}>
+            {NAV_ITEMS.map(({ to, icon, label }) => (
+              <Link key={to} to={to} className={`nav-pill ${isNavActive(to) ? "active" : ""}`}>
+                <i className={`bi ${icon}`}></i>{label}
+              </Link>
+            ))}
+          </nav>
 
-        {/* ── Main ── */}
-        <div className="flex-grow-1 bg-light overflow-auto">
+          {/* ── Main ── */}
+          <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
 
-          {/* ── Course Header Band ── */}
-          <div className="bg-white border-bottom shadow-sm px-4 pt-4 pb-0">
+            {/* Course Header Band */}
+            <div className="course-hdr-band">
+              {/* Breadcrumb */}
+              <nav style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#94a3b8", flexWrap: "wrap" }}>
+                  <Link to="/instructor" style={{ color: "#94a3b8", textDecoration: "none" }}>Dashboard</Link>
+                  <i className="bi bi-chevron-right" style={{ fontSize: 10 }}></i>
+                  <Link to="/instructor/courses" style={{ color: "#94a3b8", textDecoration: "none" }}>Courses</Link>
+                  <i className="bi bi-chevron-right" style={{ fontSize: 10 }}></i>
+                  <span style={{ color: "#0f172a", fontWeight: 600 }}>{course.code}</span>
+                </div>
+              </nav>
 
-            {/* Breadcrumb */}
-            <nav aria-label="breadcrumb" className="mb-2">
-              <ol className="breadcrumb mb-0 small">
-                <li className="breadcrumb-item">
-                  <Link to="/instructor" className="text-decoration-none text-muted">Dashboard</Link>
-                </li>
-                <li className="breadcrumb-item">
-                  <Link to="/instructor/courses" className="text-decoration-none text-muted">Courses</Link>
-                </li>
-                <li className="breadcrumb-item active fw-semibold">{course.code}</li>
-              </ol>
-            </nav>
-
-            {/* Title + Actions */}
-            <div className="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-3">
-              <div>
-                <div className="d-flex align-items-center gap-3 mb-1">
-                  <div className="rounded-3 bg-primary bg-opacity-10 d-flex align-items-center justify-content-center flex-shrink-0"
-                    style={{ width: 48, height: 48 }}>
-                    <i className="bi bi-folder2-open text-primary fs-4"></i>
+              {/* Title + Actions */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                  <div style={{ width: 52, height: 52, borderRadius: 14, background: "#e8f0fe", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <i className="bi bi-folder2-open" style={{ color: "#0056b3", fontSize: 22 }}></i>
                   </div>
                   <div>
-                    <h4 className="mb-0 fw-bold">{course.code} — {course.name}</h4>
-                    {course.description && <p className="text-muted mb-0 small">{course.description}</p>}
+                    <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: "-.4px", lineHeight: 1.2 }}>
+                      {course.code} — {course.name}
+                    </h1>
+                    {course.description && (
+                      <p style={{ margin: "4px 0 6px", fontSize: 13, color: "#64748b" }}>{course.description}</p>
+                    )}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {course.semester && (
+                        <span className="badge-pill" style={{ background: "#f1f5f9", color: "#64748b" }}>
+                          <i className="bi bi-calendar3 me-1"></i>{course.semester}
+                        </span>
+                      )}
+                      {course.credits && (
+                        <span className="badge-pill" style={{ background: "#f0f9ff", color: "#0369a1" }}>
+                          <i className="bi bi-award me-1"></i>{course.credits} credits
+                        </span>
+                      )}
+                      <span className="badge-pill" style={{ background: "#f0fdf4", color: "#15803d" }}>
+                        <i className="bi bi-people me-1"></i>{students.length} students
+                      </span>
+                      <span className="badge-pill" style={{ background: "#e8f0fe", color: "#0056b3" }}>
+                        <i className="bi bi-file-earmark-text me-1"></i>{exams.length} exams
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <div className="d-flex flex-wrap gap-2 mt-2 ms-1">
-                  {course.semester && (
-                    <span className="badge bg-light text-dark border">
-                      <i className="bi bi-calendar3 me-1"></i>{course.semester}
-                    </span>
-                  )}
-                  {course.credits && (
-                    <span className="badge bg-light text-dark border">
-                      <i className="bi bi-award me-1"></i>{course.credits} credits
-                    </span>
-                  )}
-                  <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
-                    <i className="bi bi-people me-1"></i>{students.length} students enrolled
-                  </span>
-                  <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
-                    <i className="bi bi-file-earmark-text me-1"></i>{exams.length} exams
-                  </span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button className="dash-btn-success" onClick={() => setShowAddModal(true)}>
+                    <i className="bi bi-person-plus"></i> Add Student
+                  </button>
+                  <Link to="/instructor/exams" state={{ openCreateExam:true }} className="dash-btn-primary">
+                    <i className="bi bi-plus-circle"></i> New Exam
+                  </Link>
                 </div>
               </div>
-              <div className="d-flex gap-2">
-                <button className="btn btn-success btn-sm" onClick={() => setShowAddModal(true)}>
-                  <i className="bi bi-person-plus me-2"></i>Add Student
-                </button>
-                <Link to="/instructor/exams" state={{ openCreateExam: true }} className="btn btn-primary btn-sm">
-                  <i className="bi bi-plus-circle me-2"></i>New Exam
-                </Link>
+
+              {/* Tabs */}
+              <div className="dash-tabs">
+                {TABS.map(({ key, icon, label }) => (
+                  <button key={key} className={`dash-tab ${activeTab===key?"active":""}`} onClick={() => setActiveTab(key)}>
+                    <i className={`bi ${icon}`}></i>{label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Tabs */}
-            <ul className="nav nav-tabs border-0 mb-0">
-              {[
-                { key: "overview",  icon: "bi-grid-1x2",          label: "Overview"                           },
-                { key: "exams",     icon: "bi-file-earmark-text", label: `Exams (${exams.length})`            },
-                { key: "students",  icon: "bi-people",            label: `Students (${students.length})`      },
-              ].map(({ key, icon, label }) => (
-                <li key={key} className="nav-item">
-                  <button
-                    className={`nav-link pb-3 ${activeTab === key ? "active fw-semibold" : "text-muted"}`}
-                    style={{ border: "none", background: "none" }}
-                    onClick={() => setActiveTab(key)}
-                  >
-                    <i className={`bi ${icon} me-2`}></i>{label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+            {/* Tab Content */}
+            <div style={{ padding: "24px 20px", paddingBottom: 100, flex: 1, minWidth: 0 }}>
 
-          {/* ── Tab Content ── */}
-          <div className="p-4">
-
-            {/* ════ OVERVIEW ════ */}
-            {activeTab === "overview" && (
-              <div className="row g-4">
-
-                {/* Stat Cards */}
-                <div className="col-12">
-                  <div className="row g-3">
+              {/* ════ OVERVIEW ════ */}
+              {activeTab==="overview" && (
+                <div>
+                  {/* Stat chips */}
+                  <div className="stats-grid">
                     {[
-                      { icon: "bi-file-earmark-text", color: "primary", label: "Total Exams",       value: examStats.total       },
-                      { icon: "bi-play-circle",        color: "success", label: "Active Exams",      value: examStats.active      },
-                      { icon: "bi-calendar-event",     color: "warning", label: "Scheduled",         value: examStats.scheduled   },
-                      { icon: "bi-check-circle",       color: "info",    label: "Completed",         value: examStats.completed   },
-                      { icon: "bi-people",             color: "success", label: "Students Enrolled", value: students.length       },
-                      { icon: "bi-trophy",             color: "warning", label: "Total Points",      value: examStats.totalPoints },
-                    ].map(({ icon, color, label, value }) => (
-                      <div key={label} className="col-md-2 col-4">
-                        <div className="card border-0 shadow-sm text-center h-100">
-                          <div className="card-body py-3 px-2">
-                            <div className={`rounded-circle bg-${color} bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-2`}
-                              style={{ width: 40, height: 40 }}>
-                              <i className={`bi ${icon} text-${color}`}></i>
-                            </div>
-                            <div className={`fw-bold fs-4 text-${color} lh-1`}>{value}</div>
-                            <div className="text-muted mt-1" style={{ fontSize: 11 }}>{label}</div>
-                          </div>
+                      { icon:"bi-file-earmark-text", color:"#0056b3", bg:"#e8f0fe", label:"Total Exams",       value:examStats.total       },
+                      { icon:"bi-play-circle",        color:"#15803d", bg:"#f0fdf4", label:"Active",            value:examStats.active       },
+                      { icon:"bi-calendar-event",     color:"#c2410c", bg:"#fff7ed", label:"Scheduled",         value:examStats.scheduled    },
+                      { icon:"bi-check-circle",       color:"#0369a1", bg:"#f0f9ff", label:"Completed",         value:examStats.completed    },
+                      { icon:"bi-people",             color:"#15803d", bg:"#f0fdf4", label:"Students",          value:students.length        },
+                      { icon:"bi-trophy",             color:"#6d28d9", bg:"#ede9fe", label:"Total Points",      value:examStats.totalPoints  },
+                    ].map(({ icon, color, bg, label, value }) => (
+                      <div key={label} className="stat-mini">
+                        <div style={{ width: 38, height: 38, borderRadius: 10, background: bg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px" }}>
+                          <i className={`bi ${icon}`} style={{ color, fontSize: 16 }}></i>
                         </div>
+                        <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+                        <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>{label}</div>
                       </div>
                     ))}
                   </div>
-                </div>
 
-                {/* Recent Exams */}
-                <div className="col-md-7">
-                  <div className="card shadow-sm border-0 h-100">
-                    <div className="card-header bg-white d-flex justify-content-between align-items-center">
-                      <h6 className="mb-0 fw-semibold">
-                        <i className="bi bi-file-earmark-text me-2 text-primary"></i>Recent Exams
-                      </h6>
-                      <button className="btn btn-sm btn-link text-primary p-0" onClick={() => setActiveTab("exams")}>
-                        View all →
-                      </button>
+                  {/* Two-column: Recent Exams + Students */}
+                  <div className="overview-grid" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16 }}>
+
+                    {/* Recent Exams */}
+                    <div className="dash-card fade-up">
+                      <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
+                          <i className="bi bi-file-earmark-text me-2" style={{ color: "#0056b3" }}></i>Recent Exams
+                        </h2>
+                        <button style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#0056b3", fontWeight: 600, fontFamily: "'DM Sans',sans-serif" }}
+                          onClick={() => setActiveTab("exams")}>View all →</button>
+                      </div>
+                      <div>
+                        {exams.length === 0 ? (
+                          <div style={{ textAlign: "center", padding: "36px 20px", color: "#94a3b8" }}>
+                            <i className="bi bi-file-earmark-x" style={{ fontSize: 28, display: "block", marginBottom: 8 }}></i>
+                            No exams yet.
+                          </div>
+                        ) : (
+                          <div style={{ overflowX: "auto" }}>
+                            <table className="dash-table">
+                              <thead>
+                                <tr>{["TITLE","TYPE","DATE","STATUS"].map(h => <th key={h}>{h}</th>)}</tr>
+                              </thead>
+                              <tbody>
+                                {exams.slice(0,5).map(exam => {
+                                  const ss = STATUS_STYLE[exam.status] || STATUS_STYLE.draft;
+                                  return (
+                                    <tr key={exam.id}>
+                                      <td>
+                                        <Link to={`/instructor/exams/${exam.id}`} style={{ fontWeight: 600, textDecoration: "none", color: "#1e293b", fontSize: 13 }}>
+                                          {exam.title}
+                                        </Link>
+                                      </td>
+                                      <td><span className="badge-pill" style={{ background: "#f1f5f9", color: "#64748b" }}>{exam.type}</span></td>
+                                      <td style={{ fontSize: 12, color: "#64748b" }}>{new Date(exam.start_time).toLocaleDateString()}</td>
+                                      <td><span className="badge-pill" style={{ background: ss.bg, color: ss.color }}>{ss.label}</span></td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="card-body p-0">
-                      {exams.length === 0 ? (
-                        <div className="text-center py-5">
-                          <i className="bi bi-file-earmark-x fs-2 text-muted d-block mb-2"></i>
-                          <p className="text-muted small mb-0">No exams yet.</p>
+
+                    {/* Enrolled Students */}
+                    <div className="dash-card fade-up">
+                      <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
+                          <i className="bi bi-people me-2" style={{ color: "#15803d" }}></i>Enrolled Students
+                        </h2>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button className="dash-btn-success" style={{ padding: "5px 12px", fontSize: 12 }} onClick={() => setShowAddModal(true)}>
+                            <i className="bi bi-person-plus"></i> Add
+                          </button>
+                          <button style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#0056b3", fontWeight: 600, fontFamily: "'DM Sans',sans-serif" }}
+                            onClick={() => setActiveTab("students")}>View all →</button>
                         </div>
-                      ) : (
-                        <div className="table-responsive">
-                          <table className="table table-hover mb-0">
-                            <thead className="table-light">
-                              <tr><th>TITLE</th><th>TYPE</th><th>DATE</th><th>STATUS</th></tr>
-                            </thead>
-                            <tbody>
-                              {exams.slice(0, 5).map((exam) => (
+                      </div>
+                      <div>
+                        {students.length === 0 ? (
+                          <div style={{ textAlign: "center", padding: "36px 20px", color: "#94a3b8" }}>
+                            <i className="bi bi-people" style={{ fontSize: 28, display: "block", marginBottom: 8 }}></i>
+                            <p style={{ marginBottom: 12, fontSize: 13 }}>No students enrolled yet.</p>
+                            <button className="dash-btn-success" style={{ fontSize: 12, padding: "7px 14px" }} onClick={() => setShowAddModal(true)}>
+                              <i className="bi bi-person-plus"></i> Enroll First Student
+                            </button>
+                          </div>
+                        ) : (
+                          <div>
+                            {students.slice(0,6).map(s => (
+                              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", borderBottom: "1px solid #f8faff" }}>
+                                <MiniAvatar name={s.name} size={32} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontWeight: 600, fontSize: 13, color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
+                                  <div style={{ fontSize: 11, color: "#94a3b8" }}>{s.email}</div>
+                                </div>
+                              </div>
+                            ))}
+                            {students.length > 6 && (
+                              <div style={{ padding: "10px 20px", textAlign: "center" }}>
+                                <button style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#64748b", fontFamily: "'DM Sans',sans-serif" }}
+                                  onClick={() => setActiveTab("students")}>
+                                  +{students.length - 6} more students
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ════ EXAMS TAB ════ */}
+              {activeTab==="exams" && (
+                <div className="dash-card fade-up">
+                  <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: exams.length > 0 ? 12 : 0 }}>
+                      <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
+                        <i className="bi bi-file-earmark-text me-2" style={{ color: "#0056b3" }}></i>Exams in this Course
+                      </h2>
+                      <Link to="/instructor/exams" className="dash-btn-primary" style={{ fontSize: 12, padding: "7px 14px" }}>
+                        <i className="bi bi-plus"></i> New Exam
+                      </Link>
+                    </div>
+                    {exams.length > 0 && (
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                        <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
+                          <i className="bi bi-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13 }}></i>
+                          <input className="form-ctrl" style={{ paddingLeft: 32 }} placeholder="Search exams…"
+                            value={examSearch} onChange={e => setExamSearch(e.target.value)} />
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {EXAM_FILTERS.map(s => {
+                            const active = examFilter === s;
+                            return (
+                              <button key={s} className="filter-pill"
+                                style={{ background: active ? "#0056b3" : "#f1f5f9", color: active ? "#fff" : "#64748b" }}
+                                onClick={() => setExamFilter(s)}>
+                                {s.charAt(0).toUpperCase()+s.slice(1)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    {exams.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: "48px 20px", color: "#94a3b8" }}>
+                        <i className="bi bi-file-earmark-x" style={{ fontSize: 36, display: "block", marginBottom: 10, opacity: .3 }}></i>
+                        <p style={{ marginBottom: 14, fontSize: 14 }}>No exams in this course yet.</p>
+                        <Link to="/instructor/exams" className="dash-btn-primary" style={{ fontSize: 12, padding: "8px 16px" }}>
+                          <i className="bi bi-plus-circle"></i> Create an Exam
+                        </Link>
+                      </div>
+                    ) : filteredExams.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>
+                        <i className="bi bi-search" style={{ fontSize: 28, display: "block", marginBottom: 8 }}></i>
+                        No exams match your filter.
+                      </div>
+                    ) : (
+                      <div style={{ overflowX: "auto" }}>
+                        <table className="dash-table">
+                          <thead>
+                            <tr>{["EXAM NAME","TYPE","START","DURATION","QUESTIONS","POINTS","STATUS","ACTIONS"].map(h => <th key={h}>{h}</th>)}</tr>
+                          </thead>
+                          <tbody>
+                            {filteredExams.map(exam => {
+                              const ss = STATUS_STYLE[exam.status] || STATUS_STYLE.draft;
+                              return (
                                 <tr key={exam.id}>
                                   <td>
-                                    <Link to={`/instructor/exams/${exam.id}`} className="fw-semibold text-decoration-none text-dark small">
+                                    <Link to={`/instructor/exams/${exam.id}`} style={{ fontWeight: 700, textDecoration: "none", color: "#1e293b", fontSize: 13 }}>
                                       {exam.title}
                                     </Link>
                                   </td>
-                                  <td><span className="badge bg-secondary text-capitalize small">{exam.type}</span></td>
-                                  <td className="text-muted small">{new Date(exam.start_time).toLocaleDateString()}</td>
-                                  <td><span className={`badge ${getStatusBadge(exam.status)} text-capitalize`}>{exam.status}</span></td>
+                                  <td><span className="badge-pill" style={{ background: "#f1f5f9", color: "#64748b" }}>{exam.type}</span></td>
+                                  <td style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>{new Date(exam.start_time).toLocaleString()}</td>
+                                  <td style={{ fontSize: 12, color: "#64748b" }}>{exam.duration_minutes} min</td>
+                                  <td style={{ textAlign: "center", fontWeight: 600 }}>{exam.questions_count || 0}</td>
+                                  <td style={{ textAlign: "center", fontWeight: 600 }}>{exam.total_points || 0}</td>
+                                  <td><span className="badge-pill" style={{ background: ss.bg, color: ss.color }}>{ss.label}</span></td>
+                                  <td>
+                                    <div style={{ display: "flex", gap: 6 }}>
+                                      <Link to={`/instructor/exams/${exam.id}`} className="action-btn" title="View"><i className="bi bi-eye"></i></Link>
+                                      <Link to={`/instructor/exams/${exam.id}/edit`} className="action-btn" title="Edit"><i className="bi bi-pencil"></i></Link>
+                                      <button className="action-btn del" onClick={() => handleDeleteExam(exam.id)} title="Delete"><i className="bi bi-trash"></i></button>
+                                    </div>
+                                  </td>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 </div>
+              )}
 
-                {/* Enrolled Students */}
-                <div className="col-md-5">
-                  <div className="card shadow-sm border-0 h-100">
-                    <div className="card-header bg-white d-flex justify-content-between align-items-center">
-                      <h6 className="mb-0 fw-semibold">
-                        <i className="bi bi-people me-2 text-success"></i>Enrolled Students
-                      </h6>
-                      <div className="d-flex gap-2">
-                        <button className="btn btn-sm btn-success" onClick={() => setShowAddModal(true)}>
-                          <i className="bi bi-person-plus me-1"></i>Add
-                        </button>
-                        <button className="btn btn-sm btn-link text-primary p-0" onClick={() => setActiveTab("students")}>
-                          View all →
-                        </button>
-                      </div>
-                    </div>
-                    <div className="card-body p-0">
-                      {students.length === 0 ? (
-                        <div className="text-center py-5">
-                          <i className="bi bi-people fs-2 text-muted d-block mb-2"></i>
-                          <p className="text-muted small mb-2">No students enrolled yet.</p>
-                          <button className="btn btn-sm btn-success" onClick={() => setShowAddModal(true)}>
-                            <i className="bi bi-person-plus me-1"></i>Enroll First Student
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="list-group list-group-flush">
-                          {students.slice(0, 6).map((s) => (
-                            <div key={s.id} className="list-group-item px-3 py-2 d-flex align-items-center gap-3">
-                              <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
-                                style={{ width: 32, height: 32, fontSize: 12 }}>
-                                {s.name.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="flex-grow-1 overflow-hidden">
-                                <div className="fw-semibold small text-truncate">{s.name}</div>
-                                <div className="text-muted" style={{ fontSize: 11 }}>{s.email}</div>
-                              </div>
-                            </div>
-                          ))}
-                          {students.length > 6 && (
-                            <div className="list-group-item text-center py-2">
-                              <button className="btn btn-link btn-sm p-0 text-muted" onClick={() => setActiveTab("students")}>
-                                +{students.length - 6} more students
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ════ EXAMS TAB ════ */}
-            {activeTab === "exams" && (
-              <div className="card shadow-sm border-0">
-                <div className="card-header bg-white">
-                  <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h6 className="mb-0 fw-semibold">
-                      <i className="bi bi-file-earmark-text me-2 text-primary"></i>Exams in this Course
-                    </h6>
-                    <Link to="/instructor/exams" className="btn btn-primary btn-sm">
-                      <i className="bi bi-plus me-1"></i>New Exam
-                    </Link>
-                  </div>
-                  {exams.length > 0 && (
-                    <div className="d-flex gap-2 mt-3 flex-wrap align-items-center">
-                      <div className="input-group input-group-sm" style={{ maxWidth: 280 }}>
-                        <span className="input-group-text bg-white border-end-0">
-                          <i className="bi bi-search text-muted"></i>
-                        </span>
-                        <input type="text" className="form-control border-start-0" placeholder="Search exams…"
-                          value={examSearch} onChange={(e) => setExamSearch(e.target.value)} />
-                        {examSearch && (
-                          <button className="btn btn-outline-secondary" onClick={() => setExamSearch("")}>
-                            <i className="bi bi-x"></i>
-                          </button>
-                        )}
-                      </div>
-                      <div className="d-flex gap-1 flex-wrap">
-                        {["all", "active", "scheduled", "completed", "draft"].map((s) => (
-                          <button key={s}
-                            className={`btn btn-sm ${examFilter === s ? "btn-primary" : "btn-outline-secondary"} text-capitalize`}
-                            onClick={() => setExamFilter(s)}>
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="card-body p-0">
-                  {exams.length === 0 ? (
-                    <div className="text-center py-5">
-                      <i className="bi bi-file-earmark-x fs-1 text-muted d-block mb-2 opacity-25"></i>
-                      <p className="text-muted mb-3">No exams in this course yet.</p>
-                      <Link to="/instructor/exams" className="btn btn-primary btn-sm">
-                        <i className="bi bi-plus-circle me-2"></i>Create an Exam
-                      </Link>
-                    </div>
-                  ) : filteredExams.length === 0 ? (
-                    <div className="text-center py-4 text-muted">
-                      <i className="bi bi-search d-block fs-3 mb-2"></i>No exams match your filter.
-                    </div>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover mb-0">
-                        <thead className="table-light">
-                          <tr>
-                            <th>EXAM NAME</th><th>TYPE</th><th>START</th>
-                            <th>DURATION</th><th>QUESTIONS</th><th>POINTS</th><th>STATUS</th><th>ACTIONS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredExams.map((exam) => (
-                            <tr key={exam.id}>
-                              <td>
-                                <Link to={`/instructor/exams/${exam.id}`} className="fw-semibold text-decoration-none text-dark">
-                                  {exam.title}
-                                </Link>
-                              </td>
-                              <td><span className="badge bg-secondary text-capitalize">{exam.type}</span></td>
-                              <td className="text-muted small">{new Date(exam.start_time).toLocaleString()}</td>
-                              <td className="text-muted small">{exam.duration_minutes} min</td>
-                              <td className="text-center">{exam.questions_count || 0}</td>
-                              <td className="text-center">{exam.total_points || 0}</td>
-                              <td><span className={`badge ${getStatusBadge(exam.status)} text-capitalize`}>{exam.status}</span></td>
-                              <td>
-                                <div className="d-flex gap-1">
-                                  <Link to={`/instructor/exams/${exam.id}`}      className="btn btn-sm btn-outline-primary"   title="View"><i className="bi bi-eye"></i></Link>
-                                  <Link to={`/instructor/exams/${exam.id}/edit`} className="btn btn-sm btn-outline-secondary" title="Edit"><i className="bi bi-pencil"></i></Link>
-                                  <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteExam(exam.id)} title="Delete"><i className="bi bi-trash"></i></button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ════ STUDENTS TAB ════ */}
-            {activeTab === "students" && (
-              <div className="card shadow-sm border-0">
-                <div className="card-header bg-white">
-                  <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h6 className="mb-0 fw-semibold">
-                      <i className="bi bi-people me-2 text-success"></i>
-                      Enrolled Students <span className="badge bg-primary ms-1">{students.length}</span>
-                    </h6>
-                    <button className="btn btn-success btn-sm" onClick={() => setShowAddModal(true)}>
-                      <i className="bi bi-person-plus me-2"></i>Add Student
-                    </button>
-                  </div>
-                  {students.length > 0 && (
-                    <div className="mt-2">
-                      <div className="input-group input-group-sm" style={{ maxWidth: 320 }}>
-                        <span className="input-group-text bg-white border-end-0">
-                          <i className="bi bi-search text-muted"></i>
-                        </span>
-                        <input type="text" className="form-control border-start-0" placeholder="Search by name or email…"
-                          value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)} />
-                        {studentSearch && (
-                          <button className="btn btn-outline-secondary" onClick={() => setStudentSearch("")}>
-                            <i className="bi bi-x"></i>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="card-body p-0">
-                  {students.length === 0 ? (
-                    <div className="text-center py-5">
-                      <i className="bi bi-people fs-1 text-muted d-block mb-2 opacity-25"></i>
-                      <p className="text-muted mb-3">No students enrolled yet.</p>
-                      <button className="btn btn-success" onClick={() => setShowAddModal(true)}>
-                        <i className="bi bi-person-plus me-2"></i>Enroll First Student
+              {/* ════ STUDENTS TAB ════ */}
+              {activeTab==="students" && (
+                <div className="dash-card fade-up">
+                  <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: students.length > 0 ? 12 : 0 }}>
+                      <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
+                        <i className="bi bi-people me-2" style={{ color: "#15803d" }}></i>
+                        Enrolled Students
+                        <span className="badge-pill ms-2" style={{ background: "#e8f0fe", color: "#0056b3" }}>{students.length}</span>
+                      </h2>
+                      <button className="dash-btn-success" style={{ fontSize: 12, padding: "7px 14px" }} onClick={() => setShowAddModal(true)}>
+                        <i className="bi bi-person-plus"></i> Add Student
                       </button>
                     </div>
-                  ) : filteredStudents.length === 0 ? (
-                    <div className="text-center py-4 text-muted">
-                      <i className="bi bi-search d-block fs-3 mb-2"></i>
-                      No students match "<strong>{studentSearch}</strong>"
-                    </div>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover mb-0">
-                        <thead className="table-light">
-                          <tr><th>#</th><th>STUDENT</th><th>EMAIL</th><th>ENROLLED</th><th>EXAM ACCESS</th><th>ACTIONS</th></tr>
-                        </thead>
-                        <tbody>
-                          {filteredStudents.map((student, idx) => (
-                            <tr key={student.id}>
-                              <td className="text-muted align-middle">{idx + 1}</td>
-                              <td className="align-middle">
-                                <div className="d-flex align-items-center gap-2">
-                                  <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
-                                    style={{ width: 34, height: 34, fontSize: 13 }}>
-                                    {student.name.charAt(0).toUpperCase()}
+                    {students.length > 0 && (
+                      <div style={{ position: "relative", maxWidth: 320 }}>
+                        <i className="bi bi-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13 }}></i>
+                        <input className="form-ctrl" style={{ paddingLeft: 32 }} placeholder="Search by name or email…"
+                          value={studentSearch} onChange={e => setStudentSearch(e.target.value)} />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    {students.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: "48px 20px", color: "#94a3b8" }}>
+                        <i className="bi bi-people" style={{ fontSize: 36, display: "block", marginBottom: 10, opacity: .3 }}></i>
+                        <p style={{ marginBottom: 14, fontSize: 14 }}>No students enrolled yet.</p>
+                        <button className="dash-btn-success" style={{ fontSize: 12, padding: "8px 16px" }} onClick={() => setShowAddModal(true)}>
+                          <i className="bi bi-person-plus"></i> Enroll First Student
+                        </button>
+                      </div>
+                    ) : filteredStudents.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>
+                        <i className="bi bi-search" style={{ fontSize: 28, display: "block", marginBottom: 8 }}></i>
+                        No students match "<strong>{studentSearch}</strong>"
+                      </div>
+                    ) : (
+                      <div style={{ overflowX: "auto" }}>
+                        <table className="dash-table">
+                          <thead>
+                            <tr>{["#","STUDENT","EMAIL","ENROLLED","EXAM ACCESS","ACTIONS"].map(h => <th key={h}>{h}</th>)}</tr>
+                          </thead>
+                          <tbody>
+                            {filteredStudents.map((student, idx) => (
+                              <tr key={student.id}>
+                                <td style={{ color: "#94a3b8", fontSize: 12 }}>{idx + 1}</td>
+                                <td>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                    <MiniAvatar name={student.name} size={32} />
+                                    <span style={{ fontWeight: 600, fontSize: 13, color: "#1e293b" }}>{student.name}</span>
                                   </div>
-                                  <span className="fw-semibold">{student.name}</span>
-                                </div>
-                              </td>
-                              <td className="text-muted small align-middle">{student.email}</td>
-                              <td className="text-muted small align-middle">
-                                {student.enrolled_at ? new Date(student.enrolled_at).toLocaleDateString() : "—"}
-                              </td>
-                              <td className="align-middle">
-                                <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
-                                  <i className="bi bi-check-circle me-1"></i>
-                                  {exams.length} exam{exams.length !== 1 ? "s" : ""}
-                                </span>
-                              </td>
-                              <td className="align-middle">
-                                <button className="btn btn-sm btn-outline-danger"
-                                  onClick={() => handleRemoveStudent(student.id, student.name)}>
-                                  <i className="bi bi-person-dash me-1"></i>
-                                  <span className="d-none d-md-inline">Remove</span>
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                                </td>
+                                <td style={{ fontSize: 12, color: "#64748b" }}>{student.email}</td>
+                                <td style={{ fontSize: 12, color: "#64748b" }}>
+                                  {student.enrolled_at ? new Date(student.enrolled_at).toLocaleDateString() : "—"}
+                                </td>
+                                <td>
+                                  <span className="badge-pill" style={{ background: "#f0fdf4", color: "#15803d" }}>
+                                    <i className="bi bi-check-circle me-1"></i>
+                                    {exams.length} exam{exams.length!==1?"s":""}
+                                  </span>
+                                </td>
+                                <td>
+                                  <button className="action-btn del" style={{ width: "auto", padding: "0 10px", gap: 5, fontSize: 12 }}
+                                    onClick={() => handleRemoveStudent(student.id, student.name)}>
+                                    <i className="bi bi-person-dash"></i>
+                                    <span className="d-none d-md-inline">Remove</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                  {students.length > 0 && (
+                    <div style={{ padding: "12px 20px", borderTop: "1px solid #f1f5f9", fontSize: 12, color: "#94a3b8" }}>
+                      <i className="bi bi-info-circle me-1"></i>
+                      Enrolled students have access to all <strong style={{ color: "#64748b" }}>{exams.length}</strong> exam(s).
+                      Removing a student only unenrolls them — their account is not deleted.
                     </div>
                   )}
                 </div>
-                {students.length > 0 && (
-                  <div className="card-footer bg-white text-muted small">
-                    <i className="bi bi-info-circle me-1"></i>
-                    Enrolled students have access to all <strong>{exams.length}</strong> exam(s) in this course.
-                    Removing a student only unenrolls them — their account is not deleted.
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
+          </main>
+        </div>
 
-          </div>{/* /tab content */}
-        </div>{/* /main */}
-      </div>{/* /layout */}
+        <InstructorBottomNav active="Courses" />
+      </div>
 
-      {/* ── Add Student Modal ── */}
+      {/* Add Student Modal */}
       <AddStudentModal
         show={showAddModal}
         course={course}
         onHide={() => setShowAddModal(false)}
         onSuccess={handleStudentAdded}
       />
-    </div>
+    </>
   );
 };
 
-/* ════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════════════════════
    ADD STUDENT MODAL
-════════════════════════════════════════════ */
+════════════════════════════════════════════════════════════════════════════ */
 const AddStudentModal = ({ show, course, onHide, onSuccess }) => {
   const [mode,            setMode]            = useState("existing");
   const [submitting,      setSubmitting]      = useState(false);
@@ -617,13 +778,13 @@ const AddStudentModal = ({ show, course, onHide, onSuccess }) => {
   const [searchResults,   setSearchResults]   = useState([]);
   const [searching,       setSearching]       = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [newForm,         setNewForm]         = useState({ name: "", email: "", password: "" });
+  const [newForm,         setNewForm]         = useState({ name:"", email:"", password:"" });
   const [showPassword,    setShowPassword]    = useState(false);
 
   useEffect(() => {
     if (!show) {
       setMode("existing"); setSearchQuery(""); setSearchResults([]);
-      setSelectedStudent(null); setNewForm({ name: "", email: "", password: "" }); setShowPassword(false);
+      setSelectedStudent(null); setNewForm({ name:"", email:"", password:"" }); setShowPassword(false);
     }
   }, [show]);
 
@@ -645,16 +806,15 @@ const AddStudentModal = ({ show, course, onHide, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (mode === "existing" && !selectedStudent) {
-      Swal.fire("Oops!", "Please select a student from the list.", "warning");
-      return;
+      Swal.fire("Oops!", "Please select a student from the list.", "warning"); return;
     }
     setSubmitting(true);
     try {
       const payload = mode === "existing"
-        ? { mode: "existing", email: selectedStudent.email }
-        : { mode: "new", name: newForm.name, new_email: newForm.email, password: newForm.password };
+        ? { mode:"existing", email:selectedStudent.email }
+        : { mode:"new", name:newForm.name, new_email:newForm.email, password:newForm.password };
       const res = await API.post(`/courses/${course.id}/students`, payload);
-      Swal.fire({ icon: "success", title: "Enrolled!", text: res.data.message, timer: 2000, showConfirmButton: false });
+      Swal.fire({ icon:"success", title:"Enrolled!", text:res.data.message, timer:2000, showConfirmButton:false });
       onSuccess(res.data.student);
     } catch (err) {
       Swal.fire("Error!", err.response?.data?.message || "Failed to enroll student.", "error");
@@ -664,151 +824,149 @@ const AddStudentModal = ({ show, course, onHide, onSuccess }) => {
   if (!show || !course) return null;
 
   return (
-    <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-      onClick={(e) => { if (e.target === e.currentTarget && !submitting) onHide(); }}>
-      <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: 500 }}>
-        <div className="modal-content">
-
-          <div className="modal-header border-0 pb-0">
-            <div>
-              <h5 className="modal-title fw-bold">
-                <i className="bi bi-person-plus me-2 text-success"></i>Add Student
-              </h5>
-              <small className="text-muted d-block mt-1">
-                <i className="bi bi-folder2 text-primary me-1"></i>
-                Enrolling into <strong className="text-primary">{course.code} — {course.name}</strong>
-              </small>
-            </div>
-            <button type="button" className="btn-close" onClick={onHide} disabled={submitting} />
+    <div className="dash-modal-overlay" onClick={e => { if (e.target === e.currentTarget && !submitting) onHide(); }}>
+      <div className="dash-modal">
+        <div className="dash-modal-hdr">
+          <div>
+            <h5 style={{ margin: 0, fontWeight: 700, fontSize: 17, color: "#0f172a" }}>
+              <i className="bi bi-person-plus me-2" style={{ color: "#15803d" }}></i>Add Student
+            </h5>
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#94a3b8" }}>
+              <i className="bi bi-folder2 me-1" style={{ color: "#0056b3" }}></i>
+              Enrolling into <strong style={{ color: "#0056b3" }}>{course.code} — {course.name}</strong>
+            </p>
           </div>
+          <button onClick={onHide} disabled={submitting}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#94a3b8", padding: 4 }}>
+            <i className="bi bi-x-lg"></i>
+          </button>
+        </div>
 
-          <div className="px-3 pt-3">
-            <div className="btn-group w-100">
-              <button type="button"
-                className={`btn ${mode === "existing" ? "btn-primary" : "btn-outline-secondary"}`}
-                onClick={() => setMode("existing")} disabled={submitting}>
-                <i className="bi bi-search me-2"></i>Enroll Existing
-              </button>
-              <button type="button"
-                className={`btn ${mode === "new" ? "btn-primary" : "btn-outline-secondary"}`}
-                onClick={() => setMode("new")} disabled={submitting}>
-                <i className="bi bi-person-add me-2"></i>Create New
-              </button>
-            </div>
+        <div style={{ padding: "16px 24px 0" }}>
+          <div className="mode-toggle">
+            <button type="button" className={`mode-btn ${mode==="existing"?"active":""}`}
+              onClick={() => setMode("existing")} disabled={submitting}>
+              <i className="bi bi-search"></i> Enroll Existing
+            </button>
+            <button type="button" className={`mode-btn ${mode==="new"?"active":""}`}
+              onClick={() => setMode("new")} disabled={submitting}>
+              <i className="bi bi-person-add"></i> Create New
+            </button>
           </div>
+        </div>
 
-          <form onSubmit={handleSubmit}>
-            <div className="modal-body">
+        <form onSubmit={handleSubmit}>
+          <div className="dash-modal-body">
 
-              {mode === "existing" && (
-                <div>
-                  <p className="text-muted small mb-3">Search by name or email to find an existing student account.</p>
-                  <label className="form-label fw-semibold">Search Student <span className="text-danger">*</span></label>
-                  <div className="position-relative">
-                    <div className="input-group">
-                      <span className="input-group-text">
-                        {searching ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-search"></i>}
-                      </span>
-                      <input type="text" className="form-control" autoComplete="off"
-                        placeholder="Type name or email (min. 2 chars)…"
-                        value={searchQuery}
-                        onChange={(e) => { setSearchQuery(e.target.value); setSelectedStudent(null); }}
-                        disabled={submitting} />
-                      {searchQuery && (
-                        <button type="button" className="btn btn-outline-secondary"
-                          onClick={() => { setSearchQuery(""); setSelectedStudent(null); setSearchResults([]); }}>
-                          <i className="bi bi-x"></i>
-                        </button>
-                      )}
-                    </div>
-                    {searchResults.length > 0 && (
-                      <div className="position-absolute w-100 bg-white border rounded shadow-sm"
-                        style={{ top: "100%", zIndex: 1050, maxHeight: 220, overflowY: "auto" }}>
-                        {searchResults.map((s) => (
-                          <button key={s.id} type="button"
-                            className="d-flex align-items-center gap-3 w-100 px-3 py-2 border-0 bg-transparent text-start"
-                            onMouseEnter={(e) => e.currentTarget.classList.add("bg-light")}
-                            onMouseLeave={(e) => e.currentTarget.classList.remove("bg-light")}
-                            onClick={() => handleSelect(s)}>
-                            <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
-                              style={{ width: 34, height: 34, fontSize: 13 }}>
-                              {s.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <div className="fw-semibold small">{s.name}</div>
-                              <div className="text-muted" style={{ fontSize: 11 }}>{s.email}</div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {searchQuery.trim().length >= 2 && !searching && searchResults.length === 0 && !selectedStudent && (
-                      <div className="text-muted small mt-2">
-                        <i className="bi bi-exclamation-circle me-1"></i>
-                        No accounts found.{" "}
-                        <button type="button" className="btn btn-link btn-sm p-0" onClick={() => setMode("new")}>
-                          Create a new student instead
-                        </button>
-                      </div>
+            {mode==="existing" && (
+              <div>
+                <p style={{ margin: "0 0 14px", fontSize: 13, color: "#64748b" }}>
+                  Search by name or email to find an existing student account.
+                </p>
+                <label className="form-lbl">Search Student <span style={{ color: "#ef4444" }}>*</span></label>
+                <div style={{ position: "relative" }}>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <span style={{ padding: "9px 12px", background: "#f8faff", border: "1px solid rgba(0,86,179,.15)", borderRight: "none", borderRadius: "10px 0 0 10px", color: "#94a3b8", fontSize: 13, flexShrink: 0 }}>
+                      {searching ? <span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14, borderWidth: 2 }} /> : <i className="bi bi-search"></i>}
+                    </span>
+                    <input type="text" autoComplete="off"
+                      style={{ flex: 1, border: "1px solid rgba(0,86,179,.15)", borderLeft: "none", borderRight: searchQuery ? "none" : "1px solid rgba(0,86,179,.15)", borderRadius: searchQuery?"0":"0 10px 10px 0", padding:"9px 13px", fontSize:13, outline:"none", fontFamily:"'DM Sans',sans-serif", background:"#f8faff", color:"#1e293b" }}
+                      placeholder="Type name or email (min. 2 chars)…"
+                      value={searchQuery}
+                      onChange={e => { setSearchQuery(e.target.value); setSelectedStudent(null); }}
+                      disabled={submitting} />
+                    {searchQuery && (
+                      <button type="button"
+                        style={{ padding:"9px 12px", background:"#f8faff", border:"1px solid rgba(0,86,179,.15)", borderLeft:"none", borderRadius:"0 10px 10px 0", color:"#94a3b8", cursor:"pointer", fontSize:13 }}
+                        onClick={() => { setSearchQuery(""); setSelectedStudent(null); setSearchResults([]); }}>
+                        <i className="bi bi-x"></i>
+                      </button>
                     )}
                   </div>
-                  {selectedStudent && (
-                    <div className="alert alert-success d-flex align-items-center gap-3 mt-3 py-2 mb-0">
-                      <i className="bi bi-check-circle-fill fs-5 text-success"></i>
-                      <div>
-                        <div className="fw-semibold small">{selectedStudent.name}</div>
-                        <div className="text-muted" style={{ fontSize: 11 }}>{selectedStudent.email}</div>
-                      </div>
+                  {searchResults.length > 0 && (
+                    <div className="search-dropdown">
+                      {searchResults.map(s => (
+                        <div key={s.id} className="search-dropdown-item" onClick={() => handleSelect(s)}>
+                          <div style={{ width:34, height:34, borderRadius:"50%", background:"#0056b3", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:13, flexShrink:0 }}>
+                            {s.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight:600, fontSize:13, color:"#1e293b" }}>{s.name}</div>
+                            <div style={{ fontSize:11, color:"#94a3b8" }}>{s.email}</div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
+                  {searchQuery.trim().length >= 2 && !searching && searchResults.length === 0 && !selectedStudent && (
+                    <p style={{ margin:"8px 0 0", fontSize:12, color:"#94a3b8" }}>
+                      <i className="bi bi-exclamation-circle me-1"></i>No accounts found.{" "}
+                      <button type="button" style={{ background:"none", border:"none", cursor:"pointer", color:"#0056b3", fontWeight:600, fontSize:12, fontFamily:"'DM Sans',sans-serif", padding:0 }}
+                        onClick={() => setMode("new")}>Create a new student instead</button>
+                    </p>
+                  )}
                 </div>
-              )}
+                {selectedStudent && (
+                  <div style={{ marginTop:12, padding:"12px 14px", background:"#f0fdf4", borderRadius:10, border:"1px solid #bbf7d0", display:"flex", alignItems:"center", gap:10 }}>
+                    <i className="bi bi-check-circle-fill" style={{ color:"#22c55e", fontSize:16, flexShrink:0 }}></i>
+                    <div>
+                      <div style={{ fontWeight:600, fontSize:13, color:"#15803d" }}>{selectedStudent.name}</div>
+                      <div style={{ fontSize:11, color:"#4ade80" }}>{selectedStudent.email}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
-              {mode === "new" && (
-                <div>
-                  <div className="alert alert-info py-2 small mb-3">
-                    <i className="bi bi-info-circle me-1"></i>
-                    A new account will be created and automatically enrolled in <strong>{course.code}</strong>.
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label fw-semibold">Full Name <span className="text-danger">*</span></label>
-                    <input type="text" className="form-control" placeholder="e.g., Juan dela Cruz"
-                      value={newForm.name} onChange={(e) => setNewForm({ ...newForm, name: e.target.value })}
+            {mode==="new" && (
+              <div>
+                <div style={{ padding:"10px 14px", background:"#e8f0fe", borderRadius:10, border:"1px solid rgba(0,86,179,.15)", marginBottom:16, fontSize:13, color:"#0056b3" }}>
+                  <i className="bi bi-info-circle me-1"></i>
+                  A new account will be created and automatically enrolled in <strong>{course.code}</strong>.
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+                  <div>
+                    <label className="form-lbl">Full Name <span style={{ color:"#ef4444" }}>*</span></label>
+                    <input type="text" className="form-ctrl" placeholder="e.g., Juan dela Cruz"
+                      value={newForm.name} onChange={e => setNewForm({...newForm,name:e.target.value})}
                       required disabled={submitting} />
                   </div>
-                  <div className="mb-3">
-                    <label className="form-label fw-semibold">Email Address <span className="text-danger">*</span></label>
-                    <input type="email" className="form-control" placeholder="e.g., student@university.edu"
-                      value={newForm.email} onChange={(e) => setNewForm({ ...newForm, email: e.target.value })}
+                  <div>
+                    <label className="form-lbl">Email Address <span style={{ color:"#ef4444" }}>*</span></label>
+                    <input type="email" className="form-ctrl" placeholder="e.g., student@university.edu"
+                      value={newForm.email} onChange={e => setNewForm({...newForm,email:e.target.value})}
                       required disabled={submitting} />
                   </div>
-                  <div className="mb-0">
-                    <label className="form-label fw-semibold">Temporary Password <span className="text-danger">*</span></label>
-                    <div className="input-group">
-                      <input type={showPassword ? "text" : "password"} className="form-control"
+                  <div>
+                    <label className="form-lbl">Temporary Password <span style={{ color:"#ef4444" }}>*</span></label>
+                    <div style={{ display:"flex", alignItems:"center" }}>
+                      <input type={showPassword?"text":"password"} className="form-ctrl"
+                        style={{ borderRadius:"10px 0 0 10px", borderRight:"none" }}
                         placeholder="Min. 8 characters"
-                        value={newForm.password} onChange={(e) => setNewForm({ ...newForm, password: e.target.value })}
+                        value={newForm.password} onChange={e => setNewForm({...newForm,password:e.target.value})}
                         required minLength={8} disabled={submitting} />
-                      <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPassword((v) => !v)}>
-                        <i className={`bi bi-eye${showPassword ? "-slash" : ""}`}></i>
+                      <button type="button"
+                        style={{ padding:"9px 13px", background:"#f8faff", border:"1px solid rgba(0,86,179,.15)", borderLeft:"none", borderRadius:"0 10px 10px 0", color:"#64748b", cursor:"pointer", fontSize:14 }}
+                        onClick={() => setShowPassword(v => !v)}>
+                        <i className={`bi bi-eye${showPassword?"-slash":""}`}></i>
                       </button>
                     </div>
-                    <div className="form-text">Share this password with the student.</div>
+                    <p style={{ margin:"4px 0 0", fontSize:11, color:"#94a3b8" }}>Share this password with the student.</p>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+          </div>
 
-            <div className="modal-footer border-0 pt-0">
-              <button type="button" className="btn btn-light" onClick={onHide} disabled={submitting}>Cancel</button>
-              <button type="submit" className="btn btn-success px-4" disabled={submitting}>
-                {submitting
-                  ? <><span className="spinner-border spinner-border-sm me-2" />Enrolling…</>
-                  : <><i className="bi bi-person-check me-2"></i>{mode === "new" ? "Create & Enroll" : "Enroll Student"}</>}
-              </button>
-            </div>
-          </form>
-        </div>
+          <div className="dash-modal-ftr">
+            <button type="button" className="dash-btn-ghost" onClick={onHide} disabled={submitting}>Cancel</button>
+            <button type="submit" className="dash-btn-success" style={{ padding:"9px 20px" }} disabled={submitting}>
+              {submitting
+                ? <><span className="spinner-border spinner-border-sm me-2"/>Enrolling…</>
+                : <><i className="bi bi-person-check"></i>{mode==="new"?"Create & Enroll":"Enroll Student"}</>}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

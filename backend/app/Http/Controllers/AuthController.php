@@ -100,6 +100,10 @@ class AuthController extends Controller
      *
      * This method authenticates a user with email and password.
      * It verifies credentials and creates an authenticated session.
+     *
+     * BUG FIX (Suspend): Added a status check after password verification.
+     * Previously, a suspended user could still log in successfully because
+     * status was never read. Now a 403 is returned before Auth::login().
      */
     public function login(Request $request)
     {
@@ -122,6 +126,18 @@ class AuthController extends Controller
                     'message' => 'Invalid credentials',
                 ], 401); // 401 = Unauthorized
             }
+
+            // ── BUG FIX: Suspended-account gate ──────────────────────────
+            // This block was missing entirely, which allowed suspended users
+            // to log in even after an admin had suspended their account.
+            // The DB status update was working correctly — the gate was just
+            // never checked here on the way in.
+            if (($user->status ?? 'active') === 'suspended') {
+                return response()->json([
+                    'message' => 'Your account has been suspended. Please contact your administrator.',
+                ], 403); // 403 = Forbidden
+            }
+            // ─────────────────────────────────────────────────────────────
 
             // Log the user in via session
             // This creates an authenticated session for the user

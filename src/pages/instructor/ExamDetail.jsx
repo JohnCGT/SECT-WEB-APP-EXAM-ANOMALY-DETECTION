@@ -3,7 +3,17 @@ import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import API from "../../api";
 import Swal from "sweetalert2";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+/* ─── Constants ─────────────────────────────────────────────────────────── */
+const NAV_ITEMS = [
+  { to: "/instructor",                  icon: "bi-speedometer2",         label: "Dashboard" },
+  { to: "/instructor/courses",          icon: "bi-book",                 label: "Courses"   },
+  { to: "/instructor/exams",            icon: "bi-file-earmark-text",    label: "Exams"     },
+  { to: "/instructor/students",         icon: "bi-people",               label: "Students"  },
+  { to: "/instructor/alerts",           icon: "bi-exclamation-triangle", label: "Alerts"    },
+  { to: "/instructor/support",          icon: "bi-headset",              label: "Support"   },
+  { to: "/instructor/account-settings", icon: "bi-gear",                 label: "Settings"  },
+];
+
 const TYPE_LABELS = {
   tab_switch:         "Tab Switching",
   keyboard_shortcut:  "Keyboard Shortcut",
@@ -11,9 +21,9 @@ const TYPE_LABELS = {
   keystroke_dynamics: "Keystroke Dynamics",
 };
 const SEVERITY_MAP = {
-  high:   { badge: "bg-danger",            label: "High"   },
-  medium: { badge: "bg-warning text-dark", label: "Medium" },
-  low:    { badge: "bg-secondary",         label: "Low"    },
+  high:   { bg: "#fef2f2", color: "#dc2626", label: "High"   },
+  medium: { bg: "#fff7ed", color: "#d97706", label: "Medium" },
+  low:    { bg: "#f1f5f9", color: "#64748b", label: "Low"    },
 };
 const QTYPE_ICON = {
   multiple_choice: "bi-ui-radios",
@@ -21,15 +31,12 @@ const QTYPE_ICON = {
   essay:           "bi-textarea",
 };
 
-const riskColor   = (s) => s >= 50 ? "text-danger"  : s >= 20 ? "text-warning"  : "text-success";
-const riskBgClass = (s) => s >= 50 ? "bg-danger"    : s >= 20 ? "bg-warning"    : "bg-success";
+const riskColor   = (s) => s >= 50 ? "#ef4444"  : s >= 20 ? "#d97706"  : "#22c55e";
+const riskBgColor = (s) => s >= 50 ? "#fef2f2"  : s >= 20 ? "#fff7ed"  : "#f0fdf4";
 const cpiLabel    = (s) => s >= 75 ? "Highly Likely" : s >= 50 ? "Likely" : s >= 25 ? "Possible" : "Unlikely";
-
-// An essay is graded ONLY when the instructor has explicitly set points_earned.
-// null = not yet graded. 0 = graded zero (valid).
 const isEssayGraded = (e) => e.points_earned !== null && e.points_earned !== undefined;
 
-// ─── jsPDF (CDN, on-demand) ───────────────────────────────────────────────────
+/* ─── jsPDF (CDN, on-demand) ────────────────────────────────────────────── */
 let jsPDFPromise = null;
 function loadJsPDF() {
   if (jsPDFPromise) return jsPDFPromise;
@@ -50,21 +57,16 @@ function loadJsPDF() {
   return jsPDFPromise;
 }
 
-// ─── Per-student PDF generator ────────────────────────────────────────────────
 async function generateStudentPDF(data) {
   const JsPDF = await loadJsPDF();
   const doc   = new JsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
   const PW = 210, ML = 14, MR = 14, CW = PW - ML - MR;
   const PURPLE = [108,99,255], DARK = [26,26,46], MUTED = [120,120,150];
   const GREEN  = [25,135,84],  RED  = [220,53,69], ORANGE = [253,126,20];
   const LBKG   = [244,243,255];
-
   const { exam, student, submission, integrity, answers } = data;
   let y = 14;
-
   const ensureSpace = (n) => { if (y + n > 278) { doc.addPage(); y = 14; } };
-
   const sectionHeader = (label) => {
     ensureSpace(10);
     doc.setFont("helvetica","bold"); doc.setFontSize(9); doc.setTextColor(...PURPLE);
@@ -73,8 +75,6 @@ async function generateStudentPDF(data) {
     doc.line(ML, y + 1.5, ML + CW, y + 1.5);
     y += 7;
   };
-
-  // Cover
   doc.setFillColor(...PURPLE); doc.rect(0, 0, PW, 2, "F");
   doc.setFillColor(...LBKG);   doc.rect(ML, y, CW, 28, "F");
   doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(...PURPLE);
@@ -89,8 +89,6 @@ async function generateStudentPDF(data) {
   doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(...MUTED);
   doc.text("For Instructor Use Only", PW - MR - 2, y + 11, { align:"right" });
   y += 34;
-
-  // Student row
   ensureSpace(22);
   doc.setFillColor(255,255,255); doc.setDrawColor(220,220,240);
   doc.roundedRect(ML, y, CW, 18, 2, 2, "FD");
@@ -108,8 +106,6 @@ async function generateStudentPDF(data) {
   doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(255,255,255);
   doc.text(`${submission.score ?? 0} / ${submission.total_points}  (${pct}%)`, PW - MR - 21, y + 11, { align:"center" });
   y += 24;
-
-  // Timing
   const fmt = (d) => d ? new Date(d).toLocaleString("en-PH") : "-";
   doc.autoTable({
     startY: y, margin:{left:ML,right:MR}, tableWidth:CW, head:[],
@@ -119,11 +115,9 @@ async function generateStudentPDF(data) {
     theme:"grid",
   });
   y = doc.lastAutoTable.finalY + 6;
-
-  // Integrity
   sectionHeader("ACADEMIC INTEGRITY");
   if (integrity) {
-    const cpi    = integrity.cpi_score ?? 0;
+    const cpi = integrity.cpi_score ?? 0;
     const cpiCol = cpi >= 50 ? RED : cpi >= 25 ? ORANGE : GREEN;
     ensureSpace(28);
     doc.setFillColor(...cpiCol); doc.roundedRect(ML, y, 44, 18, 2, 2, "F");
@@ -148,10 +142,10 @@ async function generateStudentPDF(data) {
       startY:y, margin:{left:ML,right:MR}, tableWidth:CW,
       head:[["Algorithm","Raw Score","Flag","Event Count","Weight"]],
       body:[
-        ["One-Class SVM",          integrity.svm_score     != null ? integrity.svm_score.toFixed(4)     : "-", integrity.svm_flagged     ? "Flagged":"OK", `Shortcuts: ${integrity.keyboard_shortcut_count}`,       "0.40"],
-        ["Isolation Forest (Tab)", integrity.iso_tab_score != null ? integrity.iso_tab_score.toFixed(4) : "-", integrity.iso_tab_flagged ? "Flagged":"OK", `Tab switches: ${integrity.tab_switch_count}`,            "0.30"],
-        ["Isolation Forest (RT)",  integrity.rt_score      != null ? integrity.rt_score.toFixed(4)      : "-", integrity.rt_flagged      ? "Flagged":"OK", `Response anomalies: ${integrity.response_time_anomaly_count}`, "0.15"],
-        ["Hidden Markov Model",    integrity.hmm_score     != null ? integrity.hmm_score.toFixed(4)     : "-", integrity.hmm_flagged     ? "Flagged":"OK", `Keystroke anomalies: ${integrity.keystroke_anomaly_count}`,     "0.15"],
+        ["One-Class SVM",          integrity.svm_score     != null ? integrity.svm_score.toFixed(4)     : "-", integrity.svm_flagged     ? "Flagged":"OK", `Shortcuts: ${integrity.keyboard_shortcut_count}`,            "0.40"],
+        ["Isolation Forest (Tab)", integrity.iso_tab_score != null ? integrity.iso_tab_score.toFixed(4) : "-", integrity.iso_tab_flagged ? "Flagged":"OK", `Tab switches: ${integrity.tab_switch_count}`,                 "0.30"],
+        ["Isolation Forest (RT)",  integrity.rt_score      != null ? integrity.rt_score.toFixed(4)      : "-", integrity.rt_flagged      ? "Flagged":"OK", `Response anomalies: ${integrity.response_time_anomaly_count}`,"0.15"],
+        ["Hidden Markov Model",    integrity.hmm_score     != null ? integrity.hmm_score.toFixed(4)     : "-", integrity.hmm_flagged     ? "Flagged":"OK", `Keystroke anomalies: ${integrity.keystroke_anomaly_count}`,    "0.15"],
       ],
       headStyles:{fillColor:PURPLE,textColor:255,fontSize:7,fontStyle:"bold"},
       bodyStyles:{fontSize:7,textColor:DARK},
@@ -165,11 +159,8 @@ async function generateStudentPDF(data) {
     doc.text("Integrity analysis not yet available (ML processing pending).", ML, y);
     y += 8;
   }
-
-  // Answers
   sectionHeader("ANSWERS");
   const HEADER_H = 8, LINE_H_LG = 4, LINE_H_SM = 3.5, BOTTOM_PAD = 3;
-
   for (const ans of answers) {
     const isEssay = ans.type === "essay";
     const earned  = ans.points_earned;
@@ -177,26 +168,14 @@ async function generateStudentPDF(data) {
     const stripeColor = isEssay
       ? (earned === null || earned === undefined ? ORANGE : earned > 0 ? GREEN : RED)
       : (correct ? GREEN : RED);
-
     const wrappedQ   = doc.splitTextToSize(ans.question_text || "", CW - 8);
     const wrappedAns = doc.splitTextToSize(String(ans.student_answer ?? "No answer provided"), CW - 8);
     const wrappedRub = (isEssay && ans.rubric) ? doc.splitTextToSize(`Rubric: ${ans.rubric}`, CW - 8) : [];
     const wrappedFb  = ans.feedback ? doc.splitTextToSize(`Feedback: ${ans.feedback}`, CW - 8) : [];
-
-    const blockH = HEADER_H
-      + wrappedQ.length * LINE_H_LG
-      + (wrappedRub.length ? wrappedRub.length * LINE_H_SM + 2 : 0)
-      + wrappedAns.length * LINE_H_LG
-      + (!isEssay && ans.correct_answer ? LINE_H_SM + 1 : 0)
-      + (wrappedFb.length ? wrappedFb.length * LINE_H_SM + 2 : 0)
-      + BOTTOM_PAD;
-
+    const blockH = HEADER_H + wrappedQ.length * LINE_H_LG + (wrappedRub.length ? wrappedRub.length * LINE_H_SM + 2 : 0) + wrappedAns.length * LINE_H_LG + (!isEssay && ans.correct_answer ? LINE_H_SM + 1 : 0) + (wrappedFb.length ? wrappedFb.length * LINE_H_SM + 2 : 0) + BOTTOM_PAD;
     ensureSpace(blockH);
-
     doc.setFillColor(...stripeColor); doc.rect(ML, y, 1.5, blockH, "F");
     doc.setFillColor(250,250,254);    doc.rect(ML + 1.5, y, CW - 1.5, blockH, "F");
-
-    // Header row: Q-badge | type tag | status label | points
     doc.setFillColor(...PURPLE); doc.roundedRect(ML + 3, y + 1.5, 10, 5, 1, 1, "F");
     doc.setFont("helvetica","bold"); doc.setFontSize(6.5); doc.setTextColor(255,255,255);
     doc.text(`Q${ans.order}`, ML + 8, y + 5.2, { align:"center" });
@@ -209,42 +188,22 @@ async function generateStudentPDF(data) {
       doc.text(correct ? "Correct" : "Incorrect", ML + 42, y + 5.2);
     } else {
       doc.setFont("helvetica","normal"); doc.setFontSize(6.5);
-      if (earned === null || earned === undefined) {
-        doc.setTextColor(...ORANGE); doc.text("Pending grade", ML + 42, y + 5.2);
-      } else {
-        doc.setTextColor(earned>0?GREEN[0]:RED[0], earned>0?GREEN[1]:RED[1], earned>0?GREEN[2]:RED[2]);
-        doc.text(`Graded: ${earned} pts`, ML + 42, y + 5.2);
-      }
+      if (earned === null || earned === undefined) { doc.setTextColor(...ORANGE); doc.text("Pending grade", ML + 42, y + 5.2); }
+      else { doc.setTextColor(earned>0?GREEN[0]:RED[0], earned>0?GREEN[1]:RED[1], earned>0?GREEN[2]:RED[2]); doc.text(`Graded: ${earned} pts`, ML + 42, y + 5.2); }
     }
     const ptStr = earned != null ? `${earned} / ${ans.points} pts` : `- / ${ans.points} pts`;
     doc.setFont("helvetica","bold"); doc.setFontSize(7.5); doc.setTextColor(...stripeColor);
     doc.text(ptStr, ML + CW - 2, y + 5.5, { align:"right" });
-
-    // Content
     let iy = y + HEADER_H;
     doc.setFont("helvetica","bold"); doc.setFontSize(7.5); doc.setTextColor(...DARK);
     doc.text(wrappedQ, ML + 4, iy); iy += wrappedQ.length * LINE_H_LG;
-    if (wrappedRub.length) {
-      iy += 2;
-      doc.setFont("helvetica","italic"); doc.setFontSize(6.5); doc.setTextColor(...MUTED);
-      doc.text(wrappedRub, ML + 4, iy); iy += wrappedRub.length * LINE_H_SM;
-    }
+    if (wrappedRub.length) { iy += 2; doc.setFont("helvetica","italic"); doc.setFontSize(6.5); doc.setTextColor(...MUTED); doc.text(wrappedRub, ML + 4, iy); iy += wrappedRub.length * LINE_H_SM; }
     doc.setFont("helvetica","normal"); doc.setFontSize(7.5); doc.setTextColor(...DARK);
     doc.text(wrappedAns, ML + 4, iy); iy += wrappedAns.length * LINE_H_LG;
-    if (!isEssay && ans.correct_answer) {
-      iy += 1;
-      doc.setFont("helvetica","italic"); doc.setFontSize(6.5); doc.setTextColor(...MUTED);
-      doc.text(`Correct: ${ans.correct_answer}`, ML + 4, iy); iy += LINE_H_SM;
-    }
-    if (wrappedFb.length) {
-      iy += 2;
-      doc.setFont("helvetica","italic"); doc.setFontSize(6.5); doc.setTextColor(...GREEN);
-      doc.text(wrappedFb, ML + 4, iy);
-    }
+    if (!isEssay && ans.correct_answer) { iy += 1; doc.setFont("helvetica","italic"); doc.setFontSize(6.5); doc.setTextColor(...MUTED); doc.text(`Correct: ${ans.correct_answer}`, ML + 4, iy); iy += LINE_H_SM; }
+    if (wrappedFb.length) { iy += 2; doc.setFont("helvetica","italic"); doc.setFontSize(6.5); doc.setTextColor(...GREEN); doc.text(wrappedFb, ML + 4, iy); }
     y += blockH + 3;
   }
-
-  // Footer
   const pages = doc.getNumberOfPages();
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
@@ -253,27 +212,229 @@ async function generateStudentPDF(data) {
     doc.text("SECT - Smart Exam Cheating Tracker  |  Confidential", ML, 295.5);
     doc.text(`Page ${i} of ${pages}`, PW - MR, 295.5, { align:"right" });
   }
-
   const safeName = (student?.name  || "student").replace(/[^a-zA-Z0-9_-]/g, "_");
   const safeExam = (exam?.title    || "exam"   ).replace(/[^a-zA-Z0-9_-]/g, "_");
   doc.save(`${safeExam}_${safeName}.pdf`);
 }
 
-// ─── MetadataSummary ──────────────────────────────────────────────────────────
+/* ─── Shared CSS ─────────────────────────────────────────────────────────── */
+const SHARED_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
+  *,*::before,*::after{box-sizing:border-box;}
+  body,html{margin:0;padding:0;background:#f0f4fb;font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  :root{
+    --blue:#0056b3;--blue-mid:#1a6ed8;--blue-lite:#e8f0fe;
+    --slate:#64748b;--slate-lt:#94a3b8;
+    --card-bg:#ffffff;--card-br:16px;
+    --card-sh:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,86,179,.06);
+  }
+  .dash-card{
+    background:var(--card-bg);border-radius:var(--card-br);
+    box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);
+    overflow:hidden;transition:box-shadow .2s;
+  }
+  .glass-sidebar{
+    background:rgba(255,255,255,0.60);
+    backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+    border-right:1px solid rgba(255,255,255,0.80);box-shadow:4px 0 24px rgba(0,86,179,.07);
+  }
+  .nav-pill{
+    display:flex;flex-direction:column;align-items:center;
+    padding:10px 8px;border-radius:12px;gap:4px;
+    font-size:11px;font-weight:600;text-decoration:none;
+    color:var(--slate);transition:background .15s,color .15s,transform .15s;width:100%;
+  }
+  .nav-pill:hover{background:var(--blue-lite);color:var(--blue);transform:translateY(-1px);}
+  .nav-pill.active{background:var(--blue);color:#fff;box-shadow:0 4px 14px rgba(0,86,179,.35);}
+  .nav-pill i{font-size:18px;}
+  .topbar{
+    background:rgba(255,255,255,0.80);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border-bottom:1px solid rgba(0,86,179,.08);position:sticky;top:0;z-index:200;height:56px;
+    display:flex;align-items:center;padding:0 20px;gap:12px;
+  }
+  .dash-avatar{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
+  .skeleton{
+    background:linear-gradient(90deg,#f1f5f9 25%,#e8f0fe 50%,#f1f5f9 75%);
+    background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px;
+  }
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  .fade-up{animation:fadeUp .4s ease both;}
+  /* Tabs */
+  .dash-tabs{display:flex;gap:4px;border-bottom:2px solid #f1f5f9;margin-bottom:20px;overflow-x:auto;scrollbar-width:none;padding-bottom:0;}
+  .dash-tabs::-webkit-scrollbar{display:none;}
+  .dash-tab{
+    padding:10px 16px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;
+    color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;
+    transition:color .15s,border-color .15s;border-radius:8px 8px 0 0;font-family:'DM Sans',sans-serif;
+    display:flex;align-items:center;gap:6px;
+  }
+  .dash-tab:hover{color:#0056b3;background:#f8faff;}
+  .dash-tab.active{color:#0056b3;border-bottom-color:#0056b3;background:#e8f0fe;}
+  /* Table */
+  .dash-table{width:100%;border-collapse:collapse;font-family:'DM Sans',sans-serif;}
+  .dash-table th{padding:10px 16px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.06em;white-space:nowrap;border-bottom:1px solid #f1f5f9;background:#f8faff;}
+  .dash-table td{padding:12px 16px;border-bottom:1px solid #f1f5f9;vertical-align:middle;font-size:13px;}
+  .dash-table tbody tr{transition:background .15s;}
+  .dash-table tbody tr:hover{background:#f8faff;}
+  .dash-table tbody tr:last-child td{border-bottom:none;}
+  /* Buttons */
+  .dash-btn-primary{
+    background:var(--blue);color:#fff;border:none;border-radius:10px;
+    padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;
+    font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
+    transition:opacity .15s,transform .15s;text-decoration:none;
+  }
+  .dash-btn-primary:hover{opacity:.87;transform:translateY(-1px);color:#fff;}
+  .dash-btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+  .dash-btn-ghost{
+    background:#fff;border:1px solid rgba(0,86,179,.15);color:#64748b;
+    border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;
+    cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
+    transition:all .15s;text-decoration:none;
+  }
+  .dash-btn-ghost:hover{background:#f1f5f9;}
+  .dash-btn-danger{
+    background:#fef2f2;border:1px solid #fecaca;color:#ef4444;
+    border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;
+    cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
+    transition:all .15s;
+  }
+  .dash-btn-danger:hover{background:#ef4444;color:#fff;}
+  .dash-btn-success{
+    background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;
+    border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;
+    cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
+    transition:all .15s;
+  }
+  .dash-btn-success:hover{background:#15803d;color:#fff;}
+  .action-btn{
+    width:30px;height:30px;border-radius:8px;border:1px solid rgba(0,86,179,.12);
+    background:#fff;display:inline-flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:all .15s;font-size:13px;text-decoration:none;color:#64748b;
+  }
+  .action-btn:hover{background:var(--blue-lite);border-color:var(--blue);color:var(--blue);}
+  .action-btn.del:hover{background:#fef2f2;border-color:#ef4444;color:#ef4444;}
+  /* Pills / badges */
+  .badge-pill{
+    display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;
+    font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  }
+  /* Modals */
+  .dash-modal-overlay{
+    position:fixed;inset:0;background:rgba(15,23,42,.5);
+    backdrop-filter:blur(4px);z-index:1060;
+    display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;
+  }
+  .dash-modal{
+    background:#fff;border-radius:20px;width:100%;max-width:580px;
+    box-shadow:0 24px 64px rgba(0,0,0,.18);overflow:hidden;
+    display:flex;flex-direction:column;max-height:calc(100vh - 32px);
+    animation:fadeUp .25s ease;
+  }
+  .dash-modal.lg{max-width:760px;}
+  .dash-modal.xl{max-width:1000px;}
+  .dash-modal-hdr{padding:20px 24px 16px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;}
+  .dash-modal-body{overflow-y:auto;padding:20px 24px;flex:1;}
+  .dash-modal-ftr{padding:14px 24px;border-top:1px solid #f1f5f9;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;}
+  /* Form */
+  .form-lbl{font-size:11px;font-weight:700;color:#64748b;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;display:block;}
+  .form-ctrl{
+    width:100%;border:1px solid rgba(0,86,179,.15);border-radius:10px;
+    padding:9px 13px;font-size:13px;color:#1e293b;outline:none;
+    font-family:'DM Sans',sans-serif;background:#f8faff;
+    transition:border-color .2s,box-shadow .2s;
+  }
+  .form-ctrl:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
+  .form-ctrl:disabled{opacity:.6;cursor:not-allowed;}
+  /* Info strip */
+  .info-strip{display:flex;flex-wrap:wrap;gap:0;border-bottom:1px solid #f1f5f9;}
+  .info-item{padding:14px 18px;border-right:1px solid #f1f5f9;flex:0 0 auto;}
+  .info-item:last-child{border-right:none;}
+  .info-item-label{font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.05em;text-transform:uppercase;margin-bottom:3px;}
+  .info-item-value{font-size:13px;font-weight:700;color:#1e293b;}
+  /* Essay card */
+  .essay-card-hdr{
+    padding:14px 18px;display:flex;align-items:center;gap:12px;cursor:pointer;
+    border-bottom:1px solid #f1f5f9;transition:background .15s;
+  }
+  .essay-card-hdr:hover{background:#f8faff;}
+  /* Shuffle toggle */
+  .shuffle-toggle{
+    display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:99px;
+    cursor:pointer;user-select:none;transition:all .15s;border:1px solid rgba(0,86,179,.15);
+    background:#f8faff;
+  }
+  .shuffle-toggle.on{background:#f0fdf4;border-color:#bbf7d0;}
+  /* Stats grid for anomaly / essay */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
+  .stat-card{
+    background:#fff;border-radius:14px;border:1px solid rgba(0,86,179,.06);
+    box-shadow:0 1px 3px rgba(0,0,0,.04);padding:14px 16px;
+    display:flex;align-items:center;gap:12px;cursor:pointer;transition:box-shadow .15s,transform .15s;
+  }
+  .stat-card:hover{box-shadow:0 4px 16px rgba(0,86,179,.10);transform:translateY(-1px);}
+  .stat-card.selected{box-shadow:0 4px 16px rgba(0,86,179,.15);outline:2px solid currentColor;}
+  .stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .stat-icon i{font-size:17px;}
+  /* Bottom nav */
+  .instructor-bottom-nav{
+    position:fixed;bottom:0;left:0;right:0;height:64px;
+    background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);
+    border-top:1px solid rgba(0,86,179,0.10);
+    display:flex;align-items:stretch;z-index:1030;
+    box-shadow:0 -4px 24px rgba(0,86,179,0.08);
+  }
+  .bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:600;gap:3px;text-decoration:none;transition:color .2s;}
+  .bnav-item i{font-size:19px;}
+  /* Q card */
+  .q-card{padding:20px;border-bottom:1px solid #f1f5f9;transition:background .15s;}
+  .q-card:hover{background:#f8faff;}
+  .q-card:last-child{border-bottom:none;}
+  @media(max-width:991px){.hide-lg{display:none!important;}}
+  @media(max-width:767px){
+    .info-strip{flex-direction:column;}
+    .info-item{border-right:none;border-bottom:1px solid #f1f5f9;padding:10px 16px;}
+    .info-item:last-child{border-bottom:none;}
+    .modal-grid-2{grid-template-columns:1fr!important;}
+  }
+`;
+
+/* ─── Bottom Nav ─────────────────────────────────────────────────────────── */
+const InstructorBottomNav = ({ active }) => {
+  const items = [
+    { to: "/instructor",                  icon: "bi-speedometer2",      label: "Home"     },
+    { to: "/instructor/exams",            icon: "bi-file-earmark-text", label: "Exams"    },
+    { to: "/instructor/students",         icon: "bi-people",            label: "Students" },
+    { to: "/instructor/account-settings", icon: "bi-gear",              label: "Settings" },
+  ];
+  return (
+    <nav className="instructor-bottom-nav d-lg-none">
+      {items.map(({ to, icon, label }) => (
+        <Link key={to} to={to} className="bnav-item"
+          style={{ color: active === label ? "#0056b3" : "#94a3b8", borderTop: active === label ? "2px solid #0056b3" : "2px solid transparent" }}>
+          <i className={`bi ${icon}`}></i>{label}
+        </Link>
+      ))}
+    </nav>
+  );
+};
+
+/* ─── MetadataSummary ──────────────────────────────────────────────────────*/
 const MetadataSummary = ({ type, meta }) => {
-  if (!meta) return <small className="text-muted">—</small>;
+  if (!meta) return <span style={{ fontSize: 12, color: "#94a3b8" }}>—</span>;
   switch (type) {
-    case "tab_switch":         return <small>Hidden {((meta.hidden_duration_ms??0)/1000).toFixed(1)}s · Switch #{meta.count_in_session}</small>;
-    case "keyboard_shortcut":  return <small><kbd>{meta.keys}</kbd></small>;
-    case "response_time":      return <small>{meta.direction==="too_fast"?"⚡ Too fast":"🐢 Too slow"} · z={meta.z_score} · {((meta.response_time_ms??0)/1000).toFixed(1)}s</small>;
-    case "keystroke_dynamics": return <small>{meta.reason==="impossible_speed"?"🚀 Impossible speed":"📊 Deviation"} · {meta.wpm?.toFixed(0)} WPM</small>;
-    default:                   return <small className="text-muted">—</small>;
+    case "tab_switch":         return <span style={{ fontSize: 12 }}>Hidden {((meta.hidden_duration_ms??0)/1000).toFixed(1)}s · Switch #{meta.count_in_session}</span>;
+    case "keyboard_shortcut":  return <span style={{ fontSize: 12 }}><kbd style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 4, padding: "1px 5px", fontSize: 11 }}>{meta.keys}</kbd></span>;
+    case "response_time":      return <span style={{ fontSize: 12 }}>{meta.direction==="too_fast"?"⚡ Too fast":"🐢 Too slow"} · z={meta.z_score} · {((meta.response_time_ms??0)/1000).toFixed(1)}s</span>;
+    case "keystroke_dynamics": return <span style={{ fontSize: 12 }}>{meta.reason==="impossible_speed"?"🚀 Impossible speed":"📊 Deviation"} · {meta.wpm?.toFixed(0)} WPM</span>;
+    default:                   return <span style={{ fontSize: 12, color: "#94a3b8" }}>—</span>;
   }
 };
 
-// ════════════════════════════════════════════════════════════════════════════
-// STUDENT RESULTS TAB
-// ════════════════════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════════════════════
+   STUDENT RESULTS TAB
+════════════════════════════════════════════════════════════════════════════ */
 const StudentResultsTab = ({ examId, anomalySummaries }) => {
   const [submissions, setSubmissions]     = useState([]);
   const [loading, setLoading]             = useState(true);
@@ -329,122 +490,124 @@ const StudentResultsTab = ({ examId, anomalySummaries }) => {
     } finally { setDownloadingId(null); }
   };
 
+  const PILL_FILTERS = [
+    { key:"all",         label:"All",         bg:"#e8f0fe", color:"#0056b3"  },
+    { key:"submitted",   label:"Submitted",   bg:"#f0fdf4", color:"#15803d"  },
+    { key:"in_progress", label:"In Progress", bg:"#fff7ed", color:"#c2410c"  },
+    { key:"not_started", label:"Not Started", bg:"#f1f5f9", color:"#64748b"  },
+  ];
+
+  const dtFmt = (d) => d ? new Date(d).toLocaleString("en-PH",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
+
   if (loading) return (
-    <div className="text-center py-5">
-      <div className="spinner-border text-primary" />
-      <p className="text-muted mt-3 small">Loading student results…</p>
+    <div style={{ textAlign: "center", padding: "40px 20px" }}>
+      <div className="spinner-border" style={{ color: "#0056b3" }} />
+      <p style={{ marginTop: 12, fontSize: 13, color: "#94a3b8" }}>Loading student results…</p>
     </div>
   );
 
-  const PILL_FILTERS = [
-    { key:"all",         label:"All",         color:"primary"   },
-    { key:"submitted",   label:"Submitted",   color:"success"   },
-    { key:"in_progress", label:"In Progress", color:"warning"   },
-    { key:"not_started", label:"Not Started", color:"secondary" },
-  ];
-
   return (
     <>
-      <div className="d-flex gap-2 flex-wrap align-items-center mb-3">
-        {PILL_FILTERS.map(({ key, label, color }) => (
-          <button key={key}
-            className={`btn btn-sm rounded-pill ${statusFilter === key ? `btn-${color}` : "btn-outline-secondary"}`}
-            onClick={() => setStatusFilter(key)}>
-            {label}
-            <span className={`badge ms-2 ${statusFilter===key?"bg-white text-dark":`bg-${color} text-white`}`}>
-              {counts[key]}
-            </span>
-          </button>
-        ))}
-        <div className="ms-auto d-flex gap-2 align-items-center">
-          <div className="input-group input-group-sm" style={{ maxWidth: 220 }}>
-            <span className="input-group-text bg-white"><i className="bi bi-search text-muted"></i></span>
-            <input className="form-control border-start-0" placeholder="Search student…"
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
+        {PILL_FILTERS.map(({ key, label, bg, color }) => {
+          const active = statusFilter === key;
+          return (
+            <button key={key}
+              style={{ padding: "6px 14px", borderRadius: 99, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "'DM Sans',sans-serif", background: active ? bg : "#f1f5f9", color: active ? color : "#64748b", display: "flex", alignItems: "center", gap: 6, transition: "all .15s" }}
+              onClick={() => setStatusFilter(key)}>
+              {label}
+              <span style={{ background: active ? "rgba(0,0,0,.1)" : "rgba(0,0,0,.06)", borderRadius: 99, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>{counts[key]}</span>
+            </button>
+          );
+        })}
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ position: "relative" }}>
+            <i className="bi bi-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13 }}></i>
+            <input className="form-ctrl" style={{ paddingLeft: 32, maxWidth: 200 }} placeholder="Search student…"
               value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <button className="btn btn-sm btn-outline-secondary" onClick={load} title="Refresh">
-            <i className="bi bi-arrow-clockwise"></i>
-          </button>
+          <button className="action-btn" onClick={load} title="Refresh"><i className="bi bi-arrow-clockwise"></i></button>
         </div>
       </div>
 
-      <div className="card border-0 shadow-sm">
-        <div className="table-responsive">
-          <table className="table table-hover align-middle mb-0">
-            <thead className="table-light">
+      <div className="dash-card">
+        <div style={{ overflowX: "auto" }}>
+          <table className="dash-table">
+            <thead>
               <tr>
-                <th style={{ minWidth:200 }}>STUDENT</th>
-                <th>STATUS</th><th>SCORE</th><th>%</th><th>CPI</th>
-                <th>STARTED</th><th>SUBMITTED</th><th>ESSAYS</th><th>ACTIONS</th>
+                {["STUDENT","STATUS","SCORE","%","CPI","STARTED","SUBMITTED","ESSAYS","ACTIONS"].map(h => (
+                  <th key={h}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="text-center text-muted py-5">
-                    <i className="bi bi-inbox fs-2 d-block mb-2"></i>No students match.
-                  </td>
-                </tr>
+                <tr><td colSpan="9" style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                  <i className="bi bi-inbox" style={{ fontSize: 28, display: "block", marginBottom: 8 }}></i>No students match.
+                </td></tr>
               ) : filtered.map((row) => {
                 const status      = row.status ?? "not_started";
                 const pct         = row.total_points > 0 && row.score != null ? ((row.score / row.total_points) * 100).toFixed(1) : null;
                 const isNotStarted = status === "not_started";
                 const downloading  = downloadingId === row.id;
-                const dtFmt = (d) => d ? new Date(d).toLocaleString("en-PH",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
-
+                const statusStyle = {
+                  submitted:   { bg: "#f0fdf4", color: "#15803d", label: "Submitted"   },
+                  in_progress: { bg: "#fff7ed", color: "#c2410c", label: "In Progress" },
+                  not_started: { bg: "#f1f5f9", color: "#64748b", label: "Not Started" },
+                };
+                const ss = statusStyle[status] || statusStyle.not_started;
                 return (
-                  <tr key={row.student_id ?? row.id} className={isNotStarted ? "table-light" : ""}>
+                  <tr key={row.student_id ?? row.id} style={{ opacity: isNotStarted ? .7 : 1 }}>
                     <td>
-                      <div className="d-flex align-items-center gap-2">
-                        <div className={`rounded-circle text-white d-flex align-items-center justify-content-center fw-bold flex-shrink-0 ${isNotStarted?"bg-secondary":"bg-primary"}`}
-                          style={{ width:32, height:32, fontSize:12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: "50%", background: isNotStarted ? "#e2e8f0" : "#0056b3", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
                           {row.student?.name?.charAt(0).toUpperCase() || "?"}
                         </div>
                         <div>
-                          <div className={`fw-semibold small ${isNotStarted?"text-muted":""}`}>{row.student?.name||"—"}</div>
-                          <div className="text-muted" style={{fontSize:11}}>{row.student?.email||"—"}</div>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: "#1e293b" }}>{row.student?.name || "—"}</div>
+                          <div style={{ fontSize: 11, color: "#94a3b8" }}>{row.student?.email || "—"}</div>
                         </div>
                       </div>
                     </td>
                     <td>
-                      <span className={`badge ${status==="submitted"?"bg-success":status==="in_progress"?"bg-warning text-dark":"bg-secondary"}`}>
-                        {status==="in_progress"?"In Progress":status==="submitted"?"Submitted":"Not Started"}
-                      </span>
-                      {status==="in_progress" && (
-                        <span className="ms-1 spinner-grow spinner-grow-sm text-warning" style={{width:"0.4rem",height:"0.4rem"}}></span>
-                      )}
+                      <span className="badge-pill" style={{ background: ss.bg, color: ss.color }}>{ss.label}</span>
+                      {status==="in_progress" && <span className="spinner-grow spinner-grow-sm text-warning ms-1" style={{width:"0.4rem",height:"0.4rem"}}></span>}
                     </td>
-                    <td>{row.score != null ? <span className="fw-semibold">{row.score} <span className="text-muted fw-normal">/ {row.total_points}</span></span> : <span className="text-muted">—</span>}</td>
+                    <td>
+                      {row.score != null
+                        ? <span style={{ fontWeight: 600, fontSize: 13 }}>{row.score} <span style={{ color: "#94a3b8", fontWeight: 400 }}>/ {row.total_points}</span></span>
+                        : <span style={{ color: "#94a3b8" }}>—</span>}
+                    </td>
                     <td>
                       {pct != null ? (
-                        <div className="d-flex align-items-center gap-2">
-                          <div className="progress flex-grow-1" style={{height:6,minWidth:50}}>
-                            <div className={`progress-bar ${pct>=75?"bg-success":pct>=50?"bg-warning":"bg-danger"}`} style={{width:`${pct}%`}} />
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ height: 6, borderRadius: 99, background: "#f1f5f9", flex: 1, minWidth: 50, overflow: "hidden" }}>
+                            <div style={{ height: "100%", borderRadius: 99, width: `${pct}%`, background: pct>=75?"#22c55e":pct>=50?"#f59e0b":"#ef4444" }} />
                           </div>
-                          <small className="fw-semibold">{pct}%</small>
+                          <span style={{ fontSize: 12, fontWeight: 700 }}>{pct}%</span>
                         </div>
-                      ) : <span className="text-muted">—</span>}
+                      ) : <span style={{ color: "#94a3b8" }}>—</span>}
                     </td>
                     <td>
                       {row.cpi_score != null
-                        ? <span className={`badge ${riskBgClass(row.cpi_score)} ${row.cpi_score>=20?"text-white":""}`} title={`CPI: ${row.cpi_score} — ${cpiLabel(row.cpi_score)}`}>{row.cpi_score.toFixed(1)}%</span>
-                        : <span className="text-muted small">—</span>}
+                        ? <span className="badge-pill" style={{ background: riskBgColor(row.cpi_score), color: riskColor(row.cpi_score) }}>{row.cpi_score.toFixed(1)}%</span>
+                        : <span style={{ color: "#94a3b8", fontSize: 12 }}>—</span>}
                     </td>
-                    <td><small className="text-muted">{dtFmt(row.started_at)}</small></td>
-                    <td><small className="text-muted">{dtFmt(row.submitted_at)}</small></td>
+                    <td style={{ fontSize: 12, color: "#64748b" }}>{dtFmt(row.started_at)}</td>
+                    <td style={{ fontSize: 12, color: "#64748b" }}>{dtFmt(row.submitted_at)}</td>
                     <td>
                       {row.essay_count > 0
                         ? row.ungraded_count > 0
-                          ? <span className="badge bg-warning text-dark"><i className="bi bi-hourglass-split me-1"></i>{row.ungraded_count} pending</span>
-                          : <span className="badge bg-success"><i className="bi bi-check-all me-1"></i>Graded</span>
-                        : <span className="text-muted small">—</span>}
+                          ? <span className="badge-pill" style={{ background: "#fff7ed", color: "#c2410c" }}><i className="bi bi-hourglass-split me-1"></i>{row.ungraded_count} pending</span>
+                          : <span className="badge-pill" style={{ background: "#f0fdf4", color: "#15803d" }}><i className="bi bi-check-all me-1"></i>Graded</span>
+                        : <span style={{ color: "#94a3b8", fontSize: 12 }}>—</span>}
                     </td>
                     <td>
                       {status==="submitted" && row.id
-                        ? <button className="btn btn-sm btn-danger" disabled={downloading} onClick={() => handleDownloadPDF(row.id)}>
-                            {downloading ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-file-earmark-pdf me-1"></i>PDF</>}
+                        ? <button className="dash-btn-danger" style={{ fontSize: 12, padding: "5px 12px" }} disabled={downloading} onClick={() => handleDownloadPDF(row.id)}>
+                            {downloading ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-file-earmark-pdf"></i>PDF</>}
                           </button>
-                        : <span className="text-muted small">—</span>}
+                        : <span style={{ color: "#94a3b8", fontSize: 12 }}>—</span>}
                     </td>
                   </tr>
                 );
@@ -453,17 +616,16 @@ const StudentResultsTab = ({ examId, anomalySummaries }) => {
           </table>
         </div>
       </div>
-      <p className="text-muted small mt-2">
-        <i className="bi bi-info-circle me-1"></i>
-        PDF download only for submitted exams. Downloads directly with no print dialog.
+      <p style={{ marginTop: 10, fontSize: 12, color: "#94a3b8" }}>
+        <i className="bi bi-info-circle me-1"></i>PDF download only for submitted exams.
       </p>
     </>
   );
 };
 
-// ════════════════════════════════════════════════════════════════════════════
-// ESSAY SUBMISSION CARD
-// ════════════════════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════════════════════
+   ESSAY SUBMISSION CARD
+════════════════════════════════════════════════════════════════════════════ */
 const EssaySubmissionCard = ({ sub, examId, onGraded }) => {
   const [grades, setGrades] = useState(() =>
     Object.fromEntries((sub.essays||[]).map(e => [
@@ -503,86 +665,88 @@ const EssaySubmissionCard = ({ sub, examId, onGraded }) => {
   };
 
   return (
-    <div className={`card shadow-sm border-0 mb-3 border-start border-3 ${!allGraded?"border-warning":"border-success"}`}>
-      <div className="card-header bg-white d-flex align-items-center gap-3 py-3" style={{cursor:"pointer"}} onClick={() => setExpanded(v => !v)}>
-        <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold flex-shrink-0" style={{width:38,height:38,fontSize:14}}>
+    <div className="dash-card fade-up" style={{ marginBottom: 12, borderLeft: `3px solid ${allGraded ? "#22c55e" : "#f59e0b"}` }}>
+      <div className="essay-card-hdr" onClick={() => setExpanded(v => !v)}>
+        <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#0056b3", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
           {sub.student?.name?.charAt(0).toUpperCase()}
         </div>
-        <div className="flex-grow-1">
-          <div className="fw-semibold">{sub.student?.name}</div>
-          <small className="text-muted">{sub.student?.email}</small>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{sub.student?.name}</div>
+          <div style={{ fontSize: 12, color: "#94a3b8" }}>{sub.student?.email}</div>
         </div>
-        <div className="d-flex align-items-center gap-3 flex-shrink-0">
-          <div className="text-end">
-            <div className="fw-semibold text-primary">{sub.score ?? "—"} / {sub.total_points}</div>
-            <small className="text-muted">current score</small>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "#0056b3" }}>{sub.score ?? "—"} / {sub.total_points}</div>
+            <div style={{ fontSize: 11, color: "#94a3b8" }}>current score</div>
           </div>
-          {allGraded
-            ? <span className="badge bg-success"><i className="bi bi-check-all me-1"></i>All graded</span>
-            : <span className="badge bg-warning text-dark"><i className="bi bi-hourglass-split me-1"></i>{pendingCount} pending</span>}
-          <i className={`bi ${expanded?"bi-chevron-up":"bi-chevron-down"} text-muted`}></i>
+          <span className="badge-pill" style={allGraded ? { background: "#f0fdf4", color: "#15803d" } : { background: "#fff7ed", color: "#c2410c" }}>
+            {allGraded ? <><i className="bi bi-check-all me-1"></i>All graded</> : <><i className="bi bi-hourglass-split me-1"></i>{pendingCount} pending</>}
+          </span>
+          <i className={`bi ${expanded ? "bi-chevron-up" : "bi-chevron-down"}`} style={{ color: "#94a3b8" }}></i>
         </div>
       </div>
 
       {expanded && (
-        <div className="card-body pt-2 pb-3">
+        <div style={{ padding: "16px 20px" }}>
           {sub.essays.map((essay, idx) => (
-            <div key={essay.question_id} className={`mb-4 pb-4 ${idx < sub.essays.length-1 ? "border-bottom" : ""}`}>
-              <div className="d-flex align-items-start gap-2 mb-2">
-                <span className="badge bg-light text-dark border fw-bold flex-shrink-0">Q</span>
+            <div key={essay.question_id} style={{ marginBottom: idx < sub.essays.length-1 ? 24 : 0, paddingBottom: idx < sub.essays.length-1 ? 24 : 0, borderBottom: idx < sub.essays.length-1 ? "1px solid #f1f5f9" : "none" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+                <span className="badge-pill" style={{ background: "#e8f0fe", color: "#0056b3", flexShrink: 0 }}>Q</span>
                 <div>
-                  <p className="mb-1 fw-semibold">{essay.question_text}</p>
-                  <div className="d-flex gap-3">
-                    <small className="text-muted"><i className="bi bi-trophy me-1"></i>Max {essay.points} pts</small>
-                    {essay.max_words && <small className="text-muted"><i className="bi bi-type me-1"></i>Max {essay.max_words} words</small>}
+                  <p style={{ margin: "0 0 6px", fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{essay.question_text}</p>
+                  <div style={{ display: "flex", gap: 14 }}>
+                    <span style={{ fontSize: 12, color: "#64748b" }}><i className="bi bi-trophy me-1"></i>Max {essay.points} pts</span>
+                    {essay.max_words && <span style={{ fontSize: 12, color: "#64748b" }}><i className="bi bi-type me-1"></i>Max {essay.max_words} words</span>}
                   </div>
                 </div>
               </div>
               {essay.rubric && (
-                <div className="alert alert-light border py-2 px-3 mb-3" style={{fontSize:12}}>
+                <div style={{ padding: "10px 14px", background: "#f8faff", borderRadius: 10, border: "1px solid rgba(0,86,179,.08)", marginBottom: 12, fontSize: 13, color: "#64748b" }}>
                   <strong><i className="bi bi-journal-text me-1"></i>Rubric:</strong> {essay.rubric}
                 </div>
               )}
-              <div className="mb-3">
-                <label className="form-label fw-semibold small text-muted text-uppercase" style={{letterSpacing:"0.06em"}}>Student's Answer</label>
-                <div className="p-3 bg-light border rounded" style={{whiteSpace:"pre-wrap",fontSize:13,lineHeight:1.6}}>
-                  {essay.student_answer || <span className="text-muted fst-italic">No answer provided.</span>}
+              <div style={{ marginBottom: 14 }}>
+                <label className="form-lbl">Student's Answer</label>
+                <div style={{ padding: "12px 14px", background: "#f8faff", borderRadius: 10, border: "1px solid #f1f5f9", whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.6, color: "#1e293b" }}>
+                  {essay.student_answer || <span style={{ color: "#94a3b8", fontStyle: "italic" }}>No answer provided.</span>}
                 </div>
                 {essay.student_answer && (
-                  <small className="text-muted">
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>
                     {essay.student_answer.trim().split(/\s+/).length} words{essay.max_words ? ` / ${essay.max_words} max` : ""}
-                  </small>
+                  </span>
                 )}
               </div>
-              <div className="row g-3">
-                <div className="col-md-3">
-                  <label className="form-label fw-semibold small">Points Earned <span className="text-danger">*</span> <span className="text-muted fw-normal">/ {essay.points}</span></label>
-                  <input type="number" className="form-control" min="0" max={essay.points} step="0.5"
+              <div className="modal-grid-2" style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 12 }}>
+                <div>
+                  <label className="form-lbl">Points Earned <span style={{ color: "#ef4444" }}>*</span> <span style={{ color: "#94a3b8", textTransform: "none" }}>/ {essay.points}</span></label>
+                  <input type="number" className="form-ctrl" min="0" max={essay.points} step="1"
                     placeholder={`0 – ${essay.points}`}
                     value={grades[essay.question_id]?.points_earned ?? ""}
+                    onKeyDown={e => ['.', ',', 'e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
                     onChange={e => handleGradeChange(essay.question_id, "points_earned", e.target.value)}
                     disabled={submitting} />
                 </div>
-                <div className="col-md-9">
-                  <label className="form-label fw-semibold small">Feedback <span className="text-muted fw-normal">(optional, shared with student)</span></label>
-                  <textarea className="form-control" rows="2" placeholder="Write feedback for the student…"
+                <div>
+                  <label className="form-lbl">Feedback <span style={{ color: "#94a3b8", textTransform: "none", fontWeight: 400 }}>(optional)</span></label>
+                  <textarea className="form-ctrl" rows="2" placeholder="Write feedback for the student…"
                     value={grades[essay.question_id]?.feedback || ""}
                     onChange={e => handleGradeChange(essay.question_id, "feedback", e.target.value)}
-                    disabled={submitting} />
+                    disabled={submitting} style={{ resize: "vertical" }} />
                 </div>
               </div>
               {isEssayGraded(essay) && (
-                <div className="mt-2">
-                  <span className="badge bg-success bg-opacity-10 text-success border border-success">
+                <div style={{ marginTop: 8 }}>
+                  <span className="badge-pill" style={{ background: "#f0fdf4", color: "#15803d" }}>
                     <i className="bi bi-check-circle me-1"></i>Previously graded: {essay.points_earned} / {essay.points} pts
                   </span>
                 </div>
               )}
             </div>
           ))}
-          <div className="d-flex justify-content-end mt-2">
-            <button className="btn btn-success px-4" onClick={handleSubmitGrades} disabled={submitting}>
-              {submitting ? <><span className="spinner-border spinner-border-sm me-2"/>Saving…</> : <><i className="bi bi-check2-circle me-2"></i>Save Grades</>}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+            <button className="dash-btn-success" onClick={handleSubmitGrades} disabled={submitting}
+              style={{ padding: "10px 24px" }}>
+              {submitting ? <><span className="spinner-border spinner-border-sm me-2"/>Saving…</> : <><i className="bi bi-check2-circle"></i>Save Grades</>}
             </button>
           </div>
         </div>
@@ -591,148 +755,158 @@ const EssaySubmissionCard = ({ sub, examId, onGraded }) => {
   );
 };
 
-// ════════════════════════════════════════════════════════════════════════════
-// STUDENT DETAIL MODAL (Anomaly)
-// ════════════════════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════════════════════
+   STUDENT DETAIL MODAL
+════════════════════════════════════════════════════════════════════════════ */
 const StudentDetailModal = ({ loading, data, onClose, onMarkReviewed }) => (
-  <div className="modal show d-block" style={{backgroundColor:"rgba(0,0,0,0.6)"}}>
-    <div className="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
-      <div className="modal-content">
-        <div className="modal-header">
-          <div>
-            <h5 className="modal-title fw-bold">{loading?"Loading…":`${data?.student?.name} — Anomaly Timeline`}</h5>
-            {!loading && data && <small className="text-muted">{data?.student?.email}</small>}
-          </div>
-          <button className="btn-close" onClick={onClose} />
+  <div className="dash-modal-overlay">
+    <div className="dash-modal xl" style={{ maxWidth: 1000 }}>
+      <div className="dash-modal-hdr">
+        <div>
+          <h5 style={{ margin: 0, fontWeight: 700, fontSize: 17, color: "#0f172a" }}>
+            {loading ? "Loading…" : `${data?.student?.name} — Anomaly Timeline`}
+          </h5>
+          {!loading && data && <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>{data?.student?.email}</p>}
         </div>
-        <div className="modal-body">
-          {loading && <div className="text-center py-5"><div className="spinner-border text-primary"/></div>}
-          {!loading && data && (
-            <>
-              <div className="row g-3 mb-4">
-                {[
-                  { label:"CPI Score",   value:`${(data.summary?.cpi_score??0).toFixed(1)}%`, color:riskColor(data.summary?.cpi_score??0) },
-                  { label:"Tab Switches",value:data.summary?.tab_switch_count??0,             color:"text-dark" },
-                  { label:"Shortcuts",   value:data.summary?.keyboard_shortcut_count??0,      color:"text-dark" },
-                  { label:"Response ⚠", value:data.summary?.response_time_anomaly_count??0,  color:"text-dark" },
-                  { label:"Keystroke ⚠",value:data.summary?.keystroke_anomaly_count??0,      color:"text-dark" },
-                ].map(({ label, value, color }) => (
-                  <div key={label} className="col">
-                    <div className="card border-0 bg-light text-center p-2">
-                      <div className={`fs-3 fw-bold ${color}`}>{value}</div>
-                      <small className="text-muted">{label}</small>
-                    </div>
-                  </div>
-                ))}
+        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#94a3b8", padding: 4 }}>
+          <i className="bi bi-x-lg"></i>
+        </button>
+      </div>
+      <div className="dash-modal-body">
+        {loading && <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner-border" style={{ color: "#0056b3" }} /></div>}
+        {!loading && data && (
+          <>
+            <div className="stats-grid" style={{ marginBottom: 16 }}>
+              {[
+                { label:"CPI Score",   value:`${(data.summary?.cpi_score??0).toFixed(1)}%`, color: riskColor(data.summary?.cpi_score??0), bg: riskBgColor(data.summary?.cpi_score??0) },
+                { label:"Tab Switches",value:data.summary?.tab_switch_count??0,             color:"#0056b3", bg:"#e8f0fe" },
+                { label:"Shortcuts",   value:data.summary?.keyboard_shortcut_count??0,      color:"#6d28d9", bg:"#ede9fe" },
+                { label:"Response ⚠", value:data.summary?.response_time_anomaly_count??0,  color:"#c2410c", bg:"#fff7ed" },
+                { label:"Keystroke ⚠",value:data.summary?.keystroke_anomaly_count??0,      color:"#0369a1", bg:"#f0f9ff" },
+              ].map(({ label, value, color, bg }) => (
+                <div key={label} style={{ background: bg, borderRadius: 12, padding: "12px 14px", textAlign: "center" }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color, opacity: .75, marginTop: 3 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>
+              <strong>Started:</strong> {new Date(data.submission?.started_at).toLocaleString()} &nbsp;·&nbsp;
+              <strong>Submitted:</strong> {data.submission?.submitted_at ? new Date(data.submission.submitted_at).toLocaleString() : "In progress"} &nbsp;·&nbsp;
+              <strong>Score:</strong> {data.submission?.score}/{data.submission?.total_points}
+            </p>
+            <h6 style={{ fontWeight: 700, marginBottom: 12, fontSize: 14, color: "#0f172a" }}>
+              Full Event Timeline
+              {data.logs?.length > 0 && <span className="badge-pill ms-2" style={{ background: "#f1f5f9", color: "#64748b" }}>{data.logs.length} event{data.logs.length!==1?"s":""}</span>}
+            </h6>
+            {!data.logs || data.logs.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>
+                <i className="bi bi-check-circle" style={{ fontSize: 28, display: "block", marginBottom: 8, color: "#22c55e" }}></i>
+                No anomalous events recorded.
               </div>
-              <p className="small text-muted mb-3">
-                <strong>Started:</strong> {new Date(data.submission?.started_at).toLocaleString()} &nbsp;·&nbsp;
-                <strong>Submitted:</strong> {data.submission?.submitted_at ? new Date(data.submission.submitted_at).toLocaleString() : "In progress"} &nbsp;·&nbsp;
-                <strong>Score:</strong> {data.submission?.score}/{data.submission?.total_points}
-              </p>
-              <h6 className="fw-bold mb-3">
-                Full Event Timeline
-                {data.logs?.length > 0 && <span className="badge bg-secondary ms-2 fw-normal" style={{fontSize:12}}>{data.logs.length} event{data.logs.length!==1?"s":""}</span>}
-              </h6>
-              {!data.logs || data.logs.length === 0 ? (
-                <div className="text-muted text-center py-4">
-                  <i className="bi bi-check-circle fs-3 text-success d-block mb-2"></i>No anomalous events recorded.
-                </div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table table-sm table-hover align-middle">
-                    <thead className="table-light">
-                      <tr><th>TIME</th><th>TYPE</th><th>SEVERITY</th><th>QUESTION</th><th>DETAIL</th><th>NOTES</th><th>STATUS</th><th>ACTION</th></tr>
-                    </thead>
-                    <tbody>
-                      {data.logs.map(log => (
-                        <tr key={`${log.type}-${log.id}`} className={log.reviewed?"opacity-50":""}>
-                          <td><small>{log.occurred_at ? new Date(log.occurred_at).toLocaleTimeString() : "—"}</small></td>
-                          <td><span className="badge bg-dark" style={{fontSize:10}}>{TYPE_LABELS[log.type]??log.type}</span></td>
-                          <td><span className={`badge ${SEVERITY_MAP[log.severity]?.badge??"bg-secondary"}`}>{SEVERITY_MAP[log.severity]?.label??log.severity}</span></td>
-                          <td>{log.question ? <small>Q{log.question.order}</small> : <small className="text-muted">—</small>}</td>
-                          <td><MetadataSummary type={log.type} meta={log.metadata}/></td>
-                          <td><small className="fst-italic text-muted">{log.reviewer_notes||"—"}</small></td>
-                          <td>{log.reviewed ? <span className="badge bg-success">Reviewed</span> : <span className="badge bg-secondary">Pending</span>}</td>
-                          <td>
-                            <button className={`btn btn-sm ${log.reviewed?"btn-outline-secondary":"btn-outline-success"}`}
-                              onClick={() => onMarkReviewed(log.id, log.type, !log.reviewed)}>
-                              <i className={`bi ${log.reviewed?"bi-arrow-counterclockwise":"bi-check-circle"}`}></i>
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Close</button>
-        </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table className="dash-table">
+                  <thead>
+                    <tr>{["TIME","TYPE","SEVERITY","QUESTION","DETAIL","NOTES","STATUS","ACTION"].map(h => <th key={h}>{h}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {data.logs.map(log => (
+                      <tr key={`${log.type}-${log.id}`} style={{ opacity: log.reviewed ? .55 : 1 }}>
+                        <td style={{ fontSize: 12 }}>{log.occurred_at ? new Date(log.occurred_at).toLocaleTimeString() : "—"}</td>
+                        <td><span className="badge-pill" style={{ background: "#1e293b", color: "#fff", fontSize: 10 }}>{TYPE_LABELS[log.type]??log.type}</span></td>
+                        <td><span className="badge-pill" style={{ background: SEVERITY_MAP[log.severity]?.bg || "#f1f5f9", color: SEVERITY_MAP[log.severity]?.color || "#64748b" }}>{SEVERITY_MAP[log.severity]?.label??log.severity}</span></td>
+                        <td>{log.question ? <span style={{ fontSize: 12 }}>Q{log.question.order}</span> : <span style={{ color: "#94a3b8", fontSize: 12 }}>—</span>}</td>
+                        <td><MetadataSummary type={log.type} meta={log.metadata}/></td>
+                        <td style={{ fontSize: 12, color: "#64748b", fontStyle: "italic" }}>{log.reviewer_notes||"—"}</td>
+                        <td>
+                          <span className="badge-pill" style={log.reviewed ? { background: "#f0fdf4", color: "#15803d" } : { background: "#f1f5f9", color: "#64748b" }}>
+                            {log.reviewed ? "Reviewed" : "Pending"}
+                          </span>
+                        </td>
+                        <td>
+                          <button className="action-btn" onClick={() => onMarkReviewed(log.id, log.type, !log.reviewed)}>
+                            <i className={`bi ${log.reviewed ? "bi-arrow-counterclockwise" : "bi-check-circle"}`}></i>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      <div className="dash-modal-ftr">
+        <button className="dash-btn-ghost" onClick={onClose}>Close</button>
       </div>
     </div>
   </div>
 );
 
-// ════════════════════════════════════════════════════════════════════════════
-// QUESTION MODALS (shared form fields used by both Add and Edit)
-// ════════════════════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════════════════════
+   QUESTION FORM FIELDS
+════════════════════════════════════════════════════════════════════════════ */
 const QuestionFormFields = ({ formData, setFormData, submitting }) => {
   const updateOption = (i, v) => {
     const opts = [...formData.options]; opts[i] = v;
-    setFormData({ ...formData, options: opts,
-      correct_answer: formData.correct_answer === formData.options[i] ? "" : formData.correct_answer });
+    setFormData({ ...formData, options: opts, correct_answer: formData.correct_answer === formData.options[i] ? "" : formData.correct_answer });
   };
 
+  const TYPE_OPTS = [
+    { value:"multiple_choice", label:"Multiple Choice", icon:"bi-ui-radios"  },
+    { value:"true_false",      label:"True / False",    icon:"bi-toggle-on"  },
+    { value:"essay",           label:"Essay",           icon:"bi-textarea"   },
+  ];
+
   return (
-    <div className="row g-3">
-      <div className="col-md-8">
-        <label className="form-label fw-semibold">Type <span className="text-danger">*</span></label>
-        <div className="d-flex gap-2">
-          {[{value:"multiple_choice",label:"Multiple Choice",icon:"bi-ui-radios"},
-            {value:"true_false",label:"True / False",icon:"bi-toggle-on"},
-            {value:"essay",label:"Essay",icon:"bi-textarea"}].map(opt => (
-            <button key={opt.value} type="button"
-              className={`btn btn-sm flex-grow-1 ${formData.type===opt.value?"btn-primary":"btn-outline-secondary"}`}
-              onClick={() => setFormData({...formData,type:opt.value,correct_answer:"",options:["","","",""]})}>
-              <i className={`bi ${opt.icon} me-1`}></i>{opt.label}
-            </button>
-          ))}
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12 }}>
+        <div>
+          <label className="form-lbl">Type <span style={{ color: "#ef4444" }}>*</span></label>
+          <div style={{ display: "flex", gap: 8 }}>
+            {TYPE_OPTS.map(opt => (
+              <button key={opt.value} type="button"
+                style={{ flex: 1, padding: "9px 10px", borderRadius: 10, border: `1px solid ${formData.type===opt.value?"#0056b3":"rgba(0,86,179,.15)"}`, background: formData.type===opt.value?"#0056b3":"#f8faff", color: formData.type===opt.value?"#fff":"#64748b", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, transition: "all .15s" }}
+                onClick={() => setFormData({...formData,type:opt.value,correct_answer:"",options:["","","",""]})}>
+                <i className={`bi ${opt.icon}`}></i>{opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ minWidth: 90 }}>
+          <label className="form-lbl">Points <span style={{ color: "#ef4444" }}>*</span></label>
+          <input type="number" className="form-ctrl" min="1" value={formData.points}
+            onChange={e => setFormData({...formData,points:parseInt(e.target.value)})} required disabled={submitting}/>
         </div>
       </div>
-      <div className="col-md-4">
-        <label className="form-label fw-semibold">Points <span className="text-danger">*</span></label>
-        <input type="number" className="form-control" min="1" value={formData.points}
-          onChange={e => setFormData({...formData,points:parseInt(e.target.value)})} required disabled={submitting}/>
-      </div>
-      <div className="col-12">
-        <label className="form-label fw-semibold">Question Text <span className="text-danger">*</span></label>
-        <textarea className="form-control" rows="3" placeholder="Enter your question here…"
+      <div>
+        <label className="form-lbl">Question Text <span style={{ color: "#ef4444" }}>*</span></label>
+        <textarea className="form-ctrl" rows="3" placeholder="Enter your question here…"
           value={formData.question_text} onChange={e => setFormData({...formData,question_text:e.target.value})}
-          required disabled={submitting}/>
+          required disabled={submitting} style={{ resize: "vertical" }}/>
       </div>
       {formData.type==="multiple_choice" && (
         <>
-          <div className="col-12">
-            <label className="form-label fw-semibold">Answer Options <span className="text-danger">*</span></label>
+          <div>
+            <label className="form-lbl">Answer Options <span style={{ color: "#ef4444" }}>*</span></label>
             {formData.options.map((opt,idx) => (
-              <div key={idx} className="input-group mb-2">
-                <span className="input-group-text fw-semibold">{String.fromCharCode(65+idx)}</span>
-                <input type="text" className="form-control" placeholder={`Option ${String.fromCharCode(65+idx)}`}
+              <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ width: 28, height: 28, borderRadius: 8, background: opt&&opt===formData.correct_answer?"#0056b3":"#f1f5f9", color: opt&&opt===formData.correct_answer?"#fff":"#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
+                  {String.fromCharCode(65+idx)}
+                </span>
+                <input type="text" className="form-ctrl" placeholder={`Option ${String.fromCharCode(65+idx)}`}
                   value={opt} onChange={e => updateOption(idx, e.target.value)} required disabled={submitting}/>
-                {opt && opt===formData.correct_answer &&
-                  <span className="input-group-text bg-success text-white"><i className="bi bi-check-lg"></i></span>}
+                {opt && opt===formData.correct_answer && <i className="bi bi-check-circle-fill" style={{ color: "#22c55e", flexShrink: 0 }}></i>}
               </div>
             ))}
           </div>
-          <div className="col-12">
-            <label className="form-label fw-semibold">Correct Answer <span className="text-danger">*</span></label>
-            <select className="form-select" value={formData.correct_answer}
+          <div>
+            <label className="form-lbl">Correct Answer <span style={{ color: "#ef4444" }}>*</span></label>
+            <select className="form-ctrl" value={formData.correct_answer}
               onChange={e => setFormData({...formData,correct_answer:e.target.value})} required disabled={submitting}>
-              <option value="">Select…</option>
+              <option value="">Select correct answer…</option>
               {formData.options.map((opt,idx) => opt.trim() &&
                 <option key={idx} value={opt}>{String.fromCharCode(65+idx)}. {opt}</option>)}
             </select>
@@ -740,12 +914,12 @@ const QuestionFormFields = ({ formData, setFormData, submitting }) => {
         </>
       )}
       {formData.type==="true_false" && (
-        <div className="col-12">
-          <label className="form-label fw-semibold">Correct Answer <span className="text-danger">*</span></label>
-          <div className="d-flex gap-3">
+        <div>
+          <label className="form-lbl">Correct Answer <span style={{ color: "#ef4444" }}>*</span></label>
+          <div style={{ display: "flex", gap: 10 }}>
             {["True","False"].map(val => (
               <button key={val} type="button"
-                className={`btn flex-grow-1 ${formData.correct_answer===val?"btn-primary":"btn-outline-secondary"}`}
+                style={{ flex: 1, padding: "10px", borderRadius: 10, border: `1px solid ${formData.correct_answer===val?"#0056b3":"rgba(0,86,179,.15)"}`, background: formData.correct_answer===val?"#0056b3":"#f8faff", color: formData.correct_answer===val?"#fff":"#64748b", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans',sans-serif", transition: "all .15s" }}
                 onClick={() => setFormData({...formData,correct_answer:val})}>
                 {val==="True"?"✅":"❌"} {val}
               </button>
@@ -756,16 +930,17 @@ const QuestionFormFields = ({ formData, setFormData, submitting }) => {
       )}
       {formData.type==="essay" && (
         <>
-          <div className="col-md-4">
-            <label className="form-label fw-semibold">Max Words</label>
-            <input type="number" className="form-control" min="1" placeholder="e.g., 500"
+          <div>
+            <label className="form-lbl">Max Words</label>
+            <input type="number" className="form-ctrl" min="1" placeholder="e.g., 500"
               value={formData.max_words||""}
               onChange={e => setFormData({...formData,max_words:parseInt(e.target.value)||null})} disabled={submitting}/>
           </div>
-          <div className="col-12">
-            <label className="form-label fw-semibold">Grading Rubric</label>
-            <textarea className="form-control" rows="3" placeholder="Describe how this question should be graded…"
-              value={formData.rubric} onChange={e => setFormData({...formData,rubric:e.target.value})} disabled={submitting}/>
+          <div>
+            <label className="form-lbl">Grading Rubric</label>
+            <textarea className="form-ctrl" rows="3" placeholder="Describe how this question should be graded…"
+              value={formData.rubric} onChange={e => setFormData({...formData,rubric:e.target.value})}
+              disabled={submitting} style={{ resize: "vertical" }}/>
           </div>
         </>
       )}
@@ -775,6 +950,7 @@ const QuestionFormFields = ({ formData, setFormData, submitting }) => {
 
 const BLANK_QUESTION = { type:"multiple_choice", question_text:"", points:1, options:["","","",""], correct_answer:"", max_words:null, rubric:"" };
 
+/* ─── Add Question Modal ──────────────────────────────────────────────────── */
 const AddQuestionModal = ({ show, onHide, examId, onSuccess }) => {
   const [formData, setFormData] = useState(BLANK_QUESTION);
   const [submitting, setSubmitting] = useState(false);
@@ -796,33 +972,36 @@ const AddQuestionModal = ({ show, onHide, examId, onSuccess }) => {
 
   if (!show) return null;
   return (
-    <div className="modal show d-block" style={{backgroundColor:"rgba(0,0,0,0.5)",position:"fixed",inset:0,overflowY:"hidden",zIndex:1055}}>
-      <div className="modal-dialog modal-lg" style={{margin:"1.75rem auto"}}>
-        <div className="modal-content">
-          <div className="modal-header border-0 pb-0">
-            <div>
-              <h5 className="modal-title fw-bold"><i className="bi bi-patch-plus me-2 text-primary"></i>Add Question</h5>
-              <p className="text-muted small mb-0">Add a new question to this exam</p>
-            </div>
-            <button type="button" className="btn-close" onClick={onHide} disabled={submitting}/>
+    <div className="dash-modal-overlay">
+      <div className="dash-modal lg">
+        <div className="dash-modal-hdr">
+          <div>
+            <h5 style={{ margin: 0, fontWeight: 700, fontSize: 17, color: "#0f172a" }}>
+              <i className="bi bi-patch-plus me-2" style={{ color: "#0056b3" }}></i>Add Question
+            </h5>
+            <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>Add a new question to this exam</p>
           </div>
-          <form id="add-q-form" onSubmit={handleSubmit}>
-            <div className="modal-body pt-3" style={{overflowY:"auto",maxHeight:"calc(100vh - 220px)"}}>
-              <QuestionFormFields formData={formData} setFormData={setFormData} submitting={submitting}/>
-            </div>
-          </form>
-          <div className="modal-footer border-top">
-            <button type="button" className="btn btn-light" onClick={onHide} disabled={submitting}>Cancel</button>
-            <button type="submit" form="add-q-form" className="btn btn-primary px-4" disabled={submitting}>
-              {submitting ? <><span className="spinner-border spinner-border-sm me-2"/>Adding…</> : <><i className="bi bi-plus-circle me-2"></i>Add Question</>}
-            </button>
+          <button onClick={onHide} disabled={submitting} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#94a3b8", padding: 4 }}>
+            <i className="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <form id="add-q-form" onSubmit={handleSubmit}>
+          <div className="dash-modal-body">
+            <QuestionFormFields formData={formData} setFormData={setFormData} submitting={submitting}/>
           </div>
+        </form>
+        <div className="dash-modal-ftr">
+          <button type="button" className="dash-btn-ghost" onClick={onHide} disabled={submitting}>Cancel</button>
+          <button type="submit" form="add-q-form" className="dash-btn-primary" disabled={submitting}>
+            {submitting ? <><span className="spinner-border spinner-border-sm me-2"/>Adding…</> : <><i className="bi bi-plus-circle"></i>Add Question</>}
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
+/* ─── Edit Question Modal ──────────────────────────────────────────────────── */
 const EditQuestionModal = ({ question, onHide, onSave }) => {
   const [formData, setFormData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -848,37 +1027,41 @@ const EditQuestionModal = ({ question, onHide, onSave }) => {
 
   if (!question || !formData) return null;
   return (
-    <div className="modal show d-block" style={{backgroundColor:"rgba(0,0,0,0.5)",position:"fixed",inset:0,overflowY:"hidden",zIndex:1055}}>
-      <div className="modal-dialog modal-lg" style={{margin:"1.75rem auto"}}>
-        <div className="modal-content">
-          <div className="modal-header pb-2">
-            <div>
-              <h5 className="modal-title fw-bold"><i className="bi bi-pencil-square me-2 text-warning"></i>Edit Question</h5>
-              <p className="text-muted small mb-0">Changes save on click</p>
-            </div>
-            <button type="button" className="btn-close" onClick={onHide} disabled={submitting}/>
+    <div className="dash-modal-overlay">
+      <div className="dash-modal lg">
+        <div className="dash-modal-hdr">
+          <div>
+            <h5 style={{ margin: 0, fontWeight: 700, fontSize: 17, color: "#0f172a" }}>
+              <i className="bi bi-pencil-square me-2" style={{ color: "#f59e0b" }}></i>Edit Question
+            </h5>
+            <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>Changes save on click</p>
           </div>
-          <form id="edit-q-form" onSubmit={handleSubmit}>
-            <div className="modal-body" style={{overflowY:"auto",maxHeight:"calc(100vh - 220px)"}}>
-              <QuestionFormFields formData={formData} setFormData={setFormData} submitting={submitting}/>
-            </div>
-          </form>
-          <div className="modal-footer border-top">
-            <small className="text-muted me-auto"><i className="bi bi-lock me-1"></i>Edits won't be lost until you cancel</small>
-            <button type="button" className="btn btn-light" onClick={onHide} disabled={submitting}>Cancel</button>
-            <button type="submit" form="edit-q-form" className="btn btn-warning px-4" disabled={submitting}>
-              {submitting ? <><span className="spinner-border spinner-border-sm me-2"/>Saving…</> : <><i className="bi bi-check2 me-2"></i>Save Changes</>}
-            </button>
+          <button onClick={onHide} disabled={submitting} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#94a3b8", padding: 4 }}>
+            <i className="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <form id="edit-q-form" onSubmit={handleSubmit}>
+          <div className="dash-modal-body">
+            <QuestionFormFields formData={formData} setFormData={setFormData} submitting={submitting}/>
           </div>
+        </form>
+        <div className="dash-modal-ftr">
+          <span style={{ fontSize: 12, color: "#94a3b8", marginRight: "auto", display: "flex", alignItems: "center", gap: 4 }}>
+            <i className="bi bi-lock"></i> Edits won't be lost until you cancel
+          </span>
+          <button type="button" className="dash-btn-ghost" onClick={onHide} disabled={submitting}>Cancel</button>
+          <button type="submit" form="edit-q-form" className="dash-btn-primary" style={{ background: "#f59e0b", color: "#fff" }} disabled={submitting}>
+            {submitting ? <><span className="spinner-border spinner-border-sm me-2"/>Saving…</> : <><i className="bi bi-check2"></i>Save Changes</>}
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
-// ════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ════════════════════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+════════════════════════════════════════════════════════════════════════════ */
 const ExamDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -889,15 +1072,15 @@ const ExamDetail = () => {
   const [loading, setLoading]     = useState(true);
   const [activeTab, setActiveTab] = useState("questions");
 
-  const [summaries, setSummaries]         = useState([]);
-  const [anomalyLoading, setAnomalyLoading] = useState(false);
-  const [anomalyLoaded, setAnomalyLoaded]   = useState(false);
-  const [detailData, setDetailData]         = useState(null);
-  const [detailLoading, setDetailLoading]   = useState(false);
-  const [anomalySearch, setAnomalySearch]   = useState("");
-  const [anomalyFilter, setAnomalyFilter]   = useState("all");
+  const [summaries, setSummaries]             = useState([]);
+  const [anomalyLoading, setAnomalyLoading]   = useState(false);
+  const [anomalyLoaded, setAnomalyLoaded]     = useState(false);
+  const [detailData, setDetailData]           = useState(null);
+  const [detailLoading, setDetailLoading]     = useState(false);
+  const [anomalySearch, setAnomalySearch]     = useState("");
+  const [anomalyFilter, setAnomalyFilter]     = useState("all");
 
-  const [essayData, setEssayData]     = useState(null);
+  const [essayData, setEssayData]       = useState(null);
   const [essayLoading, setEssayLoading] = useState(false);
   const [essayLoaded, setEssayLoaded]   = useState(false);
   const [essayStats, setEssayStats]     = useState(null);
@@ -910,6 +1093,8 @@ const ExamDetail = () => {
   const shuffleKey = `exam_shuffle_${id}`;
 
   const isNewExam = !!location.state?.openAddQuestion;
+  const isNavActive = (to) =>
+    to === "/instructor" ? location.pathname === to : location.pathname.startsWith(to);
 
   useEffect(() => {
     if (isNewExam && !loading) {
@@ -1066,359 +1251,417 @@ const ExamDetail = () => {
   const totalPoints = questions.reduce((sum, q) => sum + (q.points||0), 0);
   const hasEssays   = questions.some(q => q.type==="essay");
 
+  const STATUS_STYLE = {
+    active:    { bg: "#f0fdf4", color: "#15803d", label: "Active"    },
+    scheduled: { bg: "#fff7ed", color: "#c2410c", label: "Scheduled" },
+    completed: { bg: "#f0f9ff", color: "#0369a1", label: "Completed" },
+    draft:     { bg: "#f1f5f9", color: "#64748b", label: "Draft"     },
+  };
+  const ss = STATUS_STYLE[exam?.status] || STATUS_STYLE.draft;
+
+  const TABS = [
+    { key:"questions", icon:"bi-list-ol",          label:"Questions",       badge:questions.length, badgeBg:"#e8f0fe", badgeColor:"#0056b3" },
+    { key:"results",   icon:"bi-people",            label:"Student Results"  },
+    ...(hasEssays ? [{ key:"essays", icon:"bi-textarea", label:"Essay Grading",
+      badge:essayStats?.pending_count>0 ? essayStats.pending_count : null, badgeBg:"#fff7ed", badgeColor:"#c2410c" }] : []),
+    { key:"anomalies", icon:"bi-shield-exclamation",label:"Anomaly Monitor",
+      badge:anomalyLoaded&&anomalyStats.flagged>0 ? anomalyStats.flagged : null, badgeBg:"#fef2f2", badgeColor:"#ef4444" },
+  ];
+
   if (loading) return (
-    <div className="d-flex justify-content-center align-items-center min-vh-100">
-      <div className="spinner-border text-primary" role="status"/>
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#f0f4fb" }}>
+      <style>{SHARED_CSS}</style>
+      <div className="spinner-border" style={{ color: "#0056b3" }} />
     </div>
   );
 
   return (
-    <div className="container-fluid p-4" style={{ maxWidth:1200 }}>
+    <>
+      <style>{SHARED_CSS}</style>
+      <div style={{ background: "#f0f4fb", minHeight: "100vh" }}>
 
-      <nav aria-label="breadcrumb" className="mb-3">
-        <ol className="breadcrumb mb-0">
-          <li className="breadcrumb-item"><Link to="/instructor/exams" className="text-decoration-none">Exams</Link></li>
-          <li className="breadcrumb-item active">{exam.title}</li>
-        </ol>
-      </nav>
-
-      <div className="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
-        <div>
-          <h3 className="mb-1 fw-bold">{exam.title}</h3>
-          <p className="text-muted mb-0">
-            <Link to={`/instructor/courses/${exam.course?.id}`} className="text-decoration-none text-muted">
-              <i className="bi bi-folder2 me-1"></i>{exam.course?.code} — {exam.course?.name}
-            </Link>
-          </p>
-        </div>
-        <div className="d-flex gap-2 flex-wrap">
-          <Link to={`/instructor/exams/${id}/edit`} className="btn btn-outline-secondary">
-            <i className="bi bi-pencil me-2"></i>Edit Exam
-          </Link>
-          {activeTab==="questions" && (
-            <button className="btn btn-primary" onClick={() => setShowQuestionModal(true)}>
-              <i className="bi bi-plus-circle me-2"></i>Add Question
-            </button>
-          )}
-          {activeTab==="anomalies" && (
-            <button className="btn btn-outline-secondary" onClick={() => { setAnomalyLoaded(false); fetchAnomalySummaries(); }}>
-              <i className="bi bi-arrow-clockwise me-2"></i>Refresh
-            </button>
-          )}
-          {activeTab==="essays" && (
-            <button className="btn btn-outline-secondary" onClick={() => { setEssayLoaded(false); fetchEssayData(); }}>
-              <i className="bi bi-arrow-clockwise me-2"></i>Refresh
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Exam Info Strip */}
-      <div className="card mb-4 shadow-sm border-0">
-        <div className="card-body py-3">
-          <div className="row g-3 align-items-center">
-            {[
-              { icon:"bi-tag",           label:"Type",         value:<span className="badge bg-secondary text-capitalize">{exam.type}</span> },
-              { icon:"bi-clock",         label:"Duration",     value:`${exam.duration_minutes} min` },
-              { icon:"bi-trophy",        label:"Total Points", value:`${totalPoints} pts` },
-              { icon:"bi-list-ol",       label:"Questions",    value:questions.length },
-              { icon:"bi-calendar-event",label:"Start",        value:new Date(exam.start_time).toLocaleString() },
-              { icon:"bi-calendar-x",    label:"End",          value:new Date(exam.end_time).toLocaleString() },
-            ].map(({ icon, label, value }) => (
-              <div key={label} className="col-auto">
-                <div className="text-muted small"><i className={`bi ${icon} me-1`}></i>{label}</div>
-                <div className="fw-semibold">{value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {isNewExam && questions.length===0 && (
-        <div className="alert alert-primary border-primary d-flex align-items-start gap-3 mb-3">
-          <i className="bi bi-lightbulb-fill fs-5 text-primary mt-1 flex-shrink-0"></i>
-          <div>
-            <strong>Exam created! Next step: add your questions.</strong>
-            <p className="mb-2 mt-1 small text-muted">Your exam has no questions yet.</p>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowQuestionModal(true)}>
-              <i className="bi bi-plus-circle me-2"></i>Add First Question
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <ul className="nav nav-tabs mb-4">
-        {[
-          { key:"questions", icon:"bi-list-ol",         label:"Questions",      badge:questions.length, badgeColor:"primary" },
-          { key:"results",   icon:"bi-people",           label:"Student Results" },
-          ...(hasEssays ? [{ key:"essays", icon:"bi-textarea", label:"Essay Grading",
-            badge:essayStats?.pending_count>0 ? essayStats.pending_count : null, badgeColor:"warning" }] : []),
-          { key:"anomalies", icon:"bi-shield-exclamation",label:"Anomaly Monitor",
-            badge:anomalyLoaded&&anomalyStats.flagged>0 ? anomalyStats.flagged : null, badgeColor:"danger" },
-        ].map(({ key, icon, label, badge, badgeColor }) => (
-          <li key={key} className="nav-item">
-            <button className={`nav-link ${activeTab===key?"active fw-semibold":""}`} onClick={() => setActiveTab(key)}>
-              <i className={`bi ${icon} me-2`}></i>{label}
-              {badge != null && <span className={`badge bg-${badgeColor} ${badgeColor==="warning"?"text-dark":""} ms-2`}>{badge}</span>}
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      {/* ══ QUESTIONS TAB ══ */}
-      {activeTab==="questions" && (
-        <div className="card shadow-sm border-0">
-          <div className="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h6 className="mb-0 fw-semibold">
-              <i className="bi bi-list-ol me-2 text-primary"></i>
-              {questions.length} Question{questions.length!==1?"s":""} · {totalPoints} total pts
-            </h6>
-            <div className="d-flex align-items-center gap-2">
-              <div
-                className={`d-flex align-items-center gap-2 px-3 py-1 rounded-pill border ${shuffleEnabled?"border-success bg-success bg-opacity-10":"border-secondary bg-light"}`}
-                style={{ cursor:shuffleSaving?"wait":"pointer", userSelect:"none" }}
-                onClick={!shuffleSaving ? handleShuffleToggle : undefined}
-              >
-                {shuffleSaving
-                  ? <span className="spinner-border spinner-border-sm text-secondary"/>
-                  : <i className={`bi ${shuffleEnabled?"bi-shuffle text-success":"bi-list-ol text-secondary"}`}></i>}
-                <span className={`small fw-semibold ${shuffleEnabled?"text-success":"text-muted"}`}>
-                  {shuffleEnabled?"Shuffle ON":"Shuffle OFF"}
-                </span>
-                <div className={`rounded-pill ${shuffleEnabled?"bg-success":"bg-secondary"}`} style={{width:28,height:16,position:"relative",flexShrink:0}}>
-                  <div style={{position:"absolute",top:2,left:shuffleEnabled?14:2,width:12,height:12,borderRadius:"50%",background:"#fff",transition:"left 0.2s"}}/>
-                </div>
-              </div>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowQuestionModal(true)}>
-                <i className="bi bi-plus me-1"></i>Add Question
+        {/* ── Topbar ── */}
+        <div className="topbar">
+          <span style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 700, fontSize: 15, color: "#0056b3", letterSpacing: "-.3px", flexShrink: 0 }}>
+            SECT Instructor
+          </span>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="dropdown">
+              <button className="d-flex align-items-center gap-2 dropdown-toggle"
+                style={{ background: "transparent", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: 10 }}
+                data-bs-toggle="dropdown">
+                <div className="dash-avatar"><i className="bi bi-person" style={{ fontSize: 15 }}></i></div>
               </button>
+              <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0" style={{ borderRadius: 12, fontSize: 13 }}>
+                <li><Link className="dropdown-item" to="/instructor/account-settings">Account Settings</Link></li>
+                <li><Link className="dropdown-item" to="/instructor/profile">Profile</Link></li>
+                <li><hr className="dropdown-divider" /></li>
+                <li><button className="dropdown-item text-danger"
+                  onClick={async () => { try { await API.post("/logout"); } catch {} navigate("/instructor/login"); }}
+                  style={{ border: "none", background: "none", width: "100%", textAlign: "left" }}>Logout</button></li>
+              </ul>
             </div>
-          </div>
-          {shuffleEnabled && questions.length>1 && (
-            <div className="alert alert-success border-0 rounded-0 mb-0 py-2 px-4" style={{fontSize:13}}>
-              <i className="bi bi-shuffle me-2"></i>
-              <strong>Shuffle is ON</strong> — each student receives questions in a randomised order.
-            </div>
-          )}
-          <div className="card-body p-0">
-            {questions.length===0 ? (
-              <div className="text-center py-5">
-                <i className="bi bi-patch-question fs-1 text-muted d-block mb-2"></i>
-                <p className="text-muted mb-3">No questions yet.</p>
-                <button className="btn btn-primary" onClick={() => setShowQuestionModal(true)}>
-                  <i className="bi bi-plus-circle me-2"></i>Add First Question
-                </button>
-              </div>
-            ) : questions.map((question, index) => (
-              <div key={question.id} className="border-bottom p-4">
-                <div className="d-flex justify-content-between align-items-start gap-3">
-                  <div className="flex-grow-1">
-                    <div className="d-flex align-items-center gap-2 mb-2">
-                      <span className="badge bg-light text-dark border fw-bold">Q{index+1}</span>
-                      <span className="badge bg-primary bg-opacity-10 text-primary">
-                        <i className={`bi ${QTYPE_ICON[question.type]||"bi-question"} me-1`}></i>
-                        {question.type.replace("_"," ")}
-                      </span>
-                      <span className="badge bg-success bg-opacity-10 text-success">
-                        <i className="bi bi-trophy me-1"></i>{question.points} pts
-                      </span>
-                    </div>
-                    <p className="mb-2 fw-semibold">{question.question_text}</p>
-                    {question.type==="multiple_choice" && question.options && (
-                      <div className="ms-2">
-                        {question.options.map((opt, idx) => (
-                          <div key={idx} className={`d-flex align-items-center gap-2 mb-1 ${opt===question.correct_answer?"text-success fw-semibold":"text-muted"}`}>
-                            <span className={`badge ${opt===question.correct_answer?"bg-success":"bg-light text-dark border"}`} style={{minWidth:24}}>
-                              {String.fromCharCode(65+idx)}
-                            </span>
-                            <small>{opt}</small>
-                            {opt===question.correct_answer && <i className="bi bi-check-circle-fill text-success"></i>}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {question.type==="true_false" && (
-                      <div className="ms-2"><small className="text-muted">Correct: </small><span className="badge bg-success">{question.correct_answer}</span></div>
-                    )}
-                    {question.type==="essay" && (
-                      <div className="ms-2 d-flex gap-3">
-                        {question.max_words && <small className="text-muted"><i className="bi bi-type me-1"></i>Max {question.max_words} words</small>}
-                        {question.rubric    && <small className="text-muted fst-italic"><i className="bi bi-journal-text me-1"></i>{question.rubric.slice(0,80)}{question.rubric.length>80?"…":""}</small>}
-                      </div>
-                    )}
-                  </div>
-                  <div className="d-flex gap-1 flex-shrink-0">
-                    <button className="btn btn-sm btn-outline-secondary" onClick={() => setEditingQuestion(question)}><i className="bi bi-pencil"></i></button>
-                    <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteQuestion(question.id)}><i className="bi bi-trash"></i></button>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
-      )}
 
-      {/* ══ STUDENT RESULTS TAB ══ */}
-      {activeTab==="results" && <StudentResultsTab examId={id} anomalySummaries={summaries}/>}
+        <div className="d-flex">
 
-      {/* ══ ESSAY GRADING TAB ══ */}
-      {activeTab==="essays" && (
-        essayLoading ? (
-          <div className="text-center py-5"><div className="spinner-border text-warning"/><p className="text-muted mt-3">Loading essay responses…</p></div>
-        ) : (
-          <>
-            <div className="row g-3 mb-4">
-              {[
-                { label:"Ungraded",          value:essayData?.pending_count??0,                                                                                     color:"warning", icon:"bi-hourglass-split" },
-                { label:"Total Submissions", value:essayData?.submissions?.length??0,                                                                              color:"primary", icon:"bi-people"          },
-                { label:"Fully Graded",      value:(essayData?.submissions??[]).filter(s => s.essays.every(e => isEssayGraded(e))).length, color:"success", icon:"bi-check2-all"    },
-              ].map(({ label, value, color, icon }) => (
-                <div key={label} className="col-md-4">
-                  <div className="card border-0 shadow-sm">
-                    <div className="card-body d-flex align-items-center gap-3 py-3">
-                      <div className={`rounded-circle bg-${color} bg-opacity-10 d-flex align-items-center justify-content-center`} style={{width:44,height:44}}>
-                        <i className={`bi ${icon} text-${color} fs-5`}></i>
-                      </div>
-                      <div>
-                        <div className="text-muted small">{label}</div>
-                        <div className={`fw-bold fs-4 text-${color} lh-1`}>{value}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {essayData?.pending_count > 0 && (
-              <div className="alert alert-warning d-flex align-items-center gap-3 mb-3">
-                <i className="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0"></i>
-                <div>
-                  <strong>{essayData.pending_count} essay answer{essayData.pending_count!==1?"s":""} need grading.</strong>
-                  <span className="ms-2 text-muted small">Ungraded essays are excluded from the student's final score.</span>
-                </div>
-              </div>
-            )}
-            {!essayData || essayData.submissions.length===0 ? (
-              <div className="card border-0 shadow-sm">
-                <div className="card-body text-center py-5">
-                  <i className="bi bi-textarea fs-1 text-muted d-block mb-2"></i>
-                  <p className="text-muted">No essay responses yet.</p>
-                </div>
-              </div>
-            ) : essayData.submissions.map(sub => (
-              <EssaySubmissionCard key={sub.submission_id} sub={sub} examId={id}
-                onGraded={() => { setEssayLoaded(false); fetchEssayData(); }}/>
+          {/* ── Sidebar ── */}
+          <nav className="glass-sidebar d-none d-lg-flex flex-column align-items-center py-4 gap-1"
+            style={{ width: 80, minHeight: "calc(100vh - 56px)", position: "sticky", top: 56, alignSelf: "flex-start", flexShrink: 0 }}>
+            {NAV_ITEMS.map(({ to, icon, label }) => (
+              <Link key={to} to={to} className={`nav-pill ${isNavActive(to) ? "active" : ""}`}>
+                <i className={`bi ${icon}`}></i>{label}
+              </Link>
             ))}
-          </>
-        )
-      )}
+          </nav>
 
-      {/* ══ ANOMALY MONITOR TAB ══ */}
-      {activeTab==="anomalies" && (
-        anomalyLoading ? (
-          <div className="text-center py-5"><div className="spinner-border text-primary"/><p className="text-muted mt-3">Loading anomaly data…</p></div>
-        ) : (
-          <>
-            <div className="row g-3 mb-4">
-              {[
-                { label:"Flagged", value:anomalyStats.flagged, color:"danger",  icon:"bi-shield-x",            key:"flagged" },
-                { label:"Warning", value:anomalyStats.warning, color:"warning", icon:"bi-exclamation-triangle", key:"warning" },
-                { label:"Clear",   value:anomalyStats.clear,   color:"success", icon:"bi-shield-check",         key:"none"    },
-                { label:"Total",   value:summaries.length,     color:"primary", icon:"bi-people",               key:"all"     },
-              ].map(({ label, value, color, icon, key }) => (
-                <div key={label} className="col-md-3">
-                  <div className={`card border-0 shadow-sm h-100 ${anomalyFilter===key?`border-${color} border-2`:""}`}
-                    style={{ cursor:"pointer", outline:anomalyFilter===key?`2px solid var(--bs-${color})`:"none" }}
-                    onClick={() => setAnomalyFilter(anomalyFilter===key?"all":key)}>
-                    <div className="card-body d-flex align-items-center gap-3 py-3">
-                      <div className={`rounded-circle bg-${color} bg-opacity-10 d-flex align-items-center justify-content-center`} style={{width:44,height:44}}>
-                        <i className={`bi ${icon} text-${color} fs-5`}></i>
-                      </div>
-                      <div>
-                        <div className="text-muted small">{label}</div>
-                        <div className={`fw-bold fs-4 text-${color} lh-1`}>{value}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="card shadow-sm border-0">
-              <div className="card-header bg-white d-flex gap-3 align-items-center flex-wrap">
-                <h6 className="mb-0 fw-semibold me-auto">Student Risk Overview</h6>
-                <div className="input-group" style={{maxWidth:250}}>
-                  <span className="input-group-text bg-white"><i className="bi bi-search text-muted"></i></span>
-                  <input type="text" className="form-control border-start-0" placeholder="Search student…"
-                    value={anomalySearch} onChange={e => setAnomalySearch(e.target.value)}/>
-                </div>
+          {/* ── Main ── */}
+          <main style={{ flex: 1, padding: "24px 20px", paddingBottom: 100, minWidth: 0 }}>
+
+            {/* Breadcrumb */}
+            <nav style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#94a3b8", flexWrap: "wrap" }}>
+                <Link to="/instructor/exams" style={{ color: "#94a3b8", textDecoration: "none" }}>Exams</Link>
+                <i className="bi bi-chevron-right" style={{ fontSize: 10 }}></i>
+                <span style={{ color: "#0f172a", fontWeight: 600 }}>{exam.title}</span>
               </div>
-              <div className="card-body p-0">
-                {summaries.length===0 ? (
-                  <div className="text-center py-5 text-muted">
-                    <i className="bi bi-shield-check fs-1 d-block mb-2"></i>No anomaly data yet.
-                  </div>
-                ) : (
-                  <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0">
-                      <thead className="table-light">
-                        <tr>
-                          <th>STUDENT</th><th>CPI SCORE</th><th>FLAG</th>
-                          <th className="text-center"><i className="bi bi-box-arrow-up-right"></i> Tabs</th>
-                          <th className="text-center"><i className="bi bi-keyboard"></i> Keys</th>
-                          <th className="text-center"><i className="bi bi-clock"></i> Response</th>
-                          <th className="text-center"><i className="bi bi-activity"></i> Keystroke</th>
-                          {/* <th>ACTIONS</th> */}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredSummaries.length===0 ? (
-                          <tr><td colSpan="8" className="text-center text-muted py-4">No students match your filter.</td></tr>
-                        ) : filteredSummaries.map(s => (
-                          <tr key={s.submission_id}>
-                            <td>
-                              <div className="d-flex align-items-center gap-2">
-                                <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold" style={{width:34,height:34,fontSize:13,flexShrink:0}}>
-                                  {s.student?.name?.charAt(0).toUpperCase()}
-                                </div>
-                                <div>
-                                  <div className="fw-semibold">{s.student?.name}</div>
-                                  <small className="text-muted">{s.student?.email}</small>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <div className="d-flex align-items-center gap-2">
-                                <div className="progress flex-grow-1" style={{height:8,minWidth:80}}>
-                                  <div className={`progress-bar ${riskBgClass(s.cpi_score??0)}`} style={{width:`${Math.min(s.cpi_score??0,100)}%`}}/>
-                                </div>
-                                <span className={`fw-bold ${riskColor(s.cpi_score??0)}`}>{(s.cpi_score??0).toFixed(1)}%</span>
-                              </div>
-                            </td>
-                            <td>
-                              <span className={`badge ${s.is_flagged?"bg-danger":(s.cpi_score??0)>=25?"bg-warning text-dark":"bg-success"}`}>
-                                {s.is_flagged?"Flagged":(s.cpi_score??0)>=25?"Possible":"Unlikely"}
-                              </span>
-                            </td>
-                            <td className="text-center">{s.tab_switch_count}</td>
-                            <td className="text-center">{s.keyboard_shortcut_count}</td>
-                            <td className="text-center">{s.response_time_anomaly_count}</td>
-                            <td className="text-center">{s.keystroke_anomaly_count}</td>
-                            {/* <td>
-                              <button className="btn btn-sm btn-outline-primary" onClick={() => openStudentDetail(s.submission_id)}>
-                                <i className="bi bi-eye me-1"></i>Details
-                              </button>
-                            </td> */}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+            </nav>
+
+            {/* Page header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+              <div>
+                <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#0f172a", letterSpacing: "-.5px" }}>{exam.title}</h1>
+                <Link to={`/instructor/courses/${exam.course?.id}`} style={{ fontSize: 13, color: "#64748b", textDecoration: "none" }}>
+                  <i className="bi bi-folder2 me-1"></i>{exam.course?.code} — {exam.course?.name}
+                </Link>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <Link to={`/instructor/exams/${id}/edit`} className="dash-btn-ghost">
+                  <i className="bi bi-pencil"></i> Edit Exam
+                </Link>
+                {activeTab==="questions" && (
+                  <button className="dash-btn-primary" onClick={() => setShowQuestionModal(true)}>
+                    <i className="bi bi-plus-circle"></i> Add Question
+                  </button>
+                )}
+                {activeTab==="anomalies" && (
+                  <button className="dash-btn-ghost" onClick={() => { setAnomalyLoaded(false); fetchAnomalySummaries(); }}>
+                    <i className="bi bi-arrow-clockwise"></i> Refresh
+                  </button>
+                )}
+                {activeTab==="essays" && (
+                  <button className="dash-btn-ghost" onClick={() => { setEssayLoaded(false); fetchEssayData(); }}>
+                    <i className="bi bi-arrow-clockwise"></i> Refresh
+                  </button>
                 )}
               </div>
             </div>
-          </>
-        )
-      )}
+
+            {/* Exam Info Strip */}
+            <div className="dash-card fade-up" style={{ marginBottom: 20 }}>
+              <div className="info-strip">
+                {[
+                  { icon:"bi-tag",           label:"Type",         value:<span className="badge-pill" style={{ background:"#f1f5f9", color:"#64748b" }}>{exam.type}</span> },
+                  { icon:"bi-clock",         label:"Duration",     value:`${exam.duration_minutes} min` },
+                  { icon:"bi-trophy",        label:"Total Points", value:`${totalPoints} pts` },
+                  { icon:"bi-list-ol",       label:"Questions",    value:questions.length },
+                  { icon:"bi-calendar-event",label:"Start",        value:new Date(exam.start_time).toLocaleString() },
+                  { icon:"bi-calendar-x",    label:"End",          value:new Date(exam.end_time).toLocaleString() },
+                  { icon:"bi-circle-fill",   label:"Status",       value:<span className="badge-pill" style={{ background:ss.bg, color:ss.color }}>{ss.label}</span> },
+                ].map(({ icon, label, value }) => (
+                  <div key={label} className="info-item">
+                    <div className="info-item-label"><i className={`bi ${icon} me-1`}></i>{label}</div>
+                    <div className="info-item-value">{value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* New exam alert */}
+            {isNewExam && questions.length===0 && (
+              <div style={{ padding: "14px 18px", background: "#e8f0fe", borderRadius: 12, border: "1px solid rgba(0,86,179,.15)", marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
+                <i className="bi bi-lightbulb-fill" style={{ color: "#0056b3", fontSize: 18, flexShrink: 0 }}></i>
+                <div>
+                  <strong style={{ color: "#0056b3" }}>Exam created! Next step: add your questions.</strong>
+                  <p style={{ margin: "4px 0 8px", fontSize: 12, color: "#64748b" }}>Your exam has no questions yet.</p>
+                  <button className="dash-btn-primary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={() => setShowQuestionModal(true)}>
+                    <i className="bi bi-plus-circle"></i> Add First Question
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Tabs */}
+            <div className="dash-tabs">
+              {TABS.map(({ key, icon, label, badge, badgeBg, badgeColor }) => (
+                <button key={key} className={`dash-tab ${activeTab===key?"active":""}`} onClick={() => setActiveTab(key)}>
+                  <i className={`bi ${icon}`}></i>{label}
+                  {badge != null && (
+                    <span className="badge-pill" style={{ background: badgeBg, color: badgeColor, fontSize: 10 }}>{badge}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* ══ QUESTIONS TAB ══ */}
+            {activeTab==="questions" && (
+              <div className="dash-card fade-up">
+                <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                  <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
+                    <i className="bi bi-list-ol me-2" style={{ color: "#0056b3" }}></i>
+                    {questions.length} Question{questions.length!==1?"s":""} · {totalPoints} total pts
+                  </h2>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div className={`shuffle-toggle ${shuffleEnabled?"on":""}`} onClick={!shuffleSaving ? handleShuffleToggle : undefined}
+                      style={{ cursor: shuffleSaving?"wait":"pointer" }}>
+                      {shuffleSaving
+                        ? <span className="spinner-border spinner-border-sm" style={{ color: "#64748b" }}/>
+                        : <i className={`bi ${shuffleEnabled?"bi-shuffle":"bi-list-ol"}`} style={{ color: shuffleEnabled?"#15803d":"#64748b", fontSize: 14 }}></i>}
+                      <span style={{ fontSize: 12, fontWeight: 700, color: shuffleEnabled?"#15803d":"#64748b" }}>
+                        {shuffleEnabled?"Shuffle ON":"Shuffle OFF"}
+                      </span>
+                      <div style={{ width: 28, height: 16, borderRadius: 99, background: shuffleEnabled?"#22c55e":"#e2e8f0", position: "relative", flexShrink: 0 }}>
+                        <div style={{ position: "absolute", top: 2, left: shuffleEnabled?14:2, width: 12, height: 12, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+                      </div>
+                    </div>
+                    <button className="dash-btn-primary" style={{ fontSize: 12, padding: "7px 14px" }} onClick={() => setShowQuestionModal(true)}>
+                      <i className="bi bi-plus"></i> Add
+                    </button>
+                  </div>
+                </div>
+                {shuffleEnabled && questions.length>1 && (
+                  <div style={{ padding: "10px 20px", background: "#f0fdf4", borderBottom: "1px solid #bbf7d0", fontSize: 13, color: "#15803d" }}>
+                    <i className="bi bi-shuffle me-2"></i>
+                    <strong>Shuffle is ON</strong> — each student receives questions in a randomised order.
+                  </div>
+                )}
+                <div>
+                  {questions.length===0 ? (
+                    <div style={{ textAlign: "center", padding: "48px 20px", color: "#94a3b8" }}>
+                      <i className="bi bi-patch-question" style={{ fontSize: 36, display: "block", marginBottom: 10 }}></i>
+                      <p style={{ marginBottom: 14, fontSize: 14 }}>No questions yet.</p>
+                      <button className="dash-btn-primary" onClick={() => setShowQuestionModal(true)}>
+                        <i className="bi bi-plus-circle"></i> Add First Question
+                      </button>
+                    </div>
+                  ) : questions.map((question, index) => (
+                    <div key={question.id} className="q-card">
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                            <span className="badge-pill" style={{ background: "#f1f5f9", color: "#64748b" }}>Q{index+1}</span>
+                            <span className="badge-pill" style={{ background: "#e8f0fe", color: "#0056b3" }}>
+                              <i className={`bi ${QTYPE_ICON[question.type]||"bi-question"} me-1`}></i>
+                              {question.type.replace("_"," ")}
+                            </span>
+                            <span className="badge-pill" style={{ background: "#f0fdf4", color: "#15803d" }}>
+                              <i className="bi bi-trophy me-1"></i>{question.points} pts
+                            </span>
+                          </div>
+                          <p style={{ margin: "0 0 8px", fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{question.question_text}</p>
+                          {question.type==="multiple_choice" && question.options && (
+                            <div style={{ paddingLeft: 8 }}>
+                              {question.options.map((opt, idx) => (
+                                <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, color: opt===question.correct_answer?"#15803d":"#64748b", fontWeight: opt===question.correct_answer?700:400 }}>
+                                  <span className="badge-pill" style={{ minWidth: 24, justifyContent: "center", background: opt===question.correct_answer?"#f0fdf4":"#f1f5f9", color: opt===question.correct_answer?"#15803d":"#64748b", fontSize: 10 }}>
+                                    {String.fromCharCode(65+idx)}
+                                  </span>
+                                  <span style={{ fontSize: 13 }}>{opt}</span>
+                                  {opt===question.correct_answer && <i className="bi bi-check-circle-fill" style={{ color: "#22c55e", fontSize: 13 }}></i>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {question.type==="true_false" && (
+                            <div style={{ paddingLeft: 8, fontSize: 13 }}>
+                              <span style={{ color: "#64748b" }}>Correct: </span>
+                              <span className="badge-pill" style={{ background: "#f0fdf4", color: "#15803d" }}>{question.correct_answer}</span>
+                            </div>
+                          )}
+                          {question.type==="essay" && (
+                            <div style={{ paddingLeft: 8, display: "flex", gap: 14, flexWrap: "wrap" }}>
+                              {question.max_words && <span style={{ fontSize: 12, color: "#64748b" }}><i className="bi bi-type me-1"></i>Max {question.max_words} words</span>}
+                              {question.rubric && <span style={{ fontSize: 12, color: "#64748b", fontStyle: "italic" }}><i className="bi bi-journal-text me-1"></i>{question.rubric.slice(0,80)}{question.rubric.length>80?"…":""}</span>}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                          <button className="action-btn" onClick={() => setEditingQuestion(question)}><i className="bi bi-pencil"></i></button>
+                          <button className="action-btn del" onClick={() => handleDeleteQuestion(question.id)}><i className="bi bi-trash"></i></button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ══ STUDENT RESULTS TAB ══ */}
+            {activeTab==="results" && <StudentResultsTab examId={id} anomalySummaries={summaries}/>}
+
+            {/* ══ ESSAY GRADING TAB ══ */}
+            {activeTab==="essays" && (
+              essayLoading ? (
+                <div style={{ textAlign: "center", padding: "40px" }}>
+                  <div className="spinner-border" style={{ color: "#f59e0b" }} />
+                  <p style={{ marginTop: 12, fontSize: 13, color: "#94a3b8" }}>Loading essay responses…</p>
+                </div>
+              ) : (
+                <>
+                  <div className="stats-grid">
+                    {[
+                      { label:"Ungraded",          value:essayData?.pending_count??0,                                                                                      color:"#c2410c", bg:"#fff7ed", icon:"bi-hourglass-split" },
+                      { label:"Total Submissions", value:essayData?.submissions?.length??0,                                                                               color:"#0056b3", bg:"#e8f0fe", icon:"bi-people"          },
+                      { label:"Fully Graded",      value:(essayData?.submissions??[]).filter(s => s.essays.every(e => isEssayGraded(e))).length, color:"#15803d", bg:"#f0fdf4", icon:"bi-check2-all"    },
+                    ].map(({ label, value, color, bg, icon }) => (
+                      <div key={label} style={{ background: "#fff", borderRadius: 14, border: "1px solid rgba(0,86,179,.06)", boxShadow: "0 1px 3px rgba(0,0,0,.04)", padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 12, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <i className={`bi ${icon}`} style={{ color, fontSize: 18 }}></i>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+                          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{label}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {essayData?.pending_count > 0 && (
+                    <div style={{ padding: "12px 16px", background: "#fff7ed", borderRadius: 12, border: "1px solid #fed7aa", marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#92400e" }}>
+                      <i className="bi bi-exclamation-triangle-fill" style={{ flexShrink: 0 }}></i>
+                      <div>
+                        <strong>{essayData.pending_count} essay answer{essayData.pending_count!==1?"s":""} need grading.</strong>
+                        <span style={{ marginLeft: 8, color: "#b45309" }}>Ungraded essays are excluded from the student's final score.</span>
+                      </div>
+                    </div>
+                  )}
+                  {!essayData || essayData.submissions.length===0 ? (
+                    <div className="dash-card" style={{ textAlign: "center", padding: "48px 20px", color: "#94a3b8" }}>
+                      <i className="bi bi-textarea" style={{ fontSize: 36, display: "block", marginBottom: 10 }}></i>
+                      No essay responses yet.
+                    </div>
+                  ) : essayData.submissions.map(sub => (
+                    <EssaySubmissionCard key={sub.submission_id} sub={sub} examId={id}
+                      onGraded={() => { setEssayLoaded(false); fetchEssayData(); }}/>
+                  ))}
+                </>
+              )
+            )}
+
+            {/* ══ ANOMALY MONITOR TAB ══ */}
+            {activeTab==="anomalies" && (
+              anomalyLoading ? (
+                <div style={{ textAlign: "center", padding: "40px" }}>
+                  <div className="spinner-border" style={{ color: "#0056b3" }} />
+                  <p style={{ marginTop: 12, fontSize: 13, color: "#94a3b8" }}>Loading anomaly data…</p>
+                </div>
+              ) : (
+                <>
+                  <div className="stats-grid">
+                    {[
+                      { label:"Flagged", value:anomalyStats.flagged, color:"#ef4444", bg:"#fef2f2", icon:"bi-shield-x",            key:"flagged" },
+                      { label:"Warning", value:anomalyStats.warning, color:"#d97706", bg:"#fff7ed", icon:"bi-exclamation-triangle", key:"warning" },
+                      { label:"Clear",   value:anomalyStats.clear,   color:"#15803d", bg:"#f0fdf4", icon:"bi-shield-check",         key:"none"    },
+                      { label:"Total",   value:summaries.length,     color:"#0056b3", bg:"#e8f0fe", icon:"bi-people",               key:"all"     },
+                    ].map(({ label, value, color, bg, icon, key }) => {
+                      const sel = anomalyFilter === key;
+                      return (
+                        <div key={label} className={`stat-card ${sel?"selected":""}`}
+                          style={{ color, outline: sel?`2px solid ${color}`:"none" }}
+                          onClick={() => setAnomalyFilter(anomalyFilter===key?"all":key)}>
+                          <div className="stat-icon" style={{ background: bg }}>
+                            <i className={`bi ${icon}`} style={{ color, fontSize: 17 }}></i>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color, opacity: .75, marginTop: 2 }}>{label}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="dash-card fade-up">
+                    <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                      <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#0f172a", marginRight: "auto" }}>Student Risk Overview</h2>
+                      <div style={{ position: "relative" }}>
+                        <i className="bi bi-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13 }}></i>
+                        <input className="form-ctrl" style={{ paddingLeft: 32, maxWidth: 220 }} placeholder="Search student…"
+                          value={anomalySearch} onChange={e => setAnomalySearch(e.target.value)}/>
+                      </div>
+                    </div>
+                    <div style={{ overflowX: "auto" }}>
+                      {summaries.length===0 ? (
+                        <div style={{ textAlign: "center", padding: "48px", color: "#94a3b8" }}>
+                          <i className="bi bi-shield-check" style={{ fontSize: 36, display: "block", marginBottom: 10, color: "#22c55e" }}></i>
+                          No anomaly data yet.
+                        </div>
+                      ) : (
+                        <table className="dash-table">
+                          <thead>
+                            <tr>
+                              <th>STUDENT</th><th>CPI SCORE</th><th>FLAG</th>
+                              <th style={{ textAlign: "center" }}><i className="bi bi-box-arrow-up-right"></i> Tabs</th>
+                              <th style={{ textAlign: "center" }}><i className="bi bi-keyboard"></i> Keys</th>
+                              <th style={{ textAlign: "center" }}><i className="bi bi-clock"></i> Response</th>
+                              <th style={{ textAlign: "center" }}><i className="bi bi-activity"></i> Keystroke</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredSummaries.length===0 ? (
+                              <tr><td colSpan="7" style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>No students match your filter.</td></tr>
+                            ) : filteredSummaries.map(s => {
+                              const cpiClr = riskColor(s.cpi_score??0);
+                              const cpiBg  = riskBgColor(s.cpi_score??0);
+                              const flagStyle = s.is_flagged
+                                ? { bg:"#fef2f2", color:"#ef4444", label:"Flagged" }
+                                : (s.cpi_score??0)>=25
+                                  ? { bg:"#fff7ed", color:"#d97706", label:"Possible" }
+                                  : { bg:"#f0fdf4", color:"#15803d", label:"Unlikely" };
+                              return (
+                                <tr key={s.submission_id}>
+                                  <td>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#0056b3", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+                                        {s.student?.name?.charAt(0).toUpperCase()}
+                                      </div>
+                                      <div>
+                                        <div style={{ fontWeight: 600, fontSize: 13, color: "#1e293b" }}>{s.student?.name}</div>
+                                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{s.student?.email}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      <div style={{ height: 6, borderRadius: 99, background: "#f1f5f9", flex: 1, minWidth: 60, overflow: "hidden" }}>
+                                        <div style={{ height: "100%", borderRadius: 99, width: `${Math.min(s.cpi_score??0,100)}%`, background: cpiClr }} />
+                                      </div>
+                                      <span style={{ fontWeight: 700, color: cpiClr, fontSize: 13 }}>{(s.cpi_score??0).toFixed(1)}%</span>
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <span className="badge-pill" style={{ background: flagStyle.bg, color: flagStyle.color }}>{flagStyle.label}</span>
+                                  </td>
+                                  <td style={{ textAlign: "center", fontWeight: 600 }}>{s.tab_switch_count}</td>
+                                  <td style={{ textAlign: "center", fontWeight: 600 }}>{s.keyboard_shortcut_count}</td>
+                                  <td style={{ textAlign: "center", fontWeight: 600 }}>{s.response_time_anomaly_count}</td>
+                                  <td style={{ textAlign: "center", fontWeight: 600 }}>{s.keystroke_anomaly_count}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )
+            )}
+          </main>
+        </div>
+
+        <InstructorBottomNav active="Exams" />
+      </div>
 
       {/* Modals */}
       <AddQuestionModal show={showQuestionModal} onHide={() => setShowQuestionModal(false)} examId={id}
@@ -1428,7 +1671,7 @@ const ExamDetail = () => {
         <StudentDetailModal loading={detailLoading} data={detailData}
           onClose={() => setDetailData(null)} onMarkReviewed={markReviewed}/>
       )}
-    </div>
+    </>
   );
 };
 

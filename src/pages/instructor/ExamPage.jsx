@@ -4,7 +4,7 @@ import API from "../../api";
 import Swal from "sweetalert2";
 import InstructorAlertBell from "../../components/InstructorAlertBell";
 
-/* ─── Shared sidebar ─────────────────────────────────────────────────────── */
+/* ─── Shared sidebar config ──────────────────────────────────────────────── */
 const NAV_ITEMS = [
   { to: "/instructor",                  icon: "bi-speedometer2",         label: "Dashboard" },
   { to: "/instructor/courses",          icon: "bi-book",                 label: "Courses"   },
@@ -15,20 +15,191 @@ const NAV_ITEMS = [
   { to: "/instructor/account-settings", icon: "bi-gear",                 label: "Settings"  },
 ];
 
-const STATUS_BADGE = {
-  active:    "bg-success",
-  scheduled: "bg-warning text-dark",
-  completed: "bg-info",
-  draft:     "bg-secondary",
+const STATUS_STYLE = {
+  active:    { bg: "#f0fdf4", color: "#15803d", label: "Active"    },
+  scheduled: { bg: "#fff7ed", color: "#c2410c", label: "Scheduled" },
+  completed: { bg: "#f0f9ff", color: "#0369a1", label: "Completed" },
+  draft:     { bg: "#f1f5f9", color: "#64748b", label: "Draft"     },
 };
 
 const STAT_TABS = (stats) => [
-  { key: "all",       label: "Total",     value: stats.total,     color: "primary",   icon: "bi-file-earmark-text" },
-  { key: "active",    label: "Active",    value: stats.active,    color: "success",   icon: "bi-play-circle"       },
-  { key: "scheduled", label: "Scheduled", value: stats.scheduled, color: "warning",   icon: "bi-calendar-event"    },
-  { key: "completed", label: "Completed", value: stats.completed, color: "info",      icon: "bi-check-circle"      },
-  { key: "draft",     label: "Draft",     value: stats.draft,     color: "secondary", icon: "bi-pencil-square"     },
+  { key: "all",       label: "Total",     value: stats.total,     color: "#0056b3", bg: "#e8f0fe", icon: "bi-file-earmark-text" },
+  { key: "active",    label: "Active",    value: stats.active,    color: "#15803d", bg: "#f0fdf4", icon: "bi-play-circle"       },
+  { key: "scheduled", label: "Scheduled", value: stats.scheduled, color: "#c2410c", bg: "#fff7ed", icon: "bi-calendar-event"    },
+  { key: "completed", label: "Completed", value: stats.completed, color: "#0369a1", bg: "#f0f9ff", icon: "bi-check-circle"      },
+  { key: "draft",     label: "Draft",     value: stats.draft,     color: "#64748b", bg: "#f1f5f9", icon: "bi-pencil-square"     },
 ];
+
+const localInputToUTC = (localString) => {
+  if (!localString) return "";
+  return new Date(localString).toISOString();
+};
+
+/* ─── Shared CSS ─────────────────────────────────────────────────────────── */
+const SHARED_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
+  *,*::before,*::after{box-sizing:border-box;}
+  body,html{margin:0;padding:0;background:#f0f4fb;font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  :root{
+    --blue:#0056b3;--blue-mid:#1a6ed8;--blue-lite:#e8f0fe;
+    --slate:#64748b;--slate-lt:#94a3b8;
+    --card-bg:#ffffff;--card-br:16px;
+    --card-sh:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,86,179,.06);
+  }
+  .dash-card{
+    background:var(--card-bg);border-radius:var(--card-br);
+    box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);
+    transition:box-shadow .2s,transform .2s;overflow:hidden;
+  }
+  .dash-card-hover:hover{box-shadow:0 2px 6px rgba(0,0,0,.06),0 8px 28px rgba(0,86,179,.10);transform:translateY(-1px);}
+  .glass-sidebar{
+    background:rgba(255,255,255,0.60);
+    backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+    border-right:1px solid rgba(255,255,255,0.80);box-shadow:4px 0 24px rgba(0,86,179,.07);
+  }
+  .nav-pill{
+    display:flex;flex-direction:column;align-items:center;
+    padding:10px 8px;border-radius:12px;gap:4px;
+    font-size:11px;font-weight:600;text-decoration:none;
+    color:var(--slate);transition:background .15s,color .15s,transform .15s;width:100%;
+  }
+  .nav-pill:hover{background:var(--blue-lite);color:var(--blue);transform:translateY(-1px);}
+  .nav-pill.active{background:var(--blue);color:#fff;box-shadow:0 4px 14px rgba(0,86,179,.35);}
+  .nav-pill i{font-size:18px;}
+  .topbar{
+    background:rgba(255,255,255,0.80);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border-bottom:1px solid rgba(0,86,179,.08);position:sticky;top:0;z-index:200;height:56px;
+    display:flex;align-items:center;padding:0 20px;gap:12px;
+  }
+  .dash-avatar{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
+  .dash-search{
+    border:1px solid rgba(0,86,179,.15);border-radius:10px;
+    background:#f8faff;padding:7px 14px 7px 36px;
+    font-size:13px;color:#1e293b;outline:none;
+    font-family:'DM Sans',sans-serif;width:100%;
+    transition:border-color .2s,box-shadow .2s;
+  }
+  .dash-search:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
+  .skeleton{
+    background:linear-gradient(90deg,#f1f5f9 25%,#e8f0fe 50%,#f1f5f9 75%);
+    background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px;
+  }
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  .fade-up{animation:fadeUp .4s ease both;}
+  .stat-chip{
+    flex:1;min-width:130px;border-radius:14px;padding:14px 16px;
+    display:flex;align-items:center;gap:10px;cursor:pointer;
+    border:2px solid transparent;transition:border-color .15s,box-shadow .15s,transform .15s;
+    background:#f8faff;
+  }
+  .stat-chip:hover{transform:translateY(-2px);}
+  .stat-chip.selected{border-color:currentColor;box-shadow:0 4px 16px rgba(0,86,179,.12);}
+  .dash-table{width:100%;border-collapse:collapse;font-family:'DM Sans',sans-serif;}
+  .dash-table th{padding:10px 16px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.06em;
+    white-space:nowrap;border-bottom:1px solid #f1f5f9;text-align:left;background:#f8faff;}
+  .dash-table td{padding:13px 16px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+  .dash-table tbody tr{transition:background .15s;}
+  .dash-table tbody tr:hover{background:#f8faff;}
+  .dash-table tbody tr:last-child td{border-bottom:none;}
+  .action-btn{
+    width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,86,179,.15);
+    background:#fff;display:inline-flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:all .15s;font-size:13px;text-decoration:none;color:#64748b;
+  }
+  .action-btn:hover{background:var(--blue-lite);border-color:var(--blue);color:var(--blue);}
+  .action-btn.del:hover{background:#fef2f2;border-color:#ef4444;color:#ef4444;}
+  .type-badge{
+    display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;
+    font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    background:#f1f5f9;color:#64748b;
+  }
+  .status-pill{
+    display:inline-flex;align-items:center;padding:3px 10px;border-radius:99px;
+    font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  }
+  .dash-btn-primary{
+    background:var(--blue);color:#fff;border:none;border-radius:10px;
+    padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;
+    font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
+    transition:opacity .15s,transform .15s;text-decoration:none;
+  }
+  .dash-btn-primary:hover{opacity:.87;transform:translateY(-1px);color:#fff;}
+  .dash-btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+  .dash-btn-ghost{
+    background:#fff;border:1px solid rgba(0,86,179,.15);color:#0056b3;
+    border-radius:10px;padding:8px 16px;font-size:13px;font-weight:600;
+    cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
+    transition:all .15s;text-decoration:none;
+  }
+  .dash-btn-ghost:hover{background:var(--blue-lite);color:var(--blue);}
+  /* Modal */
+  .dash-modal-overlay{
+    position:fixed;inset:0;background:rgba(15,23,42,.45);
+    backdrop-filter:blur(4px);z-index:1055;
+    display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;
+  }
+  .dash-modal{
+    background:#fff;border-radius:20px;width:100%;max-width:680px;
+    box-shadow:0 24px 64px rgba(0,0,0,.18);overflow:hidden;
+    display:flex;flex-direction:column;max-height:calc(100vh - 32px);
+    animation:fadeUp .25s ease;
+  }
+  .dash-modal-hdr{padding:22px 24px 18px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;}
+  .dash-modal-body{overflow-y:auto;padding:22px 24px;flex:1;}
+  .dash-modal-ftr{padding:16px 24px;border-top:1px solid #f1f5f9;display:flex;gap:10px;justify-content:flex-end;}
+  .form-lbl{font-size:11px;font-weight:700;color:#64748b;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;display:block;}
+  .form-ctrl{
+    width:100%;border:1px solid rgba(0,86,179,.15);border-radius:10px;
+    padding:9px 13px;font-size:13px;color:#1e293b;outline:none;
+    font-family:'DM Sans',sans-serif;background:#f8faff;
+    transition:border-color .2s,box-shadow .2s;
+  }
+  .form-ctrl:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
+  .form-ctrl:disabled{opacity:.6;cursor:not-allowed;}
+  .form-ctrl option{background:#fff;}
+  /* Bottom nav */
+  .instructor-bottom-nav{
+    position:fixed;bottom:0;left:0;right:0;height:64px;
+    background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);
+    border-top:1px solid rgba(0,86,179,0.10);
+    display:flex;align-items:stretch;z-index:1030;
+    box-shadow:0 -4px 24px rgba(0,86,179,0.08);
+  }
+  .bnav-item{
+    flex:1;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;font-size:10px;font-weight:600;gap:3px;
+    text-decoration:none;transition:color .2s;
+  }
+  .bnav-item i{font-size:19px;}
+  @media(max-width:991px){
+    .hide-mobile{display:none!important;}
+  }
+  @media(max-width:576px){
+    .stat-chip{min-width:calc(50% - 8px);}
+  }
+`;
+
+/* ─── Bottom Nav ─────────────────────────────────────────────────────────── */
+const InstructorBottomNav = ({ active }) => {
+  const items = [
+    { to: "/instructor",                  icon: "bi-speedometer2",      label: "Home"     },
+    { to: "/instructor/exams",            icon: "bi-file-earmark-text", label: "Exams"    },
+    { to: "/instructor/students",         icon: "bi-people",            label: "Students" },
+    { to: "/instructor/account-settings", icon: "bi-gear",              label: "Settings" },
+  ];
+  return (
+    <nav className="instructor-bottom-nav d-lg-none">
+      {items.map(({ to, icon, label }) => (
+        <Link key={to} to={to} className="bnav-item"
+          style={{ color: active === label ? "#0056b3" : "#94a3b8", borderTop: active === label ? "2px solid #0056b3" : "2px solid transparent" }}>
+          <i className={`bi ${icon}`}></i>
+          {label}
+        </Link>
+      ))}
+    </nav>
+  );
+};
 
 /* ════════════════════════════════════════════════════════════════════════════
    MAIN PAGE
@@ -37,11 +208,11 @@ const ExamPage = () => {
   const navigate  = useNavigate();
   const location  = useLocation();
 
-  const [user,         setUser]         = useState(null);
-  const [loading,      setLoading]      = useState(true);
-  const [dataLoading,  setDataLoading]  = useState(true);
-  const [courses,      setCourses]      = useState([]);
-  const [exams,        setExams]        = useState([]);
+  const [user,          setUser]          = useState(null);
+  const [loading,       setLoading]       = useState(true);
+  const [dataLoading,   setDataLoading]   = useState(true);
+  const [courses,       setCourses]       = useState([]);
+  const [exams,         setExams]         = useState([]);
   const [showExamModal, setShowExamModal] = useState(false);
   const [displayCount,  setDisplayCount]  = useState(20);
   const [searchQuery,   setSearchQuery]   = useState("");
@@ -55,13 +226,11 @@ const ExamPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Always fetch fresh from the server — session cookie is the auth source of truth
         const [userRes, coursesRes, examsRes] = await Promise.all([
           API.get("/me"),
           API.get("/courses"),
           API.get("/exams"),
         ]);
-
         setUser(userRes.data.user);
         setCourses(coursesRes.data.courses || []);
         setExams(examsRes.data.exams       || []);
@@ -72,7 +241,6 @@ const ExamPage = () => {
         setDataLoading(false);
       }
     };
-
     fetchData();
   }, []);
 
@@ -117,190 +285,225 @@ const ExamPage = () => {
   const isActive = (to) =>
     to === "/instructor" ? location.pathname === to : location.pathname.startsWith(to);
 
+  const initial   = user?.name?.charAt(0)?.toUpperCase() ?? "I";
+  const firstName = user?.name?.split(" ")[0] ?? "Instructor";
+
   if (loading) return (
-    <div className="d-flex justify-content-center align-items-center min-vh-100">
-      <div className="spinner-border text-primary" role="status" />
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#f0f4fb" }}>
+      <style>{SHARED_CSS}</style>
+      <div className="spinner-border" style={{ color: "#0056b3" }} />
     </div>
   );
 
   return (
-    <div className="d-flex flex-column min-vh-100">
+    <>
+      <style>{SHARED_CSS}</style>
+      <div style={{ background: "#f0f4fb", minHeight: "100vh" }}>
 
-      {/* Navbar */}
-      <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm sticky-top">
-        <div className="container-fluid">
-          <a className="navbar-brand fw-bold text-primary" href="#">SECT Instructor</a>
-          <div className="d-flex mx-auto" style={{ width: "40%" }}>
-            <div className="input-group">
-              <span className="input-group-text bg-white border-end-0">
-                <i className="bi bi-search text-muted"></i>
-              </span>
-              <input className="form-control border-start-0" type="search" placeholder="Search exams…"
-                value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-              {searchQuery && (
-                <button className="btn btn-outline-secondary" onClick={() => setSearchQuery("")}>
-                  <i className="bi bi-x"></i>
-                </button>
-              )}
-            </div>
+        {/* ── Topbar ── */}
+        <div className="topbar">
+          <span style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 700, fontSize: 15, color: "#0056b3", letterSpacing: "-.3px", flexShrink: 0 }}>
+            SECT Instructor
+          </span>
+          <div className="hide-mobile" style={{ flex: 1, maxWidth: 380, position: "relative" }}>
+            <i className="bi bi-search" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13 }}></i>
+            <input className="dash-search" placeholder="Search exams…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           </div>
-          <div className="d-flex align-items-center gap-2">
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
             <InstructorAlertBell />
             <div className="dropdown">
-              <button className="btn btn-light dropdown-toggle fw-bold" type="button" data-bs-toggle="dropdown">
-                <i className="bi bi-person-circle me-2"></i>{user?.name || "Instructor"}
+              <button className="d-flex align-items-center gap-2 dropdown-toggle"
+                style={{ background: "transparent", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: 10 }}
+                data-bs-toggle="dropdown">
+                <div className="dash-avatar">{initial}</div>
+                <span className="d-none d-sm-inline" style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{firstName}</span>
               </button>
-              <ul className="dropdown-menu dropdown-menu-end">
-                <li><Link className="dropdown-item" to="/instructor/account-settings"><i className="bi bi-gear me-2"></i>Account Settings</Link></li>
-                <li><Link className="dropdown-item" to="/instructor/profile"><i className="bi bi-person me-2"></i>Profile</Link></li>
+              <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0" style={{ borderRadius: 12, fontSize: 13 }}>
+                <li><Link className="dropdown-item" to="/instructor/account-settings">Account Settings</Link></li>
+                <li><Link className="dropdown-item" to="/instructor/profile">Profile</Link></li>
                 <li><hr className="dropdown-divider" /></li>
-                <li><button className="dropdown-item text-danger" onClick={handleLogout}><i className="bi bi-box-arrow-right me-2"></i>Logout</button></li>
+                <li><button className="dropdown-item text-danger" onClick={handleLogout}
+                  style={{ border: "none", background: "none", width: "100%", textAlign: "left" }}>Logout</button></li>
               </ul>
             </div>
           </div>
         </div>
-      </nav>
 
-      <div className="d-flex flex-grow-1">
+        <div className="d-flex">
 
-        {/* Sidebar */}
-        <nav className="bg-white border-end d-flex flex-column align-items-center py-3" style={{ width: 72, minHeight: "100%" }}>
-          {NAV_ITEMS.map(({ to, icon, label }) => (
-            <Link key={to} to={to}
-              className={`nav-link d-flex flex-column align-items-center py-2 px-1 mb-2 rounded ${
-                isActive(to) ? "text-primary bg-primary bg-opacity-10 fw-bold" : "text-secondary"
-              }`}
-              style={{ fontSize: 10, width: 56, textAlign: "center" }} title={label}>
-              <i className={`bi ${icon} fs-5 mb-1`}></i>
-              <span>{label}</span>
-            </Link>
-          ))}
-        </nav>
-
-        {/* Main */}
-        <div className="flex-grow-1 p-4 bg-light">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <div>
-              <h4 className="mb-0 fw-bold">Exam Management</h4>
-              <small className="text-muted">Create and manage your exams</small>
-            </div>
-            <div className="d-flex gap-2">
-              <Link to="/instructor/courses" className="btn btn-outline-primary">
-                <i className="bi bi-book me-2"></i>Manage Courses
+          {/* ── Sidebar ── */}
+          <nav className="glass-sidebar d-none d-lg-flex flex-column align-items-center py-4 gap-1"
+            style={{ width: 80, minHeight: "calc(100vh - 56px)", position: "sticky", top: 56, alignSelf: "flex-start", flexShrink: 0 }}>
+            {NAV_ITEMS.map(({ to, icon, label }) => (
+              <Link key={to} to={to} className={`nav-pill ${isActive(to) ? "active" : ""}`}>
+                <i className={`bi ${icon}`}></i>{label}
               </Link>
-              <button className="btn btn-primary" onClick={() => setShowExamModal(true)}>
-                <i className="bi bi-plus-circle me-2"></i>New Exam
-              </button>
-            </div>
-          </div>
+            ))}
+          </nav>
 
-          {dataLoading ? (
-            <div className="text-center py-5"><div className="spinner-border text-primary" /></div>
-          ) : (
-            <>
-              {/* Stat Pill Bar */}
-              <div className="card shadow-sm border-0 mb-4">
-                <div className="card-body py-2 px-3">
-                  <div className="d-flex align-items-center flex-wrap gap-1">
-                    {STAT_TABS(stats).map(({ key, label, value, color, icon }, idx, arr) => (
-                      <React.Fragment key={key}>
-                        <button
-                          className={`btn btn-sm d-flex align-items-center gap-2 px-3 py-2 rounded-pill border-0 ${statusFilter === key ? `btn-${color}` : "btn-light"}`}
-                          onClick={() => setStatusFilter(key)}
-                          style={{ transition: "all 0.15s" }}
-                        >
-                          <i className={`bi ${icon} ${statusFilter !== key ? `text-${color}` : ""}`}></i>
-                          <span className={`small fw-semibold ${statusFilter !== key ? "text-muted" : ""}`}>{label}</span>
-                          <span className={`badge rounded-pill ms-1 ${statusFilter === key ? "bg-white text-dark" : `bg-${color} bg-opacity-15 text-${color}`}`} style={{ fontSize: 11 }}>
-                            {value}
-                          </span>
-                        </button>
-                        {idx < arr.length - 1 && <div className="vr" style={{ height: 22, opacity: 0.3 }}></div>}
-                      </React.Fragment>
-                    ))}
-                    <span className="ms-auto text-muted small">{filteredExams.length} of {exams.length} shown</span>
+          {/* ── Main ── */}
+          <main style={{ flex: 1, padding: "24px 20px", paddingBottom: 100, minWidth: 0 }}>
+
+            {/* Mobile search */}
+            <div className="d-lg-none mb-3" style={{ position: "relative" }}>
+              <i className="bi bi-search" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13, zIndex: 1 }}></i>
+              <input className="dash-search" style={{ paddingLeft: 36 }} placeholder="Search exams…"
+                value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+            </div>
+
+            {/* Page header */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 13, color: "#94a3b8", fontWeight: 500 }}>Management</p>
+                <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#0f172a", letterSpacing: "-.5px" }}>Exam Management</h1>
+                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>Create and manage your exams</p>
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <Link to="/instructor/courses" className="dash-btn-ghost">
+                  <i className="bi bi-book"></i> Manage Courses
+                </Link>
+                <button className="dash-btn-primary" onClick={() => setShowExamModal(true)}>
+                  <i className="bi bi-plus-circle"></i> New Exam
+                </button>
+              </div>
+            </div>
+
+            {dataLoading ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 64, borderRadius: 14 }} />)}
+              </div>
+            ) : (
+              <>
+                {/* Stat Chips */}
+                <div className="dash-card fade-up" style={{ padding: "16px 20px", marginBottom: 16 }}>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                    {STAT_TABS(stats).map(({ key, label, value, color, bg, icon }) => {
+                      const sel = statusFilter === key;
+                      return (
+                        <div key={key}
+                          className={`stat-chip ${sel ? "selected" : ""}`}
+                          style={{ color, background: sel ? bg : "#f8faff" }}
+                          onClick={() => setStatusFilter(sel && key !== "all" ? "all" : key)}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <i className={`bi ${icon}`} style={{ color, fontSize: 16 }}></i>
+                          </div>
+                          <div>
+                            <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color, lineHeight: 1 }}>{value}</p>
+                            <p style={{ margin: "2px 0 0", fontSize: 11, fontWeight: 600, color, opacity: .75 }}>{label}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <span style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8", paddingLeft: 8, whiteSpace: "nowrap" }}>
+                      {filteredExams.length} of {exams.length} shown
+                    </span>
                   </div>
                 </div>
-              </div>
 
-              {/* Exams Table */}
-              <div className="card shadow-sm border-0">
-                <div className="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                  <h6 className="mb-0 fw-semibold">All Exams</h6>
-                  {filteredExams.length === 0 && exams.length > 0 && (
-                    <button className="btn btn-sm btn-outline-secondary" onClick={() => { setStatusFilter("all"); setSearchQuery(""); }}>
-                      <i className="bi bi-x-circle me-1"></i>Clear filters
-                    </button>
+                {/* Exams Table */}
+                <div className="dash-card fade-up">
+                  <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
+                      <i className="bi bi-file-earmark-text me-2" style={{ color: "#0056b3" }}></i>All Exams
+                    </h2>
+                    {filteredExams.length === 0 && exams.length > 0 && (
+                      <button className="dash-btn-ghost" style={{ padding: "6px 12px", fontSize: 12 }}
+                        onClick={() => { setStatusFilter("all"); setSearchQuery(""); }}>
+                        <i className="bi bi-x-circle"></i> Clear filters
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="dash-table">
+                      <thead>
+                        <tr>
+                          {["EXAM NAME","COURSE","TYPE","START TIME","DURATION","QUESTIONS","STATUS","ACTIONS"].map(h => (
+                            <th key={h} style={{ textAlign: h === "ACTIONS" || h === "QUESTIONS" ? "center" : "left" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredExams.length === 0 ? (
+                          <tr>
+                            <td colSpan="8" style={{ textAlign: "center", padding: "48px 20px", color: "#94a3b8" }}>
+                              <i className="bi bi-file-earmark-x" style={{ fontSize: 32, display: "block", marginBottom: 10 }}></i>
+                              <span style={{ fontSize: 14 }}>
+                                {searchQuery || statusFilter !== "all"
+                                  ? "No exams match your search or filter."
+                                  : "No exams yet."}
+                              </span>
+                              {!searchQuery && statusFilter === "all" && (
+                                <div style={{ marginTop: 14 }}>
+                                  <button className="dash-btn-primary" onClick={() => setShowExamModal(true)}>
+                                    <i className="bi bi-plus-circle"></i> Create your first exam
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ) : filteredExams.slice(0, displayCount).map(exam => {
+                          const ss = STATUS_STYLE[exam.status] || STATUS_STYLE.draft;
+                          return (
+                            <tr key={exam.id}>
+                              <td>
+                                <Link to={`/instructor/exams/${exam.id}`}
+                                  style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", textDecoration: "none" }}>
+                                  {exam.title}
+                                </Link>
+                              </td>
+                              <td>
+                                <Link to={`/instructor/courses/${exam.course?.id}`}
+                                  style={{ fontSize: 12, color: "#64748b", textDecoration: "none" }}>
+                                  <i className="bi bi-folder2 me-1"></i>
+                                  {exam.course?.code} — {exam.course?.name}
+                                </Link>
+                              </td>
+                              <td><span className="type-badge">{exam.type}</span></td>
+                              <td style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>
+                                {new Date(exam.start_time).toLocaleString()}
+                              </td>
+                              <td style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>
+                                {exam.duration_minutes} min
+                              </td>
+                              <td style={{ textAlign: "center", fontWeight: 700, color: "#0056b3" }}>
+                                {exam.questions_count || 0}
+                              </td>
+                              <td>
+                                <span className="status-pill" style={{ background: ss.bg, color: ss.color }}>{ss.label}</span>
+                              </td>
+                              <td>
+                                <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
+                                  <Link to={`/instructor/exams/${exam.id}`} className="action-btn" title="View">
+                                    <i className="bi bi-eye"></i>
+                                  </Link>
+                                  <Link to={`/instructor/exams/${exam.id}/edit`} className="action-btn" title="Edit">
+                                    <i className="bi bi-pencil"></i>
+                                  </Link>
+                                  <button className="action-btn del" onClick={() => handleDeleteExam(exam.id)} title="Delete">
+                                    <i className="bi bi-trash"></i>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {filteredExams.length > displayCount && (
+                    <div style={{ padding: "14px 20px", borderTop: "1px solid #f1f5f9", textAlign: "center" }}>
+                      <button className="dash-btn-ghost" onClick={() => setDisplayCount(p => p + 20)}>
+                        Load more ({filteredExams.length - displayCount} remaining)
+                      </button>
+                    </div>
                   )}
                 </div>
-                <div className="table-responsive">
-                  <table className="table table-hover mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>EXAM NAME</th><th>COURSE</th><th>TYPE</th>
-                        <th>START TIME</th><th>DURATION</th><th>QUESTIONS</th>
-                        <th>STATUS</th><th>ACTIONS</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredExams.length === 0 ? (
-                        <tr>
-                          <td colSpan="8" className="text-center py-5">
-                            <i className="bi bi-file-earmark-x fs-1 text-muted d-block mb-2"></i>
-                            <span className="text-muted">
-                              {searchQuery || statusFilter !== "all"
-                                ? "No exams match your search or filter."
-                                : "No exams yet."}
-                            </span>
-                            {!searchQuery && statusFilter === "all" && (
-                              <div className="mt-3">
-                                <button className="btn btn-primary btn-sm" onClick={() => setShowExamModal(true)}>
-                                  <i className="bi bi-plus-circle me-2"></i>Create your first exam
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ) : filteredExams.slice(0, displayCount).map(exam => (
-                        <tr key={exam.id}>
-                          <td>
-                            <Link to={`/instructor/exams/${exam.id}`} className="fw-semibold text-decoration-none text-dark">
-                              {exam.title}
-                            </Link>
-                          </td>
-                          <td>
-                            <Link to={`/instructor/courses/${exam.course?.id}`} className="text-decoration-none text-muted small">
-                              <i className="bi bi-folder2 me-1"></i>{exam.course?.code} — {exam.course?.name}
-                            </Link>
-                          </td>
-                          <td><span className="badge bg-secondary text-capitalize">{exam.type}</span></td>
-                          <td className="text-muted small">{new Date(exam.start_time).toLocaleString()}</td>
-                          <td className="text-muted small">{exam.duration_minutes} min</td>
-                          <td className="text-center fw-semibold">{exam.questions_count || 0}</td>
-                          <td><span className={`badge ${STATUS_BADGE[exam.status] || "bg-secondary"} text-capitalize`}>{exam.status}</span></td>
-                          <td>
-                            <div className="d-flex gap-1">
-                              <Link to={`/instructor/exams/${exam.id}`}      className="btn btn-sm btn-outline-primary"   title="View"><i className="bi bi-eye"></i></Link>
-                              <Link to={`/instructor/exams/${exam.id}/edit`} className="btn btn-sm btn-outline-secondary" title="Edit"><i className="bi bi-pencil"></i></Link>
-                              <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteExam(exam.id)} title="Delete"><i className="bi bi-trash"></i></button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {filteredExams.length > displayCount && (
-                  <div className="card-footer bg-white text-center border-top">
-                    <button className="btn btn-outline-primary btn-sm" onClick={() => setDisplayCount(p => p + 20)}>
-                      Load more ({filteredExams.length - displayCount} remaining)
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+              </>
+            )}
+          </main>
         </div>
+
+        <InstructorBottomNav active="Exams" />
       </div>
 
       <CreateExamModal
@@ -313,7 +516,7 @@ const ExamPage = () => {
           navigate(`/instructor/exams/${newExam.id}`, { state: { openAddQuestion: true } });
         }}
       />
-    </div>
+    </>
   );
 };
 
@@ -325,10 +528,9 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
     course_id: "", title: "", description: "", type: "quiz",
     start_time: "", end_time: "", duration_minutes: 60,
   });
-  const [submitting,    setSubmitting]    = useState(false);
-  const [freshCourses,  setFreshCourses]  = useState([]);
+  const [submitting,   setSubmitting]   = useState(false);
+  const [freshCourses, setFreshCourses] = useState([]);
 
-  // Fetch fresh courses every time the modal opens
   useEffect(() => {
     if (!show) return;
     API.get("/courses")
@@ -344,7 +546,7 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
       try {
         const end = new Date(new Date(updated.start_time).getTime() + updated.duration_minutes * 60000);
         const p = n => String(n).padStart(2, "0");
-        updated.end_time = `${end.getFullYear()}-${p(end.getMonth() + 1)}-${p(end.getDate())}T${p(end.getHours())}:${p(end.getMinutes())}`;
+        updated.end_time = `${end.getFullYear()}-${p(end.getMonth()+1)}-${p(end.getDate())}T${p(end.getHours())}:${p(end.getMinutes())}`;
       } catch {}
     }
     setFormData(updated);
@@ -354,100 +556,114 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await API.post("/exams", formData);
+      const payload = {
+        ...formData,
+        start_time:       localInputToUTC(formData.start_time),
+        end_time:         localInputToUTC(formData.end_time),
+        duration_minutes: parseInt(formData.duration_minutes, 10),
+      };
+      const res = await API.post("/exams", payload);
       Swal.fire({ icon: "success", title: "Exam Created!", timer: 2000, showConfirmButton: false });
       onSuccess(res.data.exam);
       setFormData({ course_id: "", title: "", description: "", type: "quiz", start_time: "", end_time: "", duration_minutes: 60 });
     } catch (err) {
       Swal.fire("Error!", err.response?.data?.message || "Failed to create exam", "error");
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
   if (!show) return null;
   const hasCourses = displayCourses.length > 0;
 
+  const typeOptions = ["quiz","prelim","midterm","final"];
+
   return (
-    <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-      onClick={e => { if (e.target === e.currentTarget) onHide(); }}>
-      <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div className="modal-content">
-          <div className="modal-header border-0 pb-0">
-            <div>
-              <h5 className="modal-title fw-bold"><i className="bi bi-file-earmark-plus me-2 text-primary"></i>Create New Exam</h5>
-              <p className="text-muted small mb-0">Set up an exam for one of your courses</p>
-            </div>
-            <button type="button" className="btn-close" onClick={onHide} disabled={submitting} />
+    <div className="dash-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onHide(); }}>
+      <div className="dash-modal">
+        <div className="dash-modal-hdr">
+          <div>
+            <h5 style={{ margin: 0, fontWeight: 700, fontSize: 17, color: "#0f172a" }}>
+              <i className="bi bi-file-earmark-plus me-2" style={{ color: "#0056b3" }}></i>Create New Exam
+            </h5>
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#94a3b8" }}>
+              Times are in your local timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone})
+            </p>
           </div>
-          {!hasCourses && (
-            <div className="mx-3 mt-3">
-              <div className="alert alert-warning py-2 mb-0 d-flex align-items-center gap-2">
-                <i className="bi bi-exclamation-triangle"></i>
-                <span>No courses yet. <Link to="/instructor/courses" className="fw-semibold">Create a course first</Link> before adding an exam.</span>
+          <button onClick={onHide} disabled={submitting}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#94a3b8", lineHeight: 1, padding: 4 }}>
+            <i className="bi bi-x-lg"></i>
+          </button>
+        </div>
+
+        {!hasCourses && (
+          <div style={{ margin: "0 24px 0", padding: "12px 14px", background: "#fff7ed", borderRadius: 10, border: "1px solid #fed7aa", fontSize: 13, color: "#92400e", display: "flex", alignItems: "center", gap: 8, marginTop: 16 }}>
+            <i className="bi bi-exclamation-triangle"></i>
+            No courses yet. <Link to="/instructor/courses" style={{ fontWeight: 700, color: "#c2410c" }}>Create a course first</Link> before adding an exam.
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div className="dash-modal-body">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16 }}>
+              <div>
+                <label className="form-lbl">Course <span style={{ color: "#ef4444" }}>*</span></label>
+                <select className="form-ctrl" value={formData.course_id}
+                  onChange={e => setFormData({ ...formData, course_id: e.target.value })}
+                  required disabled={submitting || !hasCourses}>
+                  <option value="">{hasCourses ? "Select a course…" : "No courses available"}</option>
+                  {displayCourses.map(c => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+                </select>
               </div>
-            </div>
-          )}
-          <form onSubmit={handleSubmit}>
-            <div className="modal-body pt-3">
-              <div className="row g-3">
-                <div className="col-12">
-                  <label className="form-label fw-semibold">Course <span className="text-danger">*</span></label>
-                  <select className="form-select" value={formData.course_id}
-                    onChange={e => setFormData({ ...formData, course_id: e.target.value })}
-                    required disabled={submitting || !hasCourses}>
-                    <option value="">{hasCourses ? "Select a course…" : "No courses available"}</option>
-                    {displayCourses.map(c => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
-                  </select>
-                </div>
-                <div className="col-md-8">
-                  <label className="form-label fw-semibold">Exam Title <span className="text-danger">*</span></label>
-                  <input type="text" className="form-control" placeholder="e.g., Midterm Examination"
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12 }}>
+                <div>
+                  <label className="form-lbl">Exam Title <span style={{ color: "#ef4444" }}>*</span></label>
+                  <input type="text" className="form-ctrl" placeholder="e.g., Midterm Examination"
                     value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required disabled={submitting} />
                 </div>
-                <div className="col-md-4">
-                  <label className="form-label fw-semibold">Type <span className="text-danger">*</span></label>
-                  <select className="form-select" value={formData.type}
+                <div style={{ minWidth: 130 }}>
+                  <label className="form-lbl">Type <span style={{ color: "#ef4444" }}>*</span></label>
+                  <select className="form-ctrl" value={formData.type}
                     onChange={e => setFormData({ ...formData, type: e.target.value })} required disabled={submitting}>
-                    <option value="quiz">Quiz</option>
-                    <option value="prelim">Prelim</option>
-                    <option value="midterm">Midterm</option>
-                    <option value="final">Final</option>
+                    {typeOptions.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}
                   </select>
                 </div>
-                <div className="col-md-4">
-                  <label className="form-label fw-semibold">Duration (min) <span className="text-danger">*</span></label>
-                  <input type="number" className="form-control" min="1" value={formData.duration_minutes}
-                    onChange={e => handleStartOrDuration("duration_minutes", parseInt(e.target.value))} required disabled={submitting} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <div>
+                  <label className="form-lbl">Duration (min) <span style={{ color: "#ef4444" }}>*</span></label>
+                  <input type="number" className="form-ctrl" min="1" step="1"
+                    value={formData.duration_minutes}
+                    onChange={e => handleStartOrDuration("duration_minutes", parseInt(e.target.value, 10) || 1)}
+                    required disabled={submitting} />
                 </div>
-                <div className="col-md-4">
-                  <label className="form-label fw-semibold">Start Time <span className="text-danger">*</span></label>
-                  <input type="datetime-local" className="form-control" value={formData.start_time}
+                <div>
+                  <label className="form-lbl">Start Time <span style={{ color: "#ef4444" }}>*</span></label>
+                  <input type="datetime-local" className="form-ctrl" value={formData.start_time}
                     onChange={e => handleStartOrDuration("start_time", e.target.value)} required disabled={submitting} />
                 </div>
-                <div className="col-md-4">
-                  <label className="form-label fw-semibold">End Time <span className="text-danger">*</span></label>
-                  <input type="datetime-local" className="form-control" value={formData.end_time}
+                <div>
+                  <label className="form-lbl">End Time <span style={{ color: "#ef4444" }}>*</span></label>
+                  <input type="datetime-local" className="form-ctrl" value={formData.end_time}
                     onChange={e => setFormData({ ...formData, end_time: e.target.value })} required disabled={submitting} />
-                  <div className="form-text"><i className="bi bi-magic me-1"></i>Auto-set from start + duration</div>
-                </div>
-                <div className="col-12">
-                  <label className="form-label fw-semibold">Description</label>
-                  <textarea className="form-control" rows="2" placeholder="Optional instructions for students"
-                    value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} disabled={submitting} />
+                  <p style={{ margin: "4px 0 0", fontSize: 11, color: "#94a3b8" }}><i className="bi bi-magic me-1"></i>Auto-set from start + duration</p>
                 </div>
               </div>
+              <div>
+                <label className="form-lbl">Description</label>
+                <textarea className="form-ctrl" rows="2" placeholder="Optional instructions for students"
+                  value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} disabled={submitting}
+                  style={{ resize: "vertical" }} />
+              </div>
             </div>
-            <div className="modal-footer border-0 pt-0">
-              <button type="button" className="btn btn-light" onClick={onHide} disabled={submitting}>Cancel</button>
-              <button type="submit" className="btn btn-primary px-4" disabled={submitting || !hasCourses}>
-                {submitting
-                  ? <><span className="spinner-border spinner-border-sm me-2" />Creating…</>
-                  : <><i className="bi bi-check2 me-2"></i>Create Exam</>}
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+          <div className="dash-modal-ftr">
+            <button type="button" className="dash-btn-ghost" onClick={onHide} disabled={submitting}>Cancel</button>
+            <button type="submit" className="dash-btn-primary" disabled={submitting || !hasCourses}>
+              {submitting
+                ? <><span className="spinner-border spinner-border-sm me-2" />Creating…</>
+                : <><i className="bi bi-check2"></i> Create Exam</>}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

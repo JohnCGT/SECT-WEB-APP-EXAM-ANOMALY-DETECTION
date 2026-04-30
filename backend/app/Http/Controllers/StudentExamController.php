@@ -11,15 +11,11 @@ use Illuminate\Support\Facades\DB;
 
 class StudentExamController extends Controller
 {
-    // ── Private helper: resolve authenticated student  ───────────────────────
+    // ── Private helper: resolve authenticated student ────────────────────────
     private function getStudent(Request $request)
     {
         $student = $request->user();
-
-        if (!$student) {
-            abort(401, 'Unauthenticated.');
-        }
-
+        if (!$student) abort(401, 'Unauthenticated.');
         return $student;
     }
 
@@ -30,25 +26,18 @@ class StudentExamController extends Controller
             ->where('courses.id', $courseId)
             ->exists();
 
-        if (!$enrolled) {
-            abort(403, 'You are not enrolled in this course.');
-        }
+        if (!$enrolled) abort(403, 'You are not enrolled in this course.');
     }
 
-    // ── Private helper: case-insensitive, whitespace-trimmed answer comparison
+    // ── Private helper: case-insensitive answer comparison ───────────────────
     private function answersMatch(?string $studentAnswer, ?string $correctAnswer): bool
     {
-        if ($studentAnswer === null || $correctAnswer === null) {
-            return false;
-        }
+        if ($studentAnswer === null || $correctAnswer === null) return false;
         return strtolower(trim($studentAnswer)) === strtolower(trim($correctAnswer));
     }
 
     /**
      * GET /student/grades
-     *
-     * Returns per-course grade summary derived from exam submissions,
-     * plus overall GPA and cumulative stats.
      */
     public function grades(Request $request)
     {
@@ -58,7 +47,8 @@ class StudentExamController extends Controller
             ->with([
                 'instructor:id,name',
                 'exams' => function ($query) {
-                    $query->where('status', '!=', 'draft')
+                    // FIX: exclude drafts from grade calculations too
+                    $query->whereNotIn('status', ['draft', 'cancelled'])
                         ->withCount('questions');
                 },
                 'exams.submissions' => function ($query) use ($student) {
@@ -69,13 +59,9 @@ class StudentExamController extends Controller
             ->get();
 
         $courseGrades = $courses->map(function ($course) {
-            $exams = $course->exams;
+            $exams     = $course->exams;
+            $submitted = $exams->filter(fn($e) => $e->submissions->isNotEmpty());
 
-            $submitted = $exams->filter(fn($e) =>
-                $e->submissions->isNotEmpty()
-            );
-
-            // Per-exam breakdown
             $examBreakdown = $exams->map(function ($exam) {
                 $sub = $exam->submissions->first();
                 $pct = null;
@@ -95,7 +81,6 @@ class StudentExamController extends Controller
                 ];
             })->values();
 
-            // Overall course score: average of submitted exam percentages
             $average = null;
             if ($submitted->count() > 0) {
                 $total = $submitted->sum(function ($exam) {
@@ -122,20 +107,11 @@ class StudentExamController extends Controller
             ];
         });
 
-        // GPA = sum(grade_points * credits) / sum(credits) — only courses with a grade
-        $gradedCourses = $courseGrades->filter(fn($c) => $c['average'] !== null);
-
-        $totalWeightedPoints = $gradedCourses->sum(fn($c) =>
-            $c['grade_points'] * $c['credits']
-        );
-        $totalCredits = $gradedCourses->sum(fn($c) => $c['credits']);
-
-        $gpa = $totalCredits > 0
-            ? round($totalWeightedPoints / $totalCredits, 2)
-            : null;
-
-        // Total credits enrolled (all courses, not just graded)
-        $enrolledCredits = $courseGrades->sum(fn($c) => $c['credits']);
+        $gradedCourses       = $courseGrades->filter(fn($c) => $c['average'] !== null);
+        $totalWeightedPoints = $gradedCourses->sum(fn($c) => $c['grade_points'] * $c['credits']);
+        $totalCredits        = $gradedCourses->sum(fn($c) => $c['credits']);
+        $gpa                 = $totalCredits > 0 ? round($totalWeightedPoints / $totalCredits, 2) : null;
+        $enrolledCredits     = $courseGrades->sum(fn($c) => $c['credits']);
 
         return response()->json([
             'gpa'              => $gpa,
@@ -180,18 +156,20 @@ class StudentExamController extends Controller
     /**
      * GET /student/exams
      *
-     * Returns all exams across every course the authenticated student
-     * is enrolled in, each with their submission status if any.
-     * Used by the new ExamsPage.jsx.
+     * Returns all exams across every enrolled course WITH submission status.
+     *
+     * FIX #1: Only return non-draft exams. Students must never see draft exams —
+     * drafts are instructor work-in-progress and have not been published.
+     * Allowed statuses: scheduled, active, completed.
      */
     public function allExams(Request $request)
     {
-        $student = $this->getStudent($request);
-
-        // Collect all course IDs the student is enrolled in
+        $student   = $this->getStudent($request);
         $courseIds = $student->enrolledCourses()->pluck('courses.id');
 
         $exams = Exam::whereIn('course_id', $courseIds)
+            // FIX: exclude drafts — students only see published exams
+            ->whereNotIn('status', ['draft', 'cancelled'])
             ->with([
                 'course:id,name,code',
                 'submissions' => function ($query) use ($student) {
@@ -205,12 +183,12 @@ class StudentExamController extends Controller
             ->get()
             ->map(function ($exam) {
                 $sub = $exam->submissions->first();
-
                 return [
                     'id'               => $exam->id,
                     'title'            => $exam->title,
                     'description'      => $exam->description,
                     'type'             => $exam->type,
+                    'status'           => $exam->status,
                     'start_time'       => $exam->start_time,
                     'end_time'         => $exam->end_time,
                     'duration_minutes' => $exam->duration_minutes,
@@ -237,6 +215,9 @@ class StudentExamController extends Controller
 
     /**
      * GET /student/courses/{courseId}/exams
+     *
+     * FIX #1: Same draft filter applied here — course exam page must not
+     * show draft exams to students either.
      */
     public function courseExams(Request $request, $courseId)
     {
@@ -244,6 +225,8 @@ class StudentExamController extends Controller
         $this->assertEnrolled($student, (int) $courseId);
 
         $exams = Exam::where('course_id', $courseId)
+            // FIX: exclude drafts
+            ->whereNotIn('status', ['draft', 'cancelled'])
             ->withCount('questions')
             ->with(['submissions' => function ($query) use ($student) {
                 $query->where('student_id', $student->id);
@@ -257,6 +240,7 @@ class StudentExamController extends Controller
                     'title'            => $exam->title,
                     'description'      => $exam->description,
                     'type'             => $exam->type,
+                    'status'           => $exam->status,
                     'start_time'       => $exam->start_time,
                     'end_time'         => $exam->end_time,
                     'duration_minutes' => $exam->duration_minutes,
@@ -289,17 +273,24 @@ class StudentExamController extends Controller
 
         $this->assertEnrolled($student, (int) $exam->course_id);
 
-        $now = now();
+        // FIX: Also block starting a draft exam even if the student somehow
+        // has its ID (e.g. from a bookmark or direct URL)
+        if ($exam->status === 'draft') {
+            return response()->json(['message' => 'This exam is not available yet.'], 403);
+        }
 
-        if ($now < $exam->start_time) {
+        // FIX: Use Carbon::now('UTC') so the comparison is always UTC vs UTC,
+        // regardless of what APP_TIMEZONE is set to in config/app.php.
+        $now = Carbon::now('UTC');
+
+        if ($now->lt($exam->start_time)) {
             return response()->json(['message' => 'This exam has not started yet.'], 403);
         }
 
-        if ($now > $exam->end_time) {
+        if ($now->gt($exam->end_time)) {
             return response()->json(['message' => 'This exam has ended.'], 403);
         }
 
-        // Check if exam has essay questions
         $hasEssay = $exam->questions->contains('type', 'essay');
 
         if ($hasEssay) {
@@ -310,7 +301,7 @@ class StudentExamController extends Controller
             if (!$hasBaseline) {
                 return response()->json([
                     'requires_typing_test' => true,
-                    'message' => 'Please complete the typing test before starting this exam.',
+                    'message'              => 'Please complete the typing test before starting this exam.',
                 ], 403);
             }
         }
@@ -324,13 +315,10 @@ class StudentExamController extends Controller
         }
 
         $submission = ExamSubmission::firstOrCreate(
-            [
-                'exam_id'    => $examId,
-                'student_id' => $student->id,
-            ],
+            ['exam_id' => $examId, 'student_id' => $student->id],
             [
                 'status'       => 'in_progress',
-                'started_at'   => now(),
+                'started_at'   => Carbon::now('UTC'),
                 'total_points' => $exam->total_points,
             ]
         );
@@ -352,7 +340,7 @@ class StudentExamController extends Controller
             mt_srand($seed);
             $arr = $questions->values()->all();
             for ($i = count($arr) - 1; $i > 0; $i--) {
-                $j = mt_rand(0, $i);
+                $j         = mt_rand(0, $i);
                 [$arr[$i], $arr[$j]] = [$arr[$j], $arr[$i]];
             }
             $questions = collect($arr);
@@ -380,11 +368,9 @@ class StudentExamController extends Controller
     /**
      * POST /student/exams/{examId}/submit
      *
-     * FIX: Essays are stored with points_earned = NULL and is_correct = null
-     * at submission time. This is the only way to distinguish "not yet graded
-     * by instructor" (null) from "instructor awarded 0 points" (0).
-     * Previously storing 0 caused EssayGradingController to treat all essays
-     * as already graded on first load.
+     * FIX: Essays stored with points_earned = NULL (not yet graded).
+     * FIX: Removed hardcoded 'Asia/Manila' timezone — use UTC throughout
+     * so the ML job receives correct timestamps regardless of server config.
      */
     public function submit(Request $request, $examId)
     {
@@ -408,49 +394,41 @@ class StudentExamController extends Controller
                 ? (string) $answers[$question->id]
                 : null;
 
-            $isCorrect    = null;  // default for essay
-            $pointsEarned = null;  // default for essay (null = awaiting instructor grade)
+            $isCorrect    = null;
+            $pointsEarned = null;
 
             if (in_array($question->type, ['multiple_choice', 'true_false'])) {
-                // Auto-grade MC and T/F immediately
                 $isCorrect    = $this->answersMatch($studentAnswer, (string) $question->correct_answer);
                 $pointsEarned = $isCorrect ? $question->points : 0;
                 $score       += $pointsEarned;
             }
-            // Essays: points_earned stays NULL — instructor must grade manually.
-            // They do NOT contribute to score until graded.
 
             $gradedAnswers[] = [
                 'question_id'     => $question->id,
                 'student_answer'  => $studentAnswer,
                 'correct_answer'  => $question->correct_answer,
                 'is_correct'      => $isCorrect,
-                'points_earned'   => $pointsEarned,   // null for essays
+                'points_earned'   => $pointsEarned,
                 'points_possible' => $question->points,
             ];
         }
 
+        $now = Carbon::now('UTC');
+
         $submission->update([
             'status'       => 'submitted',
-            'submitted_at' => now(),
-            'score'        => $score,   // only MC/TF score for now; essays add to it when graded
+            'submitted_at' => $now,
+            'score'        => $score,
             'answers'      => $gradedAnswers,
         ]);
 
-        // ── Trigger ML processing in the background ───────────────────────────
-        $rawStart = $submission->getRawOriginal('started_at');
-        $rawEnd   = $submission->getRawOriginal('submitted_at');
-
-        $examStart = Carbon::createFromFormat('Y-m-d H:i:s', $rawStart, 'Asia/Manila')
-                        ->utc()
-                        ->toIso8601String();
-
-        $examEnd = Carbon::createFromFormat('Y-m-d H:i:s', $rawEnd, 'Asia/Manila')
-                        ->utc()
-                        ->toIso8601String();
+        // FIX: Use UTC ISO strings directly — no hardcoded Asia/Manila conversion.
+        // Carbon casts on the model already store as UTC; toIso8601String() on a
+        // UTC Carbon instance is always correct.
+        $examStart = Carbon::parse($submission->started_at)->utc()->toIso8601String();
+        $examEnd   = $now->toIso8601String();
 
         ProcessExamML::dispatch($submission->id, $examStart, $examEnd);
-        // ─────────────────────────────────────────────────────────────────────
 
         return response()->json([
             'message'    => 'Exam submitted successfully.',
@@ -476,8 +454,7 @@ class StudentExamController extends Controller
             ->where('status', 'submitted')
             ->firstOrFail();
 
-        $exam = $submission->exam;
-
+        $exam    = $submission->exam;
         $raw     = $submission->answers;
         $answers = is_string($raw) ? json_decode($raw, true) : (array) ($raw ?? []);
 
@@ -495,7 +472,6 @@ class StudentExamController extends Controller
                 );
                 $pointsEarned = $isCorrect ? $question->points : 0;
             } else {
-                // Essay: use whatever the instructor set (may still be null = pending)
                 $isCorrect    = $answerData['is_correct']    ?? null;
                 $pointsEarned = $answerData['points_earned'] ?? null;
             }
