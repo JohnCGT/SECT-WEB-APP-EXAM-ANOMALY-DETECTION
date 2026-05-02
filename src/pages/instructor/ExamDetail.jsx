@@ -1234,13 +1234,18 @@ const ExamDetail = () => {
     } finally { setShuffleSaving(false); }
   };
 
+  // ─── FIX: Use is_flagged + cpi_score to match the table's own display logic ───
   const anomalyStats = {
-    flagged: summaries.filter(s => s.flag_status==="flagged").length,
-    warning: summaries.filter(s => s.flag_status==="warning").length,
-    clear:   summaries.filter(s => s.flag_status==="none").length,
+    flagged: summaries.filter(s => s.is_flagged).length,
+    warning: summaries.filter(s => !s.is_flagged && (s.cpi_score ?? 0) >= 25).length,
+    clear:   summaries.filter(s => !s.is_flagged && (s.cpi_score ?? 0) < 25).length,
   };
+
+  // ─── FIX: Filter summaries using the same is_flagged + cpi_score logic ───
   const filteredSummaries = summaries.filter(s => {
-    if (anomalyFilter!=="all" && s.flag_status!==anomalyFilter) return false;
+    if (anomalyFilter === "flagged" && !s.is_flagged) return false;
+    if (anomalyFilter === "warning" && (s.is_flagged || (s.cpi_score ?? 0) < 25)) return false;
+    if (anomalyFilter === "none"    && (s.is_flagged || (s.cpi_score ?? 0) >= 25)) return false;
     if (anomalySearch.trim()) {
       const q = anomalySearch.toLowerCase();
       return s.student?.name?.toLowerCase().includes(q) || s.student?.email?.toLowerCase().includes(q);

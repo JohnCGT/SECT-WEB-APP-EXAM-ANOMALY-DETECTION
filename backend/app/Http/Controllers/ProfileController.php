@@ -17,25 +17,18 @@ class ProfileController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'first_name' => 'required|string|max:100',
-            'last_name'  => 'required|string|max:100',
-            'email'      => 'required|email|unique:users,email,' . $user->id,
-            'phone'      => 'nullable|string|max:20',
-            'course'     => 'nullable|string|max:100',
-            'year_level' => 'nullable|string|max:20',
+            'name'  => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $user->id,
         ]);
 
         $user->update([
-            'name'       => trim($validated['first_name'] . ' ' . $validated['last_name']),
-            'email'      => strtolower($validated['email']),
-            'phone'      => $validated['phone']      ?? null,
-            'course'     => $validated['course']     ?? null,
-            'year_level' => $validated['year_level'] ?? null,
+            'name'  => trim($validated['name']),
+            'email' => strtolower($validated['email']),
         ]);
 
         return response()->json([
             'message' => 'Profile updated successfully.',
-            'user'    => $this->formatUser($user),
+            'user'    => $this->formatUser($user->fresh()),
         ]);
     }
 
@@ -72,13 +65,10 @@ class ProfileController extends Controller
     private function formatUser($user): array
     {
         return [
-            'id'         => $user->id,
-            'name'       => $user->name,
-            'email'      => $user->email,
-            'role'       => $user->role,
-            'phone'      => $user->phone,
-            'course'     => $user->course,
-            'year_level' => $user->year_level,
+            'id'    => $user->id,
+            'name'  => $user->name,
+            'email' => $user->email,
+            'role'  => $user->role,
         ];
     }
 }

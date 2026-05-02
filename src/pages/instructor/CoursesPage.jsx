@@ -69,16 +69,24 @@ const SHARED_CSS = `
   @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   .fade-up{animation:fadeUp .4s ease both;}
-  /* Stat chips */
-  .stat-chip{
-    flex:1;min-width:150px;border-radius:14px;padding:14px 16px;
-    display:flex;align-items:center;gap:10px;
-    border:1px solid rgba(0,86,179,.06);background:#fff;
-    box-shadow:0 1px 3px rgba(0,0,0,.04);
+
+  /* ── Stat chips ── */
+  .stat-chips-row{
+    display:flex;gap:8px;flex-wrap:nowrap;margin-bottom:20px;
   }
-  .stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-  .stat-icon i{font-size:17px;}
-  /* Buttons */
+  .stat-chip{
+    flex:1;min-width:0;border-radius:14px;padding:10px 10px;
+    display:flex;align-items:center;gap:8px;
+    border:1px solid rgba(0,86,179,.06);background:#fff;
+    box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;
+  }
+  .stat-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .stat-icon i{font-size:14px;}
+  .stat-text{min-width:0;overflow:hidden;}
+  .stat-value{margin:0;font-size:18px;font-weight:700;line-height:1;}
+  .stat-label{margin:2px 0 0;font-size:10px;font-weight:600;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
+
+  /* ── Buttons ── */
   .dash-btn-primary{
     background:var(--blue);color:#fff;border:none;border-radius:10px;
     padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;
@@ -95,34 +103,88 @@ const SHARED_CSS = `
   }
   .dash-btn-ghost:hover{background:#f1f5f9;color:#1e293b;}
   .action-btn{
-    width:30px;height:30px;border-radius:8px;border:1px solid rgba(0,86,179,.12);
+    width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,86,179,.12);
     background:#fff;display:inline-flex;align-items:center;justify-content:center;
     cursor:pointer;transition:all .15s;font-size:13px;text-decoration:none;color:#64748b;
+    flex-shrink:0;
   }
   .action-btn:hover{background:var(--blue-lite);border-color:var(--blue);color:var(--blue);}
   .action-btn.warn:hover{background:#fff7ed;border-color:#f59e0b;color:#f59e0b;}
   .action-btn.del:hover{background:#fef2f2;border-color:#ef4444;color:#ef4444;}
   .action-btn.suc:hover{background:#f0fdf4;border-color:#22c55e;color:#22c55e;}
-  /* Badge pill */
+
+  /* ── Badge pill ── */
   .badge-pill{
     display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;
     font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    white-space:nowrap;flex-shrink:0;
   }
-  /* Course card */
+
+  /* ── Course card ── */
   .course-card{
     background:#fff;border-radius:16px;border:1px solid rgba(0,86,179,.06);
     box-shadow:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,86,179,.05);
     transition:box-shadow .2s,transform .2s;overflow:hidden;
   }
   .course-card:hover{box-shadow:0 2px 6px rgba(0,0,0,.07),0 8px 28px rgba(0,86,179,.10);}
-  .course-code-badge{
-    width:52px;height:52px;border-radius:12px;background:var(--blue-lite);
-    color:var(--blue);display:flex;align-items:center;justify-content:center;
-    font-weight:800;font-size:11px;flex-shrink:0;letter-spacing:.03em;text-align:center;line-height:1.2;
+
+  /* Course card body: left badge + right content */
+  .course-card-body{
+    padding:16px;
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
   }
+
+  .course-code-badge{
+    width:48px;height:48px;border-radius:12px;background:var(--blue-lite);
+    color:var(--blue);display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:10px;flex-shrink:0;letter-spacing:.03em;
+    text-align:center;line-height:1.2;word-break:break-all;
+  }
+
+  /* The right content area */
+  .course-info{
+    flex:1;min-width:0;
+    display:flex;flex-direction:column;gap:4px;
+  }
+  .course-name{
+    font-size:15px;font-weight:700;color:#0f172a;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .course-badges{
+    display:flex;flex-wrap:wrap;gap:5px;align-items:center;
+  }
+  .course-meta{
+    display:flex;flex-wrap:wrap;gap:12px;margin-top:2px;
+  }
+  .course-meta-item{
+    font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:3px;white-space:nowrap;
+  }
+
+  /* Action bar at the bottom of each card */
+  .course-action-bar{
+    padding:10px 16px;
+    border-top:1px solid rgba(0,86,179,.06);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    background:#fafbff;
+  }
+  .course-action-right{
+    display:flex;align-items:center;gap:6px;
+  }
+  .students-toggle-btn{
+    padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;
+    cursor:pointer;font-family:'DM Sans',sans-serif;
+    display:inline-flex;align-items:center;gap:5px;
+    transition:all .15s;border:none;
+  }
+
   /* Enroll panel */
   .enroll-panel{
-    padding:16px 20px;background:#f8faff;border-top:1px solid rgba(0,86,179,.08);
+    padding:16px;background:#f8faff;border-top:1px solid rgba(0,86,179,.08);
     animation:fadeUp .2s ease;
   }
   /* Student chip */
@@ -136,6 +198,7 @@ const SHARED_CSS = `
     color:#94a3b8;font-size:12px;transition:color .15s;
   }
   .student-chip button:hover{color:#ef4444;}
+
   /* Modal */
   .dash-modal-overlay{
     position:fixed;inset:0;background:rgba(15,23,42,.45);
@@ -173,6 +236,7 @@ const SHARED_CSS = `
   }
   .search-dropdown-item:last-child{border-bottom:none;}
   .search-dropdown-item:hover{background:#f8faff;}
+
   /* Bottom nav */
   .instructor-bottom-nav{
     position:fixed;bottom:0;left:0;right:0;height:64px;
@@ -183,24 +247,24 @@ const SHARED_CSS = `
   }
   .bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:600;gap:3px;text-decoration:none;transition:color .2s;}
   .bnav-item i{font-size:19px;}
-  /* Two col form grid */
+
+  /* Form grids */
   .form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   .form-grid-34{display:grid;grid-template-columns:3fr 1fr;gap:12px;}
   @media(max-width:576px){
     .form-grid-2{grid-template-columns:1fr;}
-    .form-grid-34{grid-template-columns:1fr 1fr;}
-    .stat-chip{min-width:calc(50% - 8px);}
-    .course-actions{flex-wrap:wrap;}
+    .form-grid-34{grid-template-columns:3fr 1fr;}
   }
 `;
 
 /* ─── Bottom Nav ─────────────────────────────────────────────────────────── */
 const InstructorBottomNav = ({ active }) => {
   const items = [
-    { to: "/instructor",                  icon: "bi-speedometer2", label: "Home"     },
-    { to: "/instructor/courses",          icon: "bi-book",         label: "Courses"  },
-    { to: "/instructor/students",         icon: "bi-people",       label: "Students" },
-    { to: "/instructor/account-settings", icon: "bi-gear",         label: "Settings" },
+    { to: "/instructor",                  icon: "bi-speedometer2",      label: "Home"     },
+    { to: "/instructor/courses",          icon: "bi-book",              label: "Courses"  },
+    { to: "/instructor/exams",            icon: "bi-file-earmark-text", label: "Exams"    },
+    { to: "/instructor/students",         icon: "bi-people",            label: "Students" },
+    { to: "/instructor/account-settings", icon: "bi-gear",              label: "Settings" },
   ];
   return (
     <nav className="instructor-bottom-nav d-lg-none">
@@ -257,7 +321,6 @@ export default function CoursesPage() {
       const fetchedCourses = coursesRes.data.courses || [];
       setCourses(fetchedCourses);
 
-      // Fetch enrolled students for all courses in parallel so Total Enrollments shows on load
       const enrolledResults = await Promise.all(
         fetchedCourses.map(course =>
           API.get(`/courses/${course.id}/students`)
@@ -395,7 +458,7 @@ export default function CoursesPage() {
   const firstName = user?.name?.split(" ")[0] ?? "Instructor";
 
   const totalEnrollments = new Set(
-  Object.values(enrolledMap).flatMap(arr => arr.map(s => s.id))
+    Object.values(enrolledMap).flatMap(arr => arr.map(s => s.id))
   ).size;
 
   return (
@@ -445,7 +508,7 @@ export default function CoursesPage() {
           </nav>
 
           {/* ── Main ── */}
-          <main style={{ flex: 1, padding: "24px 20px", paddingBottom: 100, minWidth: 0 }}>
+          <main style={{ flex: 1, padding: "20px 16px", paddingBottom: 90, minWidth: 0 }}>
 
             {/* Mobile search */}
             <div className="d-md-none mb-3" style={{ position: "relative" }}>
@@ -455,40 +518,42 @@ export default function CoursesPage() {
             </div>
 
             {/* Page header */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, gap: 12 }}>
               <div>
-                <p style={{ margin: 0, fontSize: 13, color: "#94a3b8", fontWeight: 500 }}>Management</p>
-                <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#0f172a", letterSpacing: "-.5px" }}>Course Management</h1>
-                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>Create and manage your courses, enroll students</p>
+                <p style={{ margin: 0, fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Management</p>
+                <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: "-.5px" }}>Courses</h1>
+                <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>Create, manage and enroll students</p>
               </div>
-              <button className="dash-btn-primary" onClick={openCreate}>
-                <i className="bi bi-plus-lg"></i> New Course
+              <button className="dash-btn-primary" onClick={openCreate} style={{ flexShrink: 0, whiteSpace: "nowrap" }}>
+                <i className="bi bi-plus-lg"></i>
+                <span className="d-none d-sm-inline">New Course</span>
+                <span className="d-sm-none">New</span>
               </button>
             </div>
 
-            {/* Stat Chips */}
-            <div className="fade-up" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+            {/* ── Stat Chips ── */}
+            <div className="stat-chips-row fade-up">
               {[
-                { label:"Total Courses",     value:courses.length,      color:"#0056b3", bg:"#e8f0fe", icon:"bi-book"   },
-                { label:"Total Enrollments", value:totalEnrollments,    color:"#15803d", bg:"#f0fdf4", icon:"bi-people" },
-                { label:"Filtered Results",  value:filtered.length,     color:"#6d28d9", bg:"#ede9fe", icon:"bi-funnel" },
+                { label: "Courses",      value: courses.length,     color: "#0056b3", bg: "#e8f0fe", icon: "bi-book"   },
+                { label: "Enrollments",  value: totalEnrollments,   color: "#15803d", bg: "#f0fdf4", icon: "bi-people" },
+                { label: "Filtered",     value: filtered.length,    color: "#6d28d9", bg: "#ede9fe", icon: "bi-funnel" },
               ].map(({ label, value, color, bg, icon }) => (
                 <div key={label} className="stat-chip">
                   <div className="stat-icon" style={{ background: bg }}>
-                    <i className={`bi ${icon}`} style={{ color, fontSize: 17 }}></i>
+                    <i className={`bi ${icon}`} style={{ color }}></i>
                   </div>
-                  <div>
-                    <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color, lineHeight: 1 }}>{value}</p>
-                    <p style={{ margin: "3px 0 0", fontSize: 11, fontWeight: 600, color, opacity: .75 }}>{label}</p>
+                  <div className="stat-text">
+                    <p className="stat-value" style={{ color }}>{value}</p>
+                    <p className="stat-label" style={{ color }}>{label}</p>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Course List */}
+            {/* ── Course List ── */}
             {loading ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 90, borderRadius: 16 }} />)}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 80, borderRadius: 16 }} />)}
               </div>
             ) : filtered.length === 0 ? (
               <div className="dash-card" style={{ textAlign: "center", padding: "48px 20px", color: "#94a3b8" }}>
@@ -503,94 +568,119 @@ export default function CoursesPage() {
                 )}
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {filtered.map(course => {
                   const enrolled   = enrolledMap[course.id] || [];
                   const isExpanded = expandedCourse === course.id;
+
                   return (
                     <div key={course.id} className="course-card fade-up">
 
-                      {/* Course Row */}
-                      <div style={{ padding: "18px 20px" }}>
-                        <div style={{ display: "flex", alignItems: "flex-start", gap: 14, flexWrap: "wrap" }}>
-                          <div className="course-code-badge">{course.code}</div>
+                      {/* ── Card body: square badge + course info ── */}
+                      <div className="course-card-body">
+                        {/* Left: colour-coded code badge */}
+                        <div className="course-code-badge">{course.code}</div>
 
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-                              <span style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{course.name}</span>
-                              <span className="badge-pill" style={{ background: "#e8f0fe", color: "#0056b3" }}>{course.code}</span>
-                              {course.semester && (
-                                <span className="badge-pill" style={{ background: "#f1f5f9", color: "#64748b" }}>
-                                  <i className="bi bi-calendar3 me-1"></i>{course.semester}
-                                </span>
-                              )}
-                              {course.credits != null && (
-                                <span className="badge-pill" style={{ background: "#f0f9ff", color: "#0369a1" }}>
-                                  {course.credits} cr
-                                </span>
-                              )}
-                            </div>
-                            {course.description && (
-                              <p style={{ margin: "0 0 6px", fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>{course.description}</p>
-                            )}
-                            <div style={{ display: "flex", gap: 14 }}>
-                              <span style={{ fontSize: 11, color: "#94a3b8" }}>
-                                <i className="bi bi-people me-1"></i>
-                                {enrolled.length > 0 ? `${enrolled.length} student${enrolled.length!==1?"s":""}` : "Students"}
+                        {/* Right: all course text */}
+                        <div className="course-info">
+                          {/* Course name — never clips mid-word */}
+                          <span className="course-name" title={course.name}>{course.name}</span>
+
+                          {/* Inline badge row */}
+                          <div className="course-badges">
+                            <span className="badge-pill" style={{ background: "#e8f0fe", color: "#0056b3" }}>
+                              {course.code}
+                            </span>
+                            {course.semester && (
+                              <span className="badge-pill" style={{ background: "#f1f5f9", color: "#64748b" }}>
+                                <i className="bi bi-calendar3" style={{ marginRight: 3 }}></i>{course.semester}
                               </span>
-                              {course.created_at && (
-                                <span style={{ fontSize: 11, color: "#94a3b8" }}>
-                                  <i className="bi bi-calendar3 me-1"></i>
-                                  {new Date(course.created_at).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}
-                                </span>
-                              )}
-                            </div>
+                            )}
+                            {course.credits != null && (
+                              <span className="badge-pill" style={{ background: "#f0f9ff", color: "#0369a1" }}>
+                                {course.credits} cr
+                              </span>
+                            )}
                           </div>
 
-                          <div className="course-actions d-flex gap-2 flex-shrink-0" style={{ alignItems: "center" }}>
-                            <button
-                              style={{ padding: "6px 14px", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans',sans-serif", display: "inline-flex", alignItems: "center", gap: 6, transition: "all .15s", border: "none", background: isExpanded ? "#0056b3" : "#e8f0fe", color: isExpanded ? "#fff" : "#0056b3" }}
-                              onClick={() => toggleExpand(course.id)}>
-                              <i className={`bi bi-people${isExpanded?"-fill":""}`}></i>
-                              {isExpanded ? "Close" : "Students"}
-                            </button>
-                            <Link to={`/instructor/courses/${course.id}`} className="action-btn" title="View detail">
-                              <i className="bi bi-eye"></i>
-                            </Link>
-                            <button className="action-btn warn" onClick={() => openEdit(course)} title="Edit">
-                              <i className="bi bi-pencil"></i>
-                            </button>
-                            <button className="action-btn del" onClick={() => handleDelete(course)} title="Delete">
-                              <i className="bi bi-trash"></i>
-                            </button>
+                          {/* Description */}
+                          {course.description && (
+                            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b", lineHeight: 1.5,
+                              display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                              {course.description}
+                            </p>
+                          )}
+
+                          {/* Meta row: students + date */}
+                          <div className="course-meta">
+                            <span className="course-meta-item">
+                              <i className="bi bi-people"></i>
+                              {enrolled.length > 0
+                                ? `${enrolled.length} student${enrolled.length !== 1 ? "s" : ""}`
+                                : "No students"}
+                            </span>
+                            {course.created_at && (
+                              <span className="course-meta-item">
+                                <i className="bi bi-calendar3"></i>
+                                {new Date(course.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
 
-                      {/* Student Enrollment Panel */}
+                      {/* ── Action bar ── always at bottom of card ── */}
+                      <div className="course-action-bar">
+                        {/* Left: students toggle */}
+                        <button
+                          className="students-toggle-btn"
+                          style={{
+                            background: isExpanded ? "#0056b3" : "#e8f0fe",
+                            color: isExpanded ? "#fff" : "#0056b3",
+                          }}
+                          onClick={() => toggleExpand(course.id)}>
+                          <i className={`bi bi-people${isExpanded ? "-fill" : ""}`}></i>
+                          {isExpanded ? "Close" : `Students${enrolled.length > 0 ? ` (${enrolled.length})` : ""}`}
+                        </button>
+
+                        {/* Right: icon actions */}
+                        <div className="course-action-right">
+                          <Link to={`/instructor/courses/${course.id}`} className="action-btn" title="View detail">
+                            <i className="bi bi-eye"></i>
+                          </Link>
+                          <button className="action-btn warn" onClick={() => openEdit(course)} title="Edit">
+                            <i className="bi bi-pencil"></i>
+                          </button>
+                          <button className="action-btn del" onClick={() => handleDelete(course)} title="Delete">
+                            <i className="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* ── Student Enrollment Panel ── */}
                       {isExpanded && (
                         <div className="enroll-panel">
-                          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid rgba(0,86,179,.08)", padding: "16px 18px" }}>
-                            <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
-                              <i className="bi bi-person-plus me-2" style={{ color: "#0056b3" }}></i>Enroll Students
+                          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid rgba(0,86,179,.08)", padding: "14px 16px" }}>
+                            <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                              <i className="bi bi-person-plus" style={{ color: "#0056b3", marginRight: 6 }}></i>Enroll Students
                             </h3>
 
-                            {/* Search */}
-                            <div style={{ position: "relative", marginBottom: 14 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-                                <span style={{ padding: "9px 12px", background: "#f8faff", border: "1px solid rgba(0,86,179,.15)", borderRight: "none", borderRadius: "10px 0 0 10px", color: "#94a3b8", fontSize: 13 }}>
+                            {/* Search box */}
+                            <div style={{ position: "relative", marginBottom: 12 }}>
+                              <div style={{ display: "flex", alignItems: "center" }}>
+                                <span style={{ padding: "9px 11px", background: "#f8faff", border: "1px solid rgba(0,86,179,.15)", borderRight: "none", borderRadius: "10px 0 0 10px", color: "#94a3b8", fontSize: 13, flexShrink: 0 }}>
                                   {enrollLoading
-                                    ? <span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14, borderWidth: 2 }} />
+                                    ? <span className="spinner-border spinner-border-sm" style={{ width: 13, height: 13, borderWidth: 2 }} />
                                     : <i className="bi bi-search"></i>}
                                 </span>
                                 <input
-                                  style={{ flex: 1, border: "1px solid rgba(0,86,179,.15)", borderLeft: "none", borderRight: studentSearch ? "none" : "1px solid rgba(0,86,179,.15)", borderRadius: studentSearch ? "0" : "0 10px 10px 0", padding: "9px 13px", fontSize: 13, outline: "none", fontFamily: "'DM Sans',sans-serif", background: "#f8faff", color: "#1e293b" }}
-                                  placeholder="Search students by name or email (min. 2 chars)…"
+                                  style={{ flex: 1, minWidth: 0, border: "1px solid rgba(0,86,179,.15)", borderLeft: "none", borderRight: studentSearch ? "none" : "1px solid rgba(0,86,179,.15)", borderRadius: studentSearch ? 0 : "0 10px 10px 0", padding: "9px 12px", fontSize: 13, outline: "none", fontFamily: "'DM Sans',sans-serif", background: "#f8faff", color: "#1e293b" }}
+                                  placeholder="Search by name or email…"
                                   value={studentSearch}
                                   onChange={handleStudentSearch} />
                                 {studentSearch && (
                                   <button onClick={() => { setStudentSearch(""); setSearchResults([]); }}
-                                    style={{ padding: "9px 12px", background: "#f8faff", border: "1px solid rgba(0,86,179,.15)", borderLeft: "none", borderRadius: "0 10px 10px 0", color: "#94a3b8", cursor: "pointer", fontSize: 13 }}>
+                                    style={{ padding: "9px 11px", background: "#f8faff", border: "1px solid rgba(0,86,179,.15)", borderLeft: "none", borderRadius: "0 10px 10px 0", color: "#94a3b8", cursor: "pointer", fontSize: 13, flexShrink: 0 }}>
                                     <i className="bi bi-x"></i>
                                   </button>
                                 )}
@@ -606,8 +696,8 @@ export default function CoursesPage() {
                                         onClick={() => !alreadyIn && handleEnroll(s)}>
                                         <MiniAvatar name={s.name} size={30} />
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                          <div style={{ fontWeight: 600, fontSize: 13, color: "#1e293b" }}>{s.name}</div>
-                                          <div style={{ fontSize: 11, color: "#94a3b8" }}>{s.email}</div>
+                                          <div style={{ fontWeight: 600, fontSize: 13, color: "#1e293b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                                          <div style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.email}</div>
                                         </div>
                                         {alreadyIn
                                           ? <span className="badge-pill" style={{ background: "#f0fdf4", color: "#15803d" }}>Enrolled</span>
@@ -621,15 +711,15 @@ export default function CoursesPage() {
 
                             {/* Enrolled list */}
                             {enrolled.length === 0 ? (
-                              <p style={{ margin: 0, fontSize: 13, color: "#94a3b8", textAlign: "center", padding: "10px 0" }}>
-                                No students enrolled yet. Search above to add students.
+                              <p style={{ margin: 0, fontSize: 13, color: "#94a3b8", textAlign: "center", padding: "8px 0" }}>
+                                No students enrolled yet. Search above to add.
                               </p>
                             ) : (
                               <>
-                                <p style={{ margin: "0 0 10px", fontSize: 12, color: "#64748b" }}>
-                                  {enrolled.length} enrolled student{enrolled.length!==1?"s":""}
+                                <p style={{ margin: "0 0 8px", fontSize: 12, color: "#64748b" }}>
+                                  {enrolled.length} enrolled student{enrolled.length !== 1 ? "s" : ""}
                                 </p>
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                                   {enrolled.map(s => (
                                     <div key={s.id} className="student-chip">
                                       <MiniAvatar name={s.name} size={20} />
@@ -663,11 +753,11 @@ export default function CoursesPage() {
             <div className="dash-modal-hdr">
               <div>
                 <h5 style={{ margin: 0, fontWeight: 700, fontSize: 17, color: "#0f172a" }}>
-                  <i className={`bi ${modalMode==="create"?"bi-plus-circle":"bi-pencil"} me-2`} style={{ color: "#0056b3" }}></i>
-                  {modalMode==="create" ? "New Course" : "Edit Course"}
+                  <i className={`bi ${modalMode === "create" ? "bi-plus-circle" : "bi-pencil"} me-2`} style={{ color: "#0056b3" }}></i>
+                  {modalMode === "create" ? "New Course" : "Edit Course"}
                 </h5>
                 <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>
-                  {modalMode==="create" ? "Fill in the details to create a course" : "Update course information"}
+                  {modalMode === "create" ? "Fill in the details to create a course" : "Update course information"}
                 </p>
               </div>
               <button onClick={() => setShowModal(false)} disabled={saving}
@@ -681,35 +771,35 @@ export default function CoursesPage() {
 
                 <div>
                   <label className="form-lbl">Course Name <span style={{ color: "#ef4444" }}>*</span></label>
-                  <input type="text" className={`form-ctrl ${errors.name?"err":""}`}
+                  <input type="text" className={`form-ctrl ${errors.name ? "err" : ""}`}
                     placeholder="e.g. Introduction to Programming"
-                    value={form.name} onChange={e => setForm(f => ({...f,name:e.target.value}))}
+                    value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                     maxLength={150} disabled={saving} />
                   {errors.name && <p className="form-err">{errors.name}</p>}
                 </div>
 
                 <div>
                   <label className="form-lbl">Course Code <span style={{ color: "#ef4444" }}>*</span></label>
-                  <input type="text" className={`form-ctrl ${errors.code?"err":""}`}
+                  <input type="text" className={`form-ctrl ${errors.code ? "err" : ""}`}
                     placeholder="e.g. CS101"
-                    value={form.code} onChange={e => setForm(f => ({...f,code:e.target.value.toUpperCase()}))}
+                    value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
                     maxLength={20} disabled={saving} />
                   {errors.code && <p className="form-err">{errors.code}</p>}
                 </div>
 
                 <div className="form-grid-34">
                   <div>
-                    <label className="form-lbl">Semester <span style={{ color: "#94a3b8", fontWeight: 400, textTransform: "none" }}></span></label>
+                    <label className="form-lbl">Semester</label>
                     <input type="text" className="form-ctrl"
                       placeholder="e.g. Fall 2026"
-                      value={form.semester} onChange={e => setForm(f => ({...f,semester:e.target.value}))}
+                      value={form.semester} onChange={e => setForm(f => ({ ...f, semester: e.target.value }))}
                       maxLength={50} disabled={saving} />
                   </div>
                   <div>
                     <label className="form-lbl">Credits <span style={{ color: "#ef4444" }}>*</span></label>
-                    <input type="number" className={`form-ctrl ${errors.credits?"err":""}`}
+                    <input type="number" className={`form-ctrl ${errors.credits ? "err" : ""}`}
                       placeholder="3" value={form.credits}
-                      onChange={e => setForm(f => ({...f,credits:e.target.value}))}
+                      onChange={e => setForm(f => ({ ...f, credits: e.target.value }))}
                       min={1} max={6} disabled={saving} />
                     {errors.credits && <p className="form-err">{errors.credits}</p>}
                   </div>
@@ -719,7 +809,7 @@ export default function CoursesPage() {
                   <label className="form-lbl">Description <span style={{ color: "#94a3b8", fontWeight: 400, textTransform: "none" }}>(optional)</span></label>
                   <textarea className="form-ctrl" rows={3}
                     placeholder="Brief description of the course…"
-                    value={form.description} onChange={e => setForm(f => ({...f,description:e.target.value}))}
+                    value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                     maxLength={500} disabled={saving} style={{ resize: "vertical" }} />
                   <p style={{ margin: "4px 0 0", fontSize: 11, color: "#94a3b8", textAlign: "right" }}>{form.description.length}/500</p>
                 </div>
@@ -730,8 +820,8 @@ export default function CoursesPage() {
               <button className="dash-btn-ghost" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
               <button className="dash-btn-primary" onClick={handleSave} disabled={saving}>
                 {saving
-                  ? <><span className="spinner-border spinner-border-sm me-2"/>Saving…</>
-                  : <><i className="bi bi-check-lg"></i>{modalMode==="create"?"Create Course":"Save Changes"}</>}
+                  ? <><span className="spinner-border spinner-border-sm me-2" />Saving…</>
+                  : <><i className="bi bi-check-lg"></i>{modalMode === "create" ? "Create Course" : "Save Changes"}</>}
               </button>
             </div>
           </div>

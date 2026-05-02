@@ -4,7 +4,6 @@ import API from "../../api";
 import Swal from "sweetalert2";
 import InstructorAlertBell from "../../components/InstructorAlertBell";
 
-/* ─── Shared sidebar config ──────────────────────────────────────────────── */
 const NAV_ITEMS = [
   { to: "/instructor",                  icon: "bi-speedometer2",         label: "Dashboard" },
   { to: "/instructor/courses",          icon: "bi-book",                 label: "Courses"   },
@@ -35,7 +34,8 @@ const localInputToUTC = (localString) => {
   return new Date(localString).toISOString();
 };
 
-/* ─── Shared CSS ─────────────────────────────────────────────────────────── */
+const PAGE_SIZE = 15;
+
 const SHARED_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
   *,*::before,*::after{box-sizing:border-box;}
@@ -46,144 +46,71 @@ const SHARED_CSS = `
     --card-bg:#ffffff;--card-br:16px;
     --card-sh:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,86,179,.06);
   }
-  .dash-card{
-    background:var(--card-bg);border-radius:var(--card-br);
-    box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);
-    transition:box-shadow .2s,transform .2s;overflow:hidden;
-  }
+  .dash-card{background:var(--card-bg);border-radius:var(--card-br);box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);transition:box-shadow .2s,transform .2s;overflow:hidden;}
   .dash-card-hover:hover{box-shadow:0 2px 6px rgba(0,0,0,.06),0 8px 28px rgba(0,86,179,.10);transform:translateY(-1px);}
-  .glass-sidebar{
-    background:rgba(255,255,255,0.60);
-    backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
-    border-right:1px solid rgba(255,255,255,0.80);box-shadow:4px 0 24px rgba(0,86,179,.07);
-  }
-  .nav-pill{
-    display:flex;flex-direction:column;align-items:center;
-    padding:10px 8px;border-radius:12px;gap:4px;
-    font-size:11px;font-weight:600;text-decoration:none;
-    color:var(--slate);transition:background .15s,color .15s,transform .15s;width:100%;
-  }
+  .glass-sidebar{background:rgba(255,255,255,0.60);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-right:1px solid rgba(255,255,255,0.80);box-shadow:4px 0 24px rgba(0,86,179,.07);}
+  .nav-pill{display:flex;flex-direction:column;align-items:center;padding:10px 8px;border-radius:12px;gap:4px;font-size:11px;font-weight:600;text-decoration:none;color:var(--slate);transition:background .15s,color .15s,transform .15s;width:100%;}
   .nav-pill:hover{background:var(--blue-lite);color:var(--blue);transform:translateY(-1px);}
   .nav-pill.active{background:var(--blue);color:#fff;box-shadow:0 4px 14px rgba(0,86,179,.35);}
   .nav-pill i{font-size:18px;}
-  .topbar{
-    background:rgba(255,255,255,0.80);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-    border-bottom:1px solid rgba(0,86,179,.08);position:sticky;top:0;z-index:200;height:56px;
-    display:flex;align-items:center;padding:0 20px;gap:12px;
-  }
+  .topbar{background:rgba(255,255,255,0.80);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(0,86,179,.08);position:sticky;top:0;z-index:200;height:56px;display:flex;align-items:center;padding:0 20px;gap:12px;}
   .dash-avatar{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
-  .dash-search{
-    border:1px solid rgba(0,86,179,.15);border-radius:10px;
-    background:#f8faff;padding:7px 14px 7px 36px;
-    font-size:13px;color:#1e293b;outline:none;
-    font-family:'DM Sans',sans-serif;width:100%;
-    transition:border-color .2s,box-shadow .2s;
-  }
+  .dash-search{border:1px solid rgba(0,86,179,.15);border-radius:10px;background:#f8faff;padding:7px 14px 7px 36px;font-size:13px;color:#1e293b;outline:none;font-family:'DM Sans',sans-serif;width:100%;transition:border-color .2s,box-shadow .2s;}
   .dash-search:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
-  .skeleton{
-    background:linear-gradient(90deg,#f1f5f9 25%,#e8f0fe 50%,#f1f5f9 75%);
-    background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px;
-  }
+  .skeleton{background:linear-gradient(90deg,#f1f5f9 25%,#e8f0fe 50%,#f1f5f9 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px;}
   @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   .fade-up{animation:fadeUp .4s ease both;}
-  .stat-chip{
-    flex:1;min-width:130px;border-radius:14px;padding:14px 16px;
-    display:flex;align-items:center;gap:10px;cursor:pointer;
-    border:2px solid transparent;transition:border-color .15s,box-shadow .15s,transform .15s;
-    background:#f8faff;
-  }
+  .stat-chip{flex:1;min-width:120px;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;border:2px solid transparent;transition:border-color .15s,box-shadow .15s,transform .15s;background:#f8faff;}
   .stat-chip:hover{transform:translateY(-2px);}
   .stat-chip.selected{border-color:currentColor;box-shadow:0 4px 16px rgba(0,86,179,.12);}
   .dash-table{width:100%;border-collapse:collapse;font-family:'DM Sans',sans-serif;}
-  .dash-table th{padding:10px 16px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.06em;
-    white-space:nowrap;border-bottom:1px solid #f1f5f9;text-align:left;background:#f8faff;}
-  .dash-table td{padding:13px 16px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+  .dash-table th{padding:10px 14px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.06em;white-space:nowrap;border-bottom:1px solid #f1f5f9;text-align:left;background:#f8faff;}
+  .dash-table td{padding:12px 14px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
   .dash-table tbody tr{transition:background .15s;}
   .dash-table tbody tr:hover{background:#f8faff;}
   .dash-table tbody tr:last-child td{border-bottom:none;}
-  .action-btn{
-    width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,86,179,.15);
-    background:#fff;display:inline-flex;align-items:center;justify-content:center;
-    cursor:pointer;transition:all .15s;font-size:13px;text-decoration:none;color:#64748b;
-  }
+  .action-btn{width:30px;height:30px;border-radius:8px;border:1px solid rgba(0,86,179,.15);background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;font-size:13px;text-decoration:none;color:#64748b;}
   .action-btn:hover{background:var(--blue-lite);border-color:var(--blue);color:var(--blue);}
   .action-btn.del:hover{background:#fef2f2;border-color:#ef4444;color:#ef4444;}
-  .type-badge{
-    display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;
-    font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
-    background:#f1f5f9;color:#64748b;
-  }
-  .status-pill{
-    display:inline-flex;align-items:center;padding:3px 10px;border-radius:99px;
-    font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
-  }
-  .dash-btn-primary{
-    background:var(--blue);color:#fff;border:none;border-radius:10px;
-    padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;
-    font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
-    transition:opacity .15s,transform .15s;text-decoration:none;
-  }
+  .type-badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:#f1f5f9;color:#64748b;}
+  .status-pill{display:inline-flex;align-items:center;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;}
+  .dash-btn-primary{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s,transform .15s;text-decoration:none;}
   .dash-btn-primary:hover{opacity:.87;transform:translateY(-1px);color:#fff;}
   .dash-btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;}
-  .dash-btn-ghost{
-    background:#fff;border:1px solid rgba(0,86,179,.15);color:#0056b3;
-    border-radius:10px;padding:8px 16px;font-size:13px;font-weight:600;
-    cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
-    transition:all .15s;text-decoration:none;
-  }
+  .dash-btn-ghost{background:#fff;border:1px solid rgba(0,86,179,.15);color:#0056b3;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;transition:all .15s;text-decoration:none;}
   .dash-btn-ghost:hover{background:var(--blue-lite);color:var(--blue);}
-  /* Modal */
-  .dash-modal-overlay{
-    position:fixed;inset:0;background:rgba(15,23,42,.45);
-    backdrop-filter:blur(4px);z-index:1055;
-    display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;
-  }
-  .dash-modal{
-    background:#fff;border-radius:20px;width:100%;max-width:680px;
-    box-shadow:0 24px 64px rgba(0,0,0,.18);overflow:hidden;
-    display:flex;flex-direction:column;max-height:calc(100vh - 32px);
-    animation:fadeUp .25s ease;
-  }
+  .dash-modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(4px);z-index:1055;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;}
+  .dash-modal{background:#fff;border-radius:20px;width:100%;max-width:680px;box-shadow:0 24px 64px rgba(0,0,0,.18);overflow:hidden;display:flex;flex-direction:column;max-height:calc(100vh - 32px);animation:fadeUp .25s ease;}
   .dash-modal-hdr{padding:22px 24px 18px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;}
   .dash-modal-body{overflow-y:auto;padding:22px 24px;flex:1;}
   .dash-modal-ftr{padding:16px 24px;border-top:1px solid #f1f5f9;display:flex;gap:10px;justify-content:flex-end;}
   .form-lbl{font-size:11px;font-weight:700;color:#64748b;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;display:block;}
-  .form-ctrl{
-    width:100%;border:1px solid rgba(0,86,179,.15);border-radius:10px;
-    padding:9px 13px;font-size:13px;color:#1e293b;outline:none;
-    font-family:'DM Sans',sans-serif;background:#f8faff;
-    transition:border-color .2s,box-shadow .2s;
-  }
+  .form-ctrl{width:100%;border:1px solid rgba(0,86,179,.15);border-radius:10px;padding:9px 13px;font-size:13px;color:#1e293b;outline:none;font-family:'DM Sans',sans-serif;background:#f8faff;transition:border-color .2s,box-shadow .2s;}
   .form-ctrl:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
   .form-ctrl:disabled{opacity:.6;cursor:not-allowed;}
   .form-ctrl option{background:#fff;}
-  /* Bottom nav */
-  .instructor-bottom-nav{
-    position:fixed;bottom:0;left:0;right:0;height:64px;
-    background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);
-    border-top:1px solid rgba(0,86,179,0.10);
-    display:flex;align-items:stretch;z-index:1030;
-    box-shadow:0 -4px 24px rgba(0,86,179,0.08);
-  }
-  .bnav-item{
-    flex:1;display:flex;flex-direction:column;align-items:center;
-    justify-content:center;font-size:10px;font-weight:600;gap:3px;
-    text-decoration:none;transition:color .2s;
-  }
-  .bnav-item i{font-size:19px;}
-  @media(max-width:991px){
-    .hide-mobile{display:none!important;}
-  }
+  /* Bottom nav — 5 items */
+  .instructor-bottom-nav{position:fixed;bottom:0;left:0;right:0;height:64px;background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);border-top:1px solid rgba(0,86,179,0.10);display:flex;align-items:stretch;z-index:1030;box-shadow:0 -4px 24px rgba(0,86,179,0.08);}
+  .bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;font-weight:600;gap:2px;text-decoration:none;transition:color .2s;}
+  .bnav-item i{font-size:18px;}
+  /* Pagination */
+  .pagination-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,86,179,.15);background:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;color:#64748b;}
+  .pagination-btn:hover{background:var(--blue-lite);border-color:var(--blue);color:var(--blue);}
+  .pagination-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .pagination-btn:disabled{opacity:.4;cursor:not-allowed;}
+  @media(max-width:991px){.hide-mobile{display:none!important;}}
   @media(max-width:576px){
-    .stat-chip{min-width:calc(50% - 8px);}
+    .stat-chip{min-width:calc(50% - 6px);}
+    .page-hdr-actions{flex-wrap:wrap;}
   }
 `;
 
-/* ─── Bottom Nav ─────────────────────────────────────────────────────────── */
+/* ─── 5-item Bottom Nav — both Courses AND Exams visible ─── */
 const InstructorBottomNav = ({ active }) => {
   const items = [
     { to: "/instructor",                  icon: "bi-speedometer2",      label: "Home"     },
+    { to: "/instructor/courses",          icon: "bi-book",              label: "Courses"  },
     { to: "/instructor/exams",            icon: "bi-file-earmark-text", label: "Exams"    },
     { to: "/instructor/students",         icon: "bi-people",            label: "Students" },
     { to: "/instructor/account-settings", icon: "bi-gear",              label: "Settings" },
@@ -192,7 +119,10 @@ const InstructorBottomNav = ({ active }) => {
     <nav className="instructor-bottom-nav d-lg-none">
       {items.map(({ to, icon, label }) => (
         <Link key={to} to={to} className="bnav-item"
-          style={{ color: active === label ? "#0056b3" : "#94a3b8", borderTop: active === label ? "2px solid #0056b3" : "2px solid transparent" }}>
+          style={{
+            color: active === label ? "#0056b3" : "#94a3b8",
+            borderTop: active === label ? "2px solid #0056b3" : "2px solid transparent",
+          }}>
           <i className={`bi ${icon}`}></i>
           {label}
         </Link>
@@ -201,12 +131,43 @@ const InstructorBottomNav = ({ active }) => {
   );
 };
 
+/* ─── Pagination ─── */
+const Pagination = ({ total, page, perPage, onChange }) => {
+  const totalPages = Math.ceil(total / perPage);
+  if (totalPages <= 1) return null;
+  const pages = [];
+  for (let i = 1; i <= totalPages; i++) pages.push(i);
+  const visible = pages.filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center", padding: "12px 16px", borderTop: "1px solid #f1f5f9" }}>
+      <button className="pagination-btn" disabled={page === 1} onClick={() => onChange(page - 1)}>
+        <i className="bi bi-chevron-left" style={{ fontSize: 11 }}></i>
+      </button>
+      {visible.map((p, idx) => {
+        const prev = visible[idx - 1];
+        return (
+          <React.Fragment key={p}>
+            {prev && p - prev > 1 && <span style={{ color: "#94a3b8", fontSize: 13 }}>…</span>}
+            <button className={`pagination-btn ${p === page ? "active" : ""}`} onClick={() => onChange(p)}>{p}</button>
+          </React.Fragment>
+        );
+      })}
+      <button className="pagination-btn" disabled={page === totalPages} onClick={() => onChange(page + 1)}>
+        <i className="bi bi-chevron-right" style={{ fontSize: 11 }}></i>
+      </button>
+      <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: 4 }}>
+        {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
+      </span>
+    </div>
+  );
+};
+
 /* ════════════════════════════════════════════════════════════════════════════
    MAIN PAGE
 ════════════════════════════════════════════════════════════════════════════ */
 const ExamPage = () => {
-  const navigate  = useNavigate();
-  const location  = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const [user,          setUser]          = useState(null);
   const [loading,       setLoading]       = useState(true);
@@ -214,7 +175,7 @@ const ExamPage = () => {
   const [courses,       setCourses]       = useState([]);
   const [exams,         setExams]         = useState([]);
   const [showExamModal, setShowExamModal] = useState(false);
-  const [displayCount,  setDisplayCount]  = useState(20);
+  const [page,          setPage]          = useState(1);
   const [searchQuery,   setSearchQuery]   = useState("");
   const [statusFilter,  setStatusFilter]  = useState("all");
 
@@ -244,6 +205,9 @@ const ExamPage = () => {
     fetchData();
   }, []);
 
+  // Reset page when filters change
+  useEffect(() => { setPage(1); }, [searchQuery, statusFilter]);
+
   const stats = useMemo(() => ({
     total:     exams.length,
     active:    exams.filter(e => e.status === "active").length,
@@ -267,6 +231,8 @@ const ExamPage = () => {
     return list;
   }, [exams, searchQuery, statusFilter]);
 
+  const paginatedExams = filteredExams.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const handleDeleteExam = async (examId) => {
     const result = await Swal.fire({
       title: "Delete this exam?", text: "This cannot be undone.", icon: "warning",
@@ -282,9 +248,7 @@ const ExamPage = () => {
     }
   };
 
-  const isActive = (to) =>
-    to === "/instructor" ? location.pathname === to : location.pathname.startsWith(to);
-
+  const isActive  = (to) => to === "/instructor" ? location.pathname === to : location.pathname.startsWith(to);
   const initial   = user?.name?.charAt(0)?.toUpperCase() ?? "I";
   const firstName = user?.name?.split(" ")[0] ?? "Instructor";
 
@@ -330,7 +294,6 @@ const ExamPage = () => {
         </div>
 
         <div className="d-flex">
-
           {/* ── Sidebar ── */}
           <nav className="glass-sidebar d-none d-lg-flex flex-column align-items-center py-4 gap-1"
             style={{ width: 80, minHeight: "calc(100vh - 56px)", position: "sticky", top: 56, alignSelf: "flex-start", flexShrink: 0 }}>
@@ -342,7 +305,7 @@ const ExamPage = () => {
           </nav>
 
           {/* ── Main ── */}
-          <main style={{ flex: 1, padding: "24px 20px", paddingBottom: 100, minWidth: 0 }}>
+          <main style={{ flex: 1, padding: "20px 16px", paddingBottom: 90, minWidth: 0 }}>
 
             {/* Mobile search */}
             <div className="d-lg-none mb-3" style={{ position: "relative" }}>
@@ -352,31 +315,33 @@ const ExamPage = () => {
             </div>
 
             {/* Page header */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+            <div className="page-hdr-actions" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, gap: 10 }}>
               <div>
-                <p style={{ margin: 0, fontSize: 13, color: "#94a3b8", fontWeight: 500 }}>Management</p>
-                <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#0f172a", letterSpacing: "-.5px" }}>Exam Management</h1>
-                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>Create and manage your exams</p>
+                <p style={{ margin: 0, fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Management</p>
+                <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: "-.4px" }}>Exam Management</h1>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: "#64748b" }}>Create and manage your exams</p>
               </div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <Link to="/instructor/courses" className="dash-btn-ghost">
-                  <i className="bi bi-book"></i> Manage Courses
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", flexShrink: 0 }}>
+                <Link to="/instructor/courses" className="dash-btn-ghost" style={{ fontSize: 12, padding: "7px 12px" }}>
+                  <i className="bi bi-book"></i>
+                  <span className="d-none d-sm-inline"> Courses</span>
                 </Link>
-                <button className="dash-btn-primary" onClick={() => setShowExamModal(true)}>
-                  <i className="bi bi-plus-circle"></i> New Exam
+                <button className="dash-btn-primary" style={{ fontSize: 12, padding: "7px 12px" }} onClick={() => setShowExamModal(true)}>
+                  <i className="bi bi-plus-circle"></i>
+                  <span className="d-none d-sm-inline"> New Exam</span>
                 </button>
               </div>
             </div>
 
             {dataLoading ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 64, borderRadius: 14 }} />)}
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {[1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 60, borderRadius: 14 }} />)}
               </div>
             ) : (
               <>
                 {/* Stat Chips */}
-                <div className="dash-card fade-up" style={{ padding: "16px 20px", marginBottom: 16 }}>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <div className="dash-card fade-up" style={{ padding: "14px 16px", marginBottom: 14 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                     {STAT_TABS(stats).map(({ key, label, value, color, bg, icon }) => {
                       const sel = statusFilter === key;
                       return (
@@ -384,17 +349,17 @@ const ExamPage = () => {
                           className={`stat-chip ${sel ? "selected" : ""}`}
                           style={{ color, background: sel ? bg : "#f8faff" }}
                           onClick={() => setStatusFilter(sel && key !== "all" ? "all" : key)}>
-                          <div style={{ width: 36, height: 36, borderRadius: 10, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <i className={`bi ${icon}`} style={{ color, fontSize: 16 }}></i>
+                          <div style={{ width: 32, height: 32, borderRadius: 8, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <i className={`bi ${icon}`} style={{ color, fontSize: 14 }}></i>
                           </div>
                           <div>
-                            <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color, lineHeight: 1 }}>{value}</p>
-                            <p style={{ margin: "2px 0 0", fontSize: 11, fontWeight: 600, color, opacity: .75 }}>{label}</p>
+                            <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color, lineHeight: 1 }}>{value}</p>
+                            <p style={{ margin: "2px 0 0", fontSize: 10, fontWeight: 600, color, opacity: .75 }}>{label}</p>
                           </div>
                         </div>
                       );
                     })}
-                    <span style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8", paddingLeft: 8, whiteSpace: "nowrap" }}>
+                    <span style={{ marginLeft: "auto", fontSize: 11, color: "#94a3b8", paddingLeft: 6, whiteSpace: "nowrap" }}>
                       {filteredExams.length} of {exams.length} shown
                     </span>
                   </div>
@@ -402,12 +367,12 @@ const ExamPage = () => {
 
                 {/* Exams Table */}
                 <div className="dash-card fade-up">
-                  <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
+                  <div style={{ padding: "14px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
                       <i className="bi bi-file-earmark-text me-2" style={{ color: "#0056b3" }}></i>All Exams
                     </h2>
                     {filteredExams.length === 0 && exams.length > 0 && (
-                      <button className="dash-btn-ghost" style={{ padding: "6px 12px", fontSize: 12 }}
+                      <button className="dash-btn-ghost" style={{ padding: "5px 10px", fontSize: 11 }}
                         onClick={() => { setStatusFilter("all"); setSearchQuery(""); }}>
                         <i className="bi bi-x-circle"></i> Clear filters
                       </button>
@@ -417,23 +382,23 @@ const ExamPage = () => {
                     <table className="dash-table">
                       <thead>
                         <tr>
-                          {["EXAM NAME","COURSE","TYPE","START TIME","DURATION","QUESTIONS","STATUS","ACTIONS"].map(h => (
-                            <th key={h} style={{ textAlign: h === "ACTIONS" || h === "QUESTIONS" ? "center" : "left" }}>{h}</th>
+                          {["EXAM NAME", "COURSE", "TYPE", "START TIME", "DURATION", "QS", "STATUS", "ACTIONS"].map(h => (
+                            <th key={h} style={{ textAlign: h === "ACTIONS" || h === "QS" ? "center" : "left" }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {filteredExams.length === 0 ? (
                           <tr>
-                            <td colSpan="8" style={{ textAlign: "center", padding: "48px 20px", color: "#94a3b8" }}>
-                              <i className="bi bi-file-earmark-x" style={{ fontSize: 32, display: "block", marginBottom: 10 }}></i>
-                              <span style={{ fontSize: 14 }}>
+                            <td colSpan="8" style={{ textAlign: "center", padding: "40px 20px", color: "#94a3b8" }}>
+                              <i className="bi bi-file-earmark-x" style={{ fontSize: 28, display: "block", marginBottom: 10 }}></i>
+                              <span style={{ fontSize: 13 }}>
                                 {searchQuery || statusFilter !== "all"
                                   ? "No exams match your search or filter."
                                   : "No exams yet."}
                               </span>
                               {!searchQuery && statusFilter === "all" && (
-                                <div style={{ marginTop: 14 }}>
+                                <div style={{ marginTop: 12 }}>
                                   <button className="dash-btn-primary" onClick={() => setShowExamModal(true)}>
                                     <i className="bi bi-plus-circle"></i> Create your first exam
                                   </button>
@@ -441,7 +406,7 @@ const ExamPage = () => {
                               )}
                             </td>
                           </tr>
-                        ) : filteredExams.slice(0, displayCount).map(exam => {
+                        ) : paginatedExams.map(exam => {
                           const ss = STATUS_STYLE[exam.status] || STATUS_STYLE.draft;
                           return (
                             <tr key={exam.id}>
@@ -453,26 +418,26 @@ const ExamPage = () => {
                               </td>
                               <td>
                                 <Link to={`/instructor/courses/${exam.course?.id}`}
-                                  style={{ fontSize: 12, color: "#64748b", textDecoration: "none" }}>
+                                  style={{ fontSize: 11, color: "#64748b", textDecoration: "none" }}>
                                   <i className="bi bi-folder2 me-1"></i>
                                   {exam.course?.code} — {exam.course?.name}
                                 </Link>
                               </td>
                               <td><span className="type-badge">{exam.type}</span></td>
-                              <td style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>
+                              <td style={{ fontSize: 11, color: "#64748b", whiteSpace: "nowrap" }}>
                                 {new Date(exam.start_time).toLocaleString()}
                               </td>
-                              <td style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>
-                                {exam.duration_minutes} min
+                              <td style={{ fontSize: 11, color: "#64748b", whiteSpace: "nowrap" }}>
+                                {exam.duration_minutes}m
                               </td>
-                              <td style={{ textAlign: "center", fontWeight: 700, color: "#0056b3" }}>
+                              <td style={{ textAlign: "center", fontWeight: 700, color: "#0056b3", fontSize: 13 }}>
                                 {exam.questions_count || 0}
                               </td>
                               <td>
                                 <span className="status-pill" style={{ background: ss.bg, color: ss.color }}>{ss.label}</span>
                               </td>
                               <td>
-                                <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
+                                <div style={{ display: "flex", gap: 5, justifyContent: "center" }}>
                                   <Link to={`/instructor/exams/${exam.id}`} className="action-btn" title="View">
                                     <i className="bi bi-eye"></i>
                                   </Link>
@@ -490,19 +455,15 @@ const ExamPage = () => {
                       </tbody>
                     </table>
                   </div>
-                  {filteredExams.length > displayCount && (
-                    <div style={{ padding: "14px 20px", borderTop: "1px solid #f1f5f9", textAlign: "center" }}>
-                      <button className="dash-btn-ghost" onClick={() => setDisplayCount(p => p + 20)}>
-                        Load more ({filteredExams.length - displayCount} remaining)
-                      </button>
-                    </div>
-                  )}
+                  {/* Pagination replaces the old "Load more" button */}
+                  <Pagination total={filteredExams.length} page={page} perPage={PAGE_SIZE} onChange={setPage} />
                 </div>
               </>
             )}
           </main>
         </div>
 
+        {/* FIX: 5-item nav — Courses is now visible on the Exams page */}
         <InstructorBottomNav active="Exams" />
       </div>
 
@@ -546,7 +507,7 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
       try {
         const end = new Date(new Date(updated.start_time).getTime() + updated.duration_minutes * 60000);
         const p = n => String(n).padStart(2, "0");
-        updated.end_time = `${end.getFullYear()}-${p(end.getMonth()+1)}-${p(end.getDate())}T${p(end.getHours())}:${p(end.getMinutes())}`;
+        updated.end_time = `${end.getFullYear()}-${p(end.getMonth() + 1)}-${p(end.getDate())}T${p(end.getHours())}:${p(end.getMinutes())}`;
       } catch {}
     }
     setFormData(updated);
@@ -572,9 +533,8 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
   };
 
   if (!show) return null;
-  const hasCourses = displayCourses.length > 0;
-
-  const typeOptions = ["quiz","prelim","midterm","final"];
+  const hasCourses  = displayCourses.length > 0;
+  const typeOptions = ["quiz", "prelim", "midterm", "final"];
 
   return (
     <div className="dash-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onHide(); }}>
@@ -595,15 +555,15 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
         </div>
 
         {!hasCourses && (
-          <div style={{ margin: "0 24px 0", padding: "12px 14px", background: "#fff7ed", borderRadius: 10, border: "1px solid #fed7aa", fontSize: 13, color: "#92400e", display: "flex", alignItems: "center", gap: 8, marginTop: 16 }}>
+          <div style={{ margin: "16px 24px 0", padding: "12px 14px", background: "#fff7ed", borderRadius: 10, border: "1px solid #fed7aa", fontSize: 13, color: "#92400e", display: "flex", alignItems: "center", gap: 8 }}>
             <i className="bi bi-exclamation-triangle"></i>
-            No courses yet. <Link to="/instructor/courses" style={{ fontWeight: 700, color: "#c2410c" }}>Create a course first</Link> before adding an exam.
+            No courses yet. <Link to="/instructor/courses" style={{ fontWeight: 700, color: "#c2410c" }}>Create a course first</Link>.
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
           <div className="dash-modal-body">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
               <div>
                 <label className="form-lbl">Course <span style={{ color: "#ef4444" }}>*</span></label>
                 <select className="form-ctrl" value={formData.course_id}
@@ -613,21 +573,21 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
                   {displayCourses.map(c => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
                 </select>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
                 <div>
                   <label className="form-lbl">Exam Title <span style={{ color: "#ef4444" }}>*</span></label>
                   <input type="text" className="form-ctrl" placeholder="e.g., Midterm Examination"
                     value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required disabled={submitting} />
                 </div>
-                <div style={{ minWidth: 130 }}>
+                <div style={{ minWidth: 120 }}>
                   <label className="form-lbl">Type <span style={{ color: "#ef4444" }}>*</span></label>
                   <select className="form-ctrl" value={formData.type}
                     onChange={e => setFormData({ ...formData, type: e.target.value })} required disabled={submitting}>
-                    {typeOptions.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}
+                    {typeOptions.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
                   </select>
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
                 <div>
                   <label className="form-lbl">Duration (min) <span style={{ color: "#ef4444" }}>*</span></label>
                   <input type="number" className="form-ctrl" min="1" step="1"
@@ -644,7 +604,7 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
                   <label className="form-lbl">End Time <span style={{ color: "#ef4444" }}>*</span></label>
                   <input type="datetime-local" className="form-ctrl" value={formData.end_time}
                     onChange={e => setFormData({ ...formData, end_time: e.target.value })} required disabled={submitting} />
-                  <p style={{ margin: "4px 0 0", fontSize: 11, color: "#94a3b8" }}><i className="bi bi-magic me-1"></i>Auto-set from start + duration</p>
+                  <p style={{ margin: "3px 0 0", fontSize: 10, color: "#94a3b8" }}><i className="bi bi-magic me-1"></i>Auto-set</p>
                 </div>
               </div>
               <div>

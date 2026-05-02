@@ -114,27 +114,12 @@ const AccountSettings = () => {
     navigate("/instructor/login");
   };
 
-  // Splits full name: first word = first_name, everything else = last_name (empty string if single word)
-  const splitName = (fullName) => {
-    const trimmed = fullName.trim();
-    const spaceIdx = trimmed.indexOf(" ");
-    if (spaceIdx === -1) {
-      return { first_name: trimmed, last_name: "" };
-    }
-    return {
-      first_name: trimmed.slice(0, spaceIdx),
-      last_name:  trimmed.slice(spaceIdx + 1).trim(),
-    };
-  };
-
   const handleSaveInfo = async e => {
     e.preventDefault();
     setSavingInfo(true);
     try {
-      const { first_name, last_name } = splitName(infoForm.name);
       const res = await API.put("/profile", {
-        first_name,
-        last_name,
+        name:  infoForm.name.trim(),
         email: infoForm.email,
       });
       const updated = res.data.user;
