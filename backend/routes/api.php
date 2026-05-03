@@ -18,6 +18,8 @@ use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\TypingBaselineController;
 use App\Http\Controllers\StudentDashboardController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\StudentSearchController;
+use App\Http\Controllers\StudentNotificationController;
 use Illuminate\Support\Facades\Route;
 
 // ── Public ────────────────────────────────────────────────────────────────────
@@ -112,9 +114,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/student/dashboard/exams/upcoming', [StudentDashboardController::class, 'upcomingExams']);
     Route::get('/student/dashboard/exams/active',   [StudentDashboardController::class, 'activeExam']);
     Route::get('/student/dashboard/exams/results',  [StudentDashboardController::class, 'recentResults']);
-    Route::get('/student/dashboard/announcements',  [StudentDashboardController::class, 'announcements']);
     Route::get('/student/dashboard/integrity',      [StudentDashboardController::class, 'integrityStats']);
     Route::get('/student/dashboard/score-stats',    [StudentDashboardController::class, 'scoreStats']);
+    Route::get('/student/search',                   [StudentSearchController::class, 'search']);
+
+    // ── Student: notifications ─────────────────────────────────────────────────
+    Route::get('/student/notifications',              [StudentNotificationController::class, 'index']);
+    Route::patch('/student/notifications/read-all',   [StudentNotificationController::class, 'markAllRead']);
+    Route::patch('/student/notifications/{id}/read',  [StudentNotificationController::class, 'markRead']);
 
     // ── Student: anomaly event ingestion ──────────────────────────────────────
     // Called silently by AnomalyCollector during an active exam session.

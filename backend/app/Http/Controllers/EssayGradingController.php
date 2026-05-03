@@ -6,6 +6,7 @@ use App\Models\Exam;
 use App\Models\ExamResult;
 use App\Models\ExamSubmission;
 use App\Models\Question;
+use App\Models\StudentNotification;
 use Illuminate\Http\Request;
 
 /**
@@ -96,6 +97,7 @@ class EssayGradingController extends Controller
     // ── PATCH /exams/{examId}/essays/{submissionId} ───────────────────────────
     public function grade(Request $request, int $examId, int $submissionId)
     {
+        // Verify exam ownership and fetch submission first — both are needed below
         $exam = $this->verifyOwnership($examId, $request->user()->id);
 
         $submission = ExamSubmission::where('id', $submissionId)
@@ -142,6 +144,27 @@ class EssayGradingController extends Controller
 
         $newScore = collect($newAnswers)->sum(fn ($a) => (float) ($a['points_earned'] ?? 0));
         $submission->update(['answers' => $newAnswers, 'score' => $newScore]);
+
+        // ── Notify student when all essays are graded ──
+        // $submission is now defined, so we can safely reference it here
+        $pendingEssays = \App\Models\ExamAnswer::where('submission_id', $submissionId)
+            ->whereHas('question', fn($q) => $q->where('type', 'essay'))
+            ->whereNull('points_earned')
+            ->count();
+
+        if ($pendingEssays === 0) {
+            // All essays graded — notify the student
+            $examWithCourse = \App\Models\Exam::with('course')->find($examId);
+
+            StudentNotification::create([
+                'student_id' => $submission->student_id,
+                'type'       => 'results_updated',
+                'title'      => 'Exam Results Available',
+                'body'       => "Your results for \"{$examWithCourse->title}\" in {$examWithCourse->course->name} are now available.",
+                'url'        => "/student/exams/{$examId}/results",
+                'exam_id'    => $examId,
+            ]);
+        }
 
         return response()->json([
             'message'    => 'Essays graded successfully.',

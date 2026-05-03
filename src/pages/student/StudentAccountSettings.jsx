@@ -474,15 +474,6 @@ const StudentAccountSettings = () => {
                   ))}
                 </div>
               </div>
-
-              <button
-                style={{ background:"transparent", border:"1px solid #e2e8f0", borderRadius:10, padding:"7px 14px", fontSize:12, fontWeight:600, color:"#64748b", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}
-                onClick={() => photoInput.current?.click()}
-                disabled={uploadingPhoto}
-              >
-                <i className="bi bi-camera me-2"></i>
-                {uploadingPhoto ? "Uploading…" : "Change Photo"}
-              </button>
             </div>
 
             {/* Tab bar */}
