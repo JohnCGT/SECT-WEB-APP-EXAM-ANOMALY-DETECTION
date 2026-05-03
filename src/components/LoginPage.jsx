@@ -78,34 +78,6 @@ const LoginPage = ({ role: fixedRole }) => {
     }
   };
 
-  const PasswordField = ({ id }) => (
-    <div className="auth-field">
-      <label htmlFor={id} className="auth-label">Password</label>
-      <div className="auth-input-wrap">
-        <span className="auth-input-icon"><i className="bi bi-key" /></span>
-        <input
-          id={id}
-          className="auth-input auth-input-pw-toggle"
-          type={showPassword ? "text" : "password"}
-          placeholder="Enter your password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-          disabled={loading}
-          required
-        />
-        <button
-          type="button"
-          className="auth-eye-btn"
-          onClick={() => setShowPassword(v => !v)}
-          tabIndex={-1}
-        >
-          <i className={`bi bi-eye${showPassword ? "-slash" : ""}`} />
-        </button>
-      </div>
-    </div>
-  );
-
   return (
     <>
       <style>{STYLES}</style>
@@ -129,7 +101,7 @@ const LoginPage = ({ role: fixedRole }) => {
                 autoComplete="email" disabled={loading}
                 icon={<i className="bi bi-envelope" />}
               />
-              <PasswordField id="m-password" />
+              <PasswordField id="m-password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} showPassword={showPassword} onToggle={() => setShowPassword(v => !v)} />
               <SubmitButton loading={loading} label="Sign In" loadingLabel="Signing in…" icon="bi-box-arrow-in-right" />
             </form>
 
@@ -166,7 +138,7 @@ const LoginPage = ({ role: fixedRole }) => {
                 autoComplete="email" disabled={loading}
                 icon={<i className="bi bi-envelope" />}
               />
-              <PasswordField id="password" />
+              <PasswordField id="password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} showPassword={showPassword} onToggle={() => setShowPassword(v => !v)} />
               <SubmitButton loading={loading} label="Sign In" loadingLabel="Signing in…" icon="bi-box-arrow-in-right" />
             </form>
 
@@ -184,6 +156,34 @@ const LoginPage = ({ role: fixedRole }) => {
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
+
+const PasswordField = ({ id, value, onChange, disabled, showPassword, onToggle }) => (
+  <div className="auth-field">
+    <label htmlFor={id} className="auth-label">Password</label>
+    <div className="auth-input-wrap">
+      <span className="auth-input-icon"><i className="bi bi-key" /></span>
+      <input
+        id={id}
+        className="auth-input auth-input-pw-toggle"
+        type={showPassword ? "text" : "password"}
+        placeholder="Enter your password"
+        value={value}
+        onChange={onChange}
+        autoComplete="current-password"
+        disabled={disabled}
+        required
+      />
+      <button
+        type="button"
+        className="auth-eye-btn"
+        onClick={onToggle}
+        tabIndex={-1}
+      >
+        <i className={`bi bi-eye${showPassword ? "-slash" : ""}`} />
+      </button>
+    </div>
+  </div>
+);
 
 const AuthField = ({ id, label, icon, error, ...inputProps }) => (
   <div className="auth-field">
