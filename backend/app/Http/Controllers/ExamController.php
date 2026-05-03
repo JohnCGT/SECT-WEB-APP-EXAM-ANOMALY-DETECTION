@@ -69,7 +69,7 @@ class ExamController extends Controller
             'start_time'       => $request->start_time,
             'end_time'         => $request->end_time,
             'duration_minutes' => $request->duration_minutes,
-            'status'           => $request->status ?? 'published',
+            'status'           => $request->status ?? 'draft',
         ]);
 
         // ── Notify all enrolled students ──
