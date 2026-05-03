@@ -16,18 +16,70 @@ const LOGIN_LINKS = {
   student:    "/",
 };
 
+// ─── Password helpers (ported from AccountSettings) ───────────────────────────
+
+const checkPasswordStrength = password => {
+  const checks = {
+    length:  password.length >= 8,
+    upper:   /[A-Z]/.test(password),
+    lower:   /[a-z]/.test(password),
+    number:  /[0-9]/.test(password),
+    special: /[^A-Za-z0-9]/.test(password),
+  };
+  const passed = Object.values(checks).filter(Boolean).length;
+  return { checks, passed, total: 5 };
+};
+
+const PasswordStrengthBar = ({ password }) => {
+  if (!password) return null;
+  const { checks, passed } = checkPasswordStrength(password);
+  const pct   = (passed / 5) * 100;
+  const color = passed <= 2 ? "#ef4444" : passed <= 3 ? "#f59e0b" : passed <= 4 ? "#3b82f6" : "#22c55e";
+  const label = passed <= 2 ? "Weak" : passed <= 3 ? "Fair" : passed <= 4 ? "Good" : "Strong";
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ height: 5, borderRadius: 99, background: "#f1f5f9", overflow: "hidden", marginBottom: 6 }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 99, transition: "width .3s" }} />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color }}>{label}</span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          {[
+            { key: "length",  label: "8+ chars"  },
+            { key: "upper",   label: "Uppercase"  },
+            { key: "lower",   label: "Lowercase"  },
+            { key: "number",  label: "Number"     },
+            { key: "special", label: "Special"    },
+          ].map(({ key, label }) => (
+            <span key={key} style={{
+              fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 6,
+              background: checks[key] ? "#dcfce7" : "#f1f5f9",
+              color:      checks[key] ? "#15803d" : "#94a3b8",
+            }}>
+              {checks[key] ? "✓" : "✗"} {label}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const RegisterPage = ({ role: fixedRole }) => {
   const [form, setForm] = useState({
-    name:     "",
-    email:    "",
-    password: "",
-    role:     fixedRole ?? "student",
+    name:                  "",
+    email:                 "",
+    password:              "",
+    password_confirmation: "",
+    role:                  fixedRole ?? "student",
   });
-  const [errors,  setErrors]  = useState({});
-  const [loading, setLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [errors,        setErrors]        = useState({});
+  const [loading,       setLoading]       = useState(false);
+  const [mounted,       setMounted]       = useState(false);
+  const [showPw,        setShowPw]        = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => { setMounted(true); }, []);
@@ -43,6 +95,22 @@ const RegisterPage = ({ role: fixedRole }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // ── Client-side password guards (same logic as AccountSettings) ──
+    if (form.password !== form.password_confirmation) {
+      Swal.fire("Mismatch", "New passwords do not match.", "warning");
+      return;
+    }
+    const { passed } = checkPasswordStrength(form.password);
+    if (passed < 5) {
+      Swal.fire(
+        "Weak Password",
+        "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
+        "warning"
+      );
+      return;
+    }
+
     setLoading(true);
     setErrors({});
 
@@ -50,10 +118,11 @@ const RegisterPage = ({ role: fixedRole }) => {
       await fetchCsrfToken();
 
       const { data } = await API.post("/register", {
-        name:     form.name.trim(),
-        email:    form.email.trim().toLowerCase(),
-        password: form.password,
-        role:     fixedRole ?? form.role,
+        name:                  form.name.trim(),
+        email:                 form.email.trim().toLowerCase(),
+        password:              form.password,
+        password_confirmation: form.password_confirmation,
+        role:                  fixedRole ?? form.role,
       });
 
       const { user } = data;
@@ -103,13 +172,77 @@ const RegisterPage = ({ role: fixedRole }) => {
         autoComplete="email" error={errors.email?.[0]}
         disabled={loading} icon={<i className="bi bi-envelope" />}
       />
-      <AuthField
-        id={`${idPrefix}password`} label="Password" type="password" name="password"
-        placeholder="Min 8 chars · upper · lower · number · special"
-        value={form.password} onChange={handleChange}
-        autoComplete="new-password" error={errors.password?.[0]}
-        disabled={loading} icon={<i className="bi bi-key" />}
-      />
+
+      {/* ── Password with strength bar ── */}
+      <div className="auth-field">
+        <label htmlFor={`${idPrefix}password`} className="auth-label">Password</label>
+        <div className="auth-input-wrap">
+          <span className="auth-input-icon"><i className="bi bi-key" /></span>
+          <input
+            id={`${idPrefix}password`}
+            name="password"
+            type={showPw ? "text" : "password"}
+            className={`auth-input auth-input-pw-toggle ${errors.password ? "auth-input-error" : ""}`}
+            placeholder="Min 8 chars · upper · lower · number · special"
+            value={form.password}
+            onChange={handleChange}
+            autoComplete="new-password"
+            required
+            disabled={loading}
+          />
+          <button
+            type="button"
+            className="auth-eye-btn"
+            onClick={() => setShowPw(v => !v)}
+            tabIndex={-1}
+          >
+            <i className={`bi bi-eye${showPw ? "-slash" : ""}`} />
+          </button>
+        </div>
+        {errors.password && <span className="auth-error-msg">{errors.password[0]}</span>}
+        <PasswordStrengthBar password={form.password} />
+      </div>
+
+      {/* ── Confirm Password ── */}
+      <div className="auth-field">
+        <label htmlFor={`${idPrefix}password_confirmation`} className="auth-label">Confirm Password</label>
+        <div className="auth-input-wrap">
+          <span className="auth-input-icon"><i className="bi bi-key-fill" /></span>
+          <input
+            id={`${idPrefix}password_confirmation`}
+            name="password_confirmation"
+            type={showConfirmPw ? "text" : "password"}
+            className={`auth-input auth-input-pw-toggle ${
+              form.password_confirmation && form.password !== form.password_confirmation
+                ? "auth-input-error"
+                : ""
+            }`}
+            placeholder="Repeat new password"
+            value={form.password_confirmation}
+            onChange={handleChange}
+            autoComplete="new-password"
+            required
+            disabled={loading}
+          />
+          <button
+            type="button"
+            className="auth-eye-btn"
+            onClick={() => setShowConfirmPw(v => !v)}
+            tabIndex={-1}
+          >
+            <i className={`bi bi-eye${showConfirmPw ? "-slash" : ""}`} />
+          </button>
+        </div>
+        {form.password_confirmation && (
+          <p style={{
+            margin: "4px 0 0", fontSize: 11, fontWeight: 600,
+            color: form.password === form.password_confirmation ? "#22c55e" : "#ef4444",
+          }}>
+            <i className={`bi bi-${form.password === form.password_confirmation ? "check" : "x"}-circle me-1`} />
+            {form.password === form.password_confirmation ? "Passwords match" : "Passwords do not match"}
+          </p>
+        )}
+      </div>
 
       {/* Role selector — only shown when role is not pre-set */}
       {!fixedRole && (
@@ -612,6 +745,18 @@ const STYLES = `
     border-color: var(--blue);
     box-shadow: 0 0 0 3px rgba(0,86,179,.10);
   }
+
+  /* Extra right padding so text doesn't run under the eye button */
+  .auth-input-pw-toggle { padding-right: 2.6rem; }
+
+  .auth-eye-btn {
+    position: absolute; right: 12px;
+    background: none; border: none; cursor: pointer;
+    color: var(--slate-lt); font-size: 15px;
+    padding: 0; display: flex; align-items: center;
+    transition: color .2s;
+  }
+  .auth-eye-btn:hover { color: var(--blue); }
 
   .auth-select { cursor: pointer; }
 
