@@ -27,10 +27,11 @@ const toastMixin = Swal.mixin({
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const LoginPage = ({ role: fixedRole }) => {
-  const [email,    setEmail]    = useState("");
-  const [password, setPassword] = useState("");
-  const [loading,  setLoading]  = useState(false);
-  const [mounted,  setMounted]  = useState(false);
+  const [email,        setEmail]        = useState("");
+  const [password,     setPassword]     = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading,      setLoading]      = useState(false);
+  const [mounted,      setMounted]      = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => { setMounted(true); }, []);
@@ -54,14 +55,13 @@ const LoginPage = ({ role: fixedRole }) => {
       const { user } = data;
 
       if (fixedRole && user.role !== fixedRole) {
-        // Destroy the server session immediately so no lingering auth exists
         try { await API.post("/logout"); } catch (_) {}
 
         await Swal.fire({
           icon: "error", title: "Access Denied",
           text: `This login page is for ${fixedRole}s only.`,
         });
-        return; // Stays on the current page, no redirect
+        return;
       }
 
       await toastMixin.fire({ icon: "success", title: `Welcome back, ${user.name}!` });
@@ -77,6 +77,34 @@ const LoginPage = ({ role: fixedRole }) => {
       setLoading(false);
     }
   };
+
+  const PasswordField = ({ id }) => (
+    <div className="auth-field">
+      <label htmlFor={id} className="auth-label">Password</label>
+      <div className="auth-input-wrap">
+        <span className="auth-input-icon"><i className="bi bi-key" /></span>
+        <input
+          id={id}
+          className="auth-input auth-input-pw-toggle"
+          type={showPassword ? "text" : "password"}
+          placeholder="Enter your password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+          disabled={loading}
+          required
+        />
+        <button
+          type="button"
+          className="auth-eye-btn"
+          onClick={() => setShowPassword(v => !v)}
+          tabIndex={-1}
+        >
+          <i className={`bi bi-eye${showPassword ? "-slash" : ""}`} />
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -101,13 +129,7 @@ const LoginPage = ({ role: fixedRole }) => {
                 autoComplete="email" disabled={loading}
                 icon={<i className="bi bi-envelope" />}
               />
-              <AuthField
-                id="m-password" label="Password" type="password"
-                placeholder="Enter your password"
-                value={password} onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password" disabled={loading}
-                icon={<i className="bi bi-key" />}
-              />
+              <PasswordField id="m-password" />
               <SubmitButton loading={loading} label="Sign In" loadingLabel="Signing in…" icon="bi-box-arrow-in-right" />
             </form>
 
@@ -144,13 +166,7 @@ const LoginPage = ({ role: fixedRole }) => {
                 autoComplete="email" disabled={loading}
                 icon={<i className="bi bi-envelope" />}
               />
-              <AuthField
-                id="password" label="Password" type="password"
-                placeholder="Enter your password"
-                value={password} onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password" disabled={loading}
-                icon={<i className="bi bi-key" />}
-              />
+              <PasswordField id="password" />
               <SubmitButton loading={loading} label="Sign In" loadingLabel="Signing in…" icon="bi-box-arrow-in-right" />
             </form>
 
@@ -169,7 +185,6 @@ const LoginPage = ({ role: fixedRole }) => {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-/** Reusable labeled input with left icon. */
 const AuthField = ({ id, label, icon, error, ...inputProps }) => (
   <div className="auth-field">
     <label htmlFor={id} className="auth-label">{label}</label>
@@ -186,7 +201,6 @@ const AuthField = ({ id, label, icon, error, ...inputProps }) => (
   </div>
 );
 
-/** Loading-aware submit button. */
 const SubmitButton = ({ loading, label, loadingLabel, icon }) => (
   <button type="submit" className="auth-btn" disabled={loading}>
     {loading ? (
@@ -197,7 +211,6 @@ const SubmitButton = ({ loading, label, loadingLabel, icon }) => (
   </button>
 );
 
-/** Mobile-only top hero bar with branding. */
 const MobileHeader = () => (
   <div className="mobile-hero">
     <div className="mobile-hero-inner">
@@ -224,7 +237,6 @@ const MobileHeader = () => (
   </div>
 );
 
-/** Wrapper card used only in the mobile layout. */
 const FormCard = ({ roleLabel, badgeIcon, badgeSuffix, title, subtitle, children }) => (
   <div className="mobile-card">
     <div className="auth-form-header">
@@ -239,7 +251,6 @@ const FormCard = ({ roleLabel, badgeIcon, badgeSuffix, title, subtitle, children
   </div>
 );
 
-/** Desktop left branding panel. */
 const BrandPanel = () => (
   <div className="auth-brand-panel">
     <div className="auth-brand-inner">
@@ -596,6 +607,17 @@ const STYLES = `
     border-color: var(--blue);
     box-shadow: 0 0 0 3px rgba(0,86,179,.10);
   }
+
+  .auth-input-pw-toggle { padding-right: 2.6rem; }
+
+  .auth-eye-btn {
+    position: absolute; right: 12px;
+    background: none; border: none; cursor: pointer;
+    color: var(--slate-lt); font-size: 15px;
+    padding: 0; display: flex; align-items: center;
+    transition: color .2s;
+  }
+  .auth-eye-btn:hover { color: var(--blue); }
 
   .auth-input-error { border-color: #ef4444 !important; }
   .auth-error-msg   { font-size: .78rem; color: #ef4444; }
