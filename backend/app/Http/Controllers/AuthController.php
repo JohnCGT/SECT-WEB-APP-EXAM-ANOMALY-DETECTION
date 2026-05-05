@@ -225,15 +225,30 @@ class AuthController extends Controller
      */
     private function formatUser(User $user): array
     {
+        if ($user->role === 'student') {
+            $user->loadMissing('enrolledCourses.instructor');
+        }
+
         return [
-            'id'         => $user->id,
-            'name'       => $user->name,
-            'email'      => $user->email,
-            'role'       => $user->role,
-            'status'     => $user->status ?? 'active',
-            'phone'      => $user->phone,
-            'course'     => $user->course,
-            'year_level' => $user->year_level,
+            'id'                => $user->id,
+            'name'              => $user->name,
+            'email'             => $user->email,
+            'role'              => $user->role,
+            'status'            => $user->status ?? 'active',
+            'phone'             => $user->phone,
+            'course'            => $user->course,
+            'year_level'        => $user->year_level,
+            'student_id'        => $user->student_id ?? null,
+            'profile_photo_url' => $user->profile_photo_url ?? null,
+            'enrollments'       => $user->role === 'student'
+                ? $user->enrolledCourses->map(fn($c) => [
+                    'id'         => $c->id,
+                    'code'       => $c->code,
+                    'name'       => $c->name,
+                    'instructor' => $c->instructor->name ?? null,
+                    'status'     => 'Active',
+                ])->values()->toArray()
+                : [],
         ];
     }
 }

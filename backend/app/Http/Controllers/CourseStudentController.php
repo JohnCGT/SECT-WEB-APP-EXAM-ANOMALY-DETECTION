@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Course;
+use App\Models\StudentNotification;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -30,6 +31,8 @@ class CourseStudentController extends Controller
 
     /**
      * Enroll an existing student OR create a new student account and enroll them.
+     * After enrollment, a 'new_subject' notification is sent to the student so
+     * it appears in their dashboard notification bell.
      */
     public function store(Request $request, $courseId)
     {
@@ -47,7 +50,10 @@ class CourseStudentController extends Controller
             'password'  => ['required_if:mode,new', 'nullable', 'string', 'min:8'],
         ]);
 
+        $instructor = $request->user();
+
         if ($data['mode'] === 'existing') {
+            // ── Enroll an existing student ──────────────────────────────────
             $student = User::where('email', $data['email'])
                 ->where('role', 'student')
                 ->first();
@@ -66,8 +72,18 @@ class CourseStudentController extends Controller
 
             $course->students()->attach($student->id, ['enrolled_at' => now()]);
 
+            // Notify the student that they have been enrolled in a new subject
+            StudentNotification::create([
+                'student_id' => $student->id,
+                'type'       => 'new_subject',
+                'title'      => "Enrolled in {$course->name}",
+                'body'       => "{$instructor->name} added you to this subject.",
+                'url'        => null,
+                'is_read'    => false,
+            ]);
+
         } else {
-            // Create a new student user account
+            // ── Create a brand-new student account and enroll them ──────────
             $student = User::create([
                 'name'     => $data['name'],
                 'email'    => $data['new_email'],
@@ -76,6 +92,16 @@ class CourseStudentController extends Controller
             ]);
 
             $course->students()->attach($student->id, ['enrolled_at' => now()]);
+
+            // Notify the newly created student that they have been enrolled
+            StudentNotification::create([
+                'student_id' => $student->id,
+                'type'       => 'new_subject',
+                'title'      => "Enrolled in {$course->name}",
+                'body'       => "{$instructor->name} added you to this subject.",
+                'url'        => null,
+                'is_read'    => false,
+            ]);
         }
 
         return response()->json([

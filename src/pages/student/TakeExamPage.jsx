@@ -133,6 +133,34 @@ const GLOBAL_CSS = `
   .fade-up{animation:fadeUp .25s ease both;}
 `;
 
+// ── Helpers for persisting exam progress in localStorage ──────────────────────
+const getStorageKey = (examId) => `exam_progress_${examId}`;
+
+const loadProgress = (examId) => {
+  try {
+    const raw = localStorage.getItem(getStorageKey(examId));
+    if (!raw) return null;
+    return JSON.parse(raw); // { answers, currentIdx }
+  } catch {
+    return null;
+  }
+};
+
+const saveProgress = (examId, answers, currentIdx) => {
+  try {
+    localStorage.setItem(getStorageKey(examId), JSON.stringify({ answers, currentIdx }));
+  } catch {
+    // localStorage full or unavailable — silently ignore
+  }
+};
+
+const clearProgress = (examId) => {
+  try {
+    localStorage.removeItem(getStorageKey(examId));
+  } catch {}
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 const TakeExamPage = () => {
   const { examId } = useParams();
   const navigate   = useNavigate();
@@ -141,8 +169,13 @@ const TakeExamPage = () => {
   const [submitting, setSubmitting]     = useState(false);
   const [exam, setExam]                 = useState(null);
   const [questions, setQuestions]       = useState([]);
-  const [answers, setAnswers]           = useState({});
-  const [currentIdx, setCurrentIdx]     = useState(0);
+
+  // ── Restore answers and currentIdx from localStorage on first render ──────
+  const savedProgress = loadProgress(examId);
+  const [answers, setAnswers]       = useState(savedProgress?.answers     ?? {});
+  const [currentIdx, setCurrentIdx] = useState(savedProgress?.currentIdx  ?? 0);
+  // ─────────────────────────────────────────────────────────────────────────
+
   const [timeLeft, setTimeLeft]         = useState(null);
   const [showNav, setShowNav]           = useState(false);
 
@@ -154,6 +187,12 @@ const TakeExamPage = () => {
   const timerRef     = useRef(null);
   const collectorRef = useRef(null);
   const essayRefs    = useRef({});
+
+  // ── Persist answers + currentIdx whenever they change ────────────────────
+  useEffect(() => {
+    saveProgress(examId, answers, currentIdx);
+  }, [examId, answers, currentIdx]);
+  // ─────────────────────────────────────────────────────────────────────────
 
   const handleAnomalyWarning = useCallback((type, severity) => {
     if (type === "keyboard_shortcut") return;
@@ -183,7 +222,17 @@ const TakeExamPage = () => {
 
       collectorRef.current = new AnomalyCollector({ examId:parseInt(examId), apiBaseUrl:"/api", onWarning:handleAnomalyWarning });
       collectorRef.current.start();
-      if (qs.length > 0) collectorRef.current.setCurrentQuestion(qs[0].id);
+
+      // ── On refresh: restore the question the student was on ──────────────
+      // We read from the ref instead of state to get the latest value
+      // synchronously right after questions have been set.
+      const saved = loadProgress(examId);
+      const restoredIdx = saved?.currentIdx ?? 0;
+      const safeIdx = Math.min(restoredIdx, qs.length - 1);
+
+      if (qs.length > 0) collectorRef.current.setCurrentQuestion(qs[safeIdx].id);
+      // ────────────────────────────────────────────────────────────────────
+
       for (const [qId, el] of Object.entries(essayRefs.current)) {
         if (el) collectorRef.current.attachToAnswerField(el, parseInt(qId));
       }
@@ -291,6 +340,9 @@ const TakeExamPage = () => {
     collectorRef.current?.stop();
     try {
       await API.post(`/student/exams/${examId}/submit`, { answers });
+      // ── Clear persisted progress on successful submission ──────────────
+      clearProgress(examId);
+      // ──────────────────────────────────────────────────────────────────
       Swal.fire({ title:"Submitted!", text:"Your exam has been submitted successfully.", icon:"success",
         confirmButtonText:"View Results", confirmButtonColor:"#22c55e" })
         .then(() => navigate(`/student/exams/${examId}/results`));
