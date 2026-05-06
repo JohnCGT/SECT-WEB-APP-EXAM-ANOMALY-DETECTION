@@ -876,8 +876,8 @@ const SubjectPage = () => {
       setNotifOpen(false);
       let finalUrl = notif.url;
       if (notif.type === "new_exam")         finalUrl = `${notif.url}/take`;
-      else if (notif.type === "results_updated") finalUrl = `${notif.url}/results`;
-      else if (notif.type === "score_updated")   finalUrl = `${notif.url}/results`;
+      // else if (notif.type === "results_updated") finalUrl = `${notif.url}/results`;
+      // else if (notif.type === "score_updated")   finalUrl = `${notif.url}/results`;
       else if (notif.type === "new_subject")     finalUrl = "/student/subjects";
       navigate(finalUrl);
     }

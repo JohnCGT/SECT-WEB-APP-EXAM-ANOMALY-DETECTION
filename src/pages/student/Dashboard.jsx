@@ -797,8 +797,8 @@ const Dashboard = () => {
       setNotifOpen(false);
       if (notif.type === "new_subject")         { navigate("/student/subjects"); return; }
       if (notif.type === "new_exam")             { navigate(`${notif.url}/take`); return; }
-      if (notif.type === "results_updated")      { navigate(`${notif.url}/results`); return; }
-      if (notif.type === "score_updated")        { navigate(`${notif.url}/results`); return; }
+      // if (notif.type === "results_updated")      { navigate(`${notif.url}/results`); return; }
+      // if (notif.type === "score_updated")        { navigate(`${notif.url}/results`); return; }
       if (notif.url)                             { navigate(notif.url); }
     }
   };
