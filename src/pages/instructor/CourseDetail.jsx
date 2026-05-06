@@ -43,20 +43,17 @@ const SHARED_CSS = `
   .dash-avatar{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
   @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   .fade-up{animation:fadeUp .4s ease both;}
-  /* Tabs */
   .dash-tabs{display:flex;gap:4px;border-bottom:2px solid #f1f5f9;margin-bottom:20px;overflow-x:auto;scrollbar-width:none;padding-bottom:0;}
   .dash-tabs::-webkit-scrollbar{display:none;}
   .dash-tab{padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:color .15s,border-color .15s;border-radius:8px 8px 0 0;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:6px;}
   .dash-tab:hover{color:#0056b3;background:#f8faff;}
   .dash-tab.active{color:#0056b3;border-bottom-color:#0056b3;background:#e8f0fe;}
-  /* Table */
   .dash-table{width:100%;border-collapse:collapse;font-family:'DM Sans',sans-serif;}
   .dash-table th{padding:10px 14px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.06em;white-space:nowrap;border-bottom:1px solid #f1f5f9;background:#f8faff;text-align:left;}
   .dash-table td{padding:11px 14px;border-bottom:1px solid #f1f5f9;vertical-align:middle;font-size:13px;}
   .dash-table tbody tr{transition:background .15s;}
   .dash-table tbody tr:hover{background:#f8faff;}
   .dash-table tbody tr:last-child td{border-bottom:none;}
-  /* Buttons */
   .dash-btn-primary{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s,transform .15s;text-decoration:none;}
   .dash-btn-primary:hover{opacity:.87;transform:translateY(-1px);color:#fff;}
   .dash-btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;}
@@ -67,14 +64,10 @@ const SHARED_CSS = `
   .action-btn{width:30px;height:30px;border-radius:8px;border:1px solid rgba(0,86,179,.12);background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;font-size:13px;text-decoration:none;color:#64748b;}
   .action-btn:hover{background:var(--blue-lite);border-color:var(--blue);color:var(--blue);}
   .action-btn.del:hover{background:#fef2f2;border-color:#ef4444;color:#ef4444;}
-  /* Badge */
   .badge-pill{display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;}
-  /* Stat grid */
   .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:18px;}
   .stat-mini{background:#fff;border-radius:14px;border:1px solid rgba(0,86,179,.06);box-shadow:0 1px 3px rgba(0,0,0,.04);padding:12px 12px;text-align:center;}
-  /* Course header band */
   .course-hdr-band{background:rgba(255,255,255,0.90);backdrop-filter:blur(12px);border-bottom:1px solid rgba(0,86,179,.08);padding:16px 16px 0;}
-  /* Modal */
   .dash-modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(4px);z-index:1055;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;}
   .dash-modal{background:#fff;border-radius:20px;width:100%;max-width:500px;box-shadow:0 24px 64px rgba(0,0,0,.18);overflow:hidden;display:flex;flex-direction:column;max-height:calc(100vh - 32px);animation:fadeUp .25s ease;}
   .dash-modal-hdr{padding:20px 24px 16px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;}
@@ -93,11 +86,9 @@ const SHARED_CSS = `
   .mode-btn:first-child{border-right:1px solid rgba(0,86,179,.15);}
   .mode-btn.active{background:var(--blue);color:#fff;}
   .filter-pill{padding:5px 12px;border-radius:99px;font-size:11px;font-weight:700;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all .15s;}
-  /* Bottom nav — 5 items */
   .instructor-bottom-nav{position:fixed;bottom:0;left:0;right:0;height:64px;background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);border-top:1px solid rgba(0,86,179,0.10);display:flex;align-items:stretch;z-index:1030;box-shadow:0 -4px 24px rgba(0,86,179,0.08);}
   .bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;font-weight:600;gap:2px;text-decoration:none;transition:color .2s;}
   .bnav-item i{font-size:18px;}
-  /* Pagination */
   .pagination-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,86,179,.15);background:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;color:#64748b;}
   .pagination-btn:hover{background:var(--blue-lite);border-color:var(--blue);color:var(--blue);}
   .pagination-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
@@ -116,7 +107,7 @@ const SHARED_CSS = `
   }
 `;
 
-/* ─── 5-item Bottom Nav — Home · Courses · Exams · Students · Settings ─── */
+/* ─── Bottom Nav ─────────────────────────────────────────────────────────── */
 const InstructorBottomNav = ({ active }) => {
   const items = [
     { to: "/instructor",                  icon: "bi-speedometer2",      label: "Home"     },
@@ -198,7 +189,6 @@ const CourseDetail = () => {
   const [examSearch,    setExamSearch]    = useState("");
   const [examFilter,    setExamFilter]    = useState("all");
 
-  // Pagination state
   const [studentPage, setStudentPage] = useState(1);
   const [examPage,    setExamPage]    = useState(1);
 
@@ -210,7 +200,6 @@ const CourseDetail = () => {
     fetchAll();
   }, [id]);
 
-  // Reset pages when filters change
   useEffect(() => { setStudentPage(1); }, [studentSearch]);
   useEffect(() => { setExamPage(1); }, [examSearch, examFilter]);
 
@@ -265,7 +254,6 @@ const CourseDetail = () => {
     navigate("/instructor/login");
   };
 
-  /* Derived */
   const examStats = useMemo(() => ({
     total:       exams.length,
     active:      exams.filter(e => e.status === "active").length,
@@ -290,7 +278,6 @@ const CourseDetail = () => {
     return list;
   }, [exams, examFilter, examSearch]);
 
-  // Paginated slices
   const paginatedStudents = filteredStudents.slice((studentPage - 1) * PAGE_SIZE, studentPage * PAGE_SIZE);
   const paginatedExams    = filteredExams.slice((examPage - 1) * PAGE_SIZE, examPage * PAGE_SIZE);
 
@@ -389,6 +376,11 @@ const CourseDetail = () => {
                           <i className="bi bi-calendar3 me-1"></i>{course.semester}
                         </span>
                       )}
+                      {course.academic_year && (
+                        <span className="badge-pill" style={{ background: "#fefce8", color: "#92400e" }}>
+                          <i className="bi bi-mortarboard me-1"></i>AY {course.academic_year}
+                        </span>
+                      )}
                       {course.credits && (
                         <span className="badge-pill" style={{ background: "#f0f9ff", color: "#0369a1" }}>
                           <i className="bi bi-award me-1"></i>{course.credits} cr
@@ -450,7 +442,6 @@ const CourseDetail = () => {
                     ))}
                   </div>
 
-                  {/* Two-col: Recent Exams + Students — single col on mobile */}
                   <div className="overview-grid" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 14 }}>
 
                     {/* Recent Exams */}
@@ -720,7 +711,6 @@ const CourseDetail = () => {
           </main>
         </div>
 
-        {/* FIX: 5-item nav — Courses tab is visible when on ExamDetail, Exams tab visible when on CourseDetail */}
         <InstructorBottomNav active="Courses" />
       </div>
 

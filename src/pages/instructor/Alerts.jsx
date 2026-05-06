@@ -14,11 +14,17 @@ const NAV_ITEMS = [
   { to: "/instructor/account-settings", icon: "bi-gear",                 label: "Settings"  },
 ];
 
+/* Bottom nav: Dashboard, Courses, Exams, Students, Alerts — NO Settings */
+const BOTTOM_NAV = [
+  { to: "/instructor",         icon: "bi-speedometer2",         label: "Home"     },
+  { to: "/instructor/courses", icon: "bi-book",                 label: "Courses"  },
+  { to: "/instructor/exams",   icon: "bi-file-earmark-text",    label: "Exams"    },
+  { to: "/instructor/students",icon: "bi-people",               label: "Students" },
+  { to: "/instructor/alerts",  icon: "bi-exclamation-triangle", label: "Alerts"   },
+];
+
 const PAGE_SIZE = 15;
 
-/* ─── Derive alert class from API data ──────────────────────────────────── */
-// The API returns is_flagged (bool) and cpi_score (number).
-// flag_status may or may not be present — we derive from is_flagged + cpi_score.
 const getAlertClass = (s) => {
   if (s.is_flagged === true) return "flagged";
   if ((s.cpi_score ?? 0) >= 25) return "warning";
@@ -26,9 +32,9 @@ const getAlertClass = (s) => {
 };
 
 const FLAG_STYLES = {
-  flagged: { bg: "#fef2f2", color: "#dc2626", label: "Flagged"  },
-  warning: { bg: "#fff7ed", color: "#c2410c", label: "Warning"  },
-  clear:   { bg: "#f0fdf4", color: "#15803d", label: "Clear"    },
+  flagged: { bg: "#fef2f2", color: "#dc2626", label: "Flagged" },
+  warning: { bg: "#fff7ed", color: "#c2410c", label: "Warning" },
+  clear:   { bg: "#f0fdf4", color: "#15803d", label: "Clear"   },
 };
 
 const riskColor = s => s >= 50 ? "#dc2626" : s >= 25 ? "#c2410c" : "#22c55e";
@@ -49,48 +55,65 @@ const STYLES = `
   @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   .fade-up{animation:fadeUp .4s ease both;}
-  .stat-chip{
-    flex:1;min-width:130px;background:#fff;border-radius:var(--card-br);
-    box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);
-    padding:14px 16px;cursor:pointer;transition:box-shadow .2s,transform .2s;
-    display:flex;align-items:center;gap:10px;
-  }
+
+  /* Stat chips */
+  .stat-chip{flex:1;min-width:130px;background:#fff;border-radius:var(--card-br);box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);padding:14px 16px;cursor:pointer;transition:box-shadow .2s,transform .2s;display:flex;align-items:center;gap:10px;}
   .stat-chip:hover{box-shadow:0 4px 16px rgba(0,86,179,.12);transform:translateY(-1px);}
   .stat-chip.selected{outline:2px solid currentColor;outline-offset:-2px;}
-  .search-input{
-    border:1px solid rgba(0,86,179,.15);border-radius:10px;background:#f8faff;
-    padding:7px 14px 7px 34px;font-size:13px;color:#1e293b;outline:none;
-    font-family:'DM Sans',sans-serif;transition:border-color .2s,box-shadow .2s;
-  }
+
+  /* Search */
+  .search-input{border:1px solid rgba(0,86,179,.15);border-radius:10px;background:#f8faff;padding:7px 14px 7px 34px;font-size:13px;color:#1e293b;outline:none;font-family:'DM Sans',sans-serif;transition:border-color .2s,box-shadow .2s;}
   .search-input:focus{border-color:#0056b3;box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
+
+  /* Risk bar */
   .risk-bar-wrap{display:flex;align-items:center;gap:8px;}
   .risk-bar{height:6px;border-radius:99px;background:#f1f5f9;overflow:hidden;flex:1;min-width:50px;}
   .risk-bar-fill{height:100%;border-radius:99px;}
+
+  /* Flag badge */
   .flag-badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;}
+
+  /* Spin */
   @keyframes spin{to{transform:rotate(360deg)}}
   .spin{animation:spin .8s linear infinite;display:inline-block;}
+
+  /* ── Mobile alert card ── */
+  .alert-mobile-card{
+    background:#fff;border-radius:14px;border:1px solid rgba(0,86,179,.07);
+    box-shadow:0 1px 4px rgba(0,0,0,.04);overflow:hidden;
+  }
+  .alert-mobile-card-body{padding:14px 16px;display:flex;align-items:flex-start;gap:12px;}
+  .alert-mobile-card-meta{padding:9px 16px;border-top:1px solid rgba(0,86,179,.06);background:#fafbff;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+
+  /* Desktop table / mobile card toggle */
+  .alert-desktop-table{display:block;}
+  .alert-mobile-list{display:none;}
+
   /* Bottom nav */
   .instructor-bottom-nav{position:fixed;bottom:0;left:0;right:0;height:64px;background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);border-top:1px solid rgba(0,86,179,.10);display:flex;align-items:stretch;z-index:1030;box-shadow:0 -4px 24px rgba(0,86,179,.08);}
   .bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:600;gap:3px;text-decoration:none;transition:color .2s;}
   .bnav-item i{font-size:19px;}
+
   /* Pagination */
-  .page-btn{
-    width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,86,179,.15);
-    background:#fff;display:inline-flex;align-items:center;justify-content:center;
-    cursor:pointer;font-size:13px;font-weight:600;color:#64748b;transition:all .15s;
-    font-family:'DM Sans',sans-serif;
-  }
+  .page-btn{width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,86,179,.15);background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;font-weight:600;color:#64748b;transition:all .15s;font-family:'DM Sans',sans-serif;}
   .page-btn:hover{background:#e8f0fe;border-color:#0056b3;color:#0056b3;}
   .page-btn.active{background:#0056b3;border-color:#0056b3;color:#fff;}
   .page-btn:disabled{opacity:.4;cursor:not-allowed;}
-  /* Responsive */
+
+  @media(max-width:991px){.main-content{padding:16px 12px 88px!important;}}
   @media(max-width:767px){
     .stats-row{flex-wrap:wrap!important;}
     .controls-row{flex-direction:column!important;align-items:stretch!important;gap:8px!important;}
     .search-input{width:100%!important;}
     .hide-sm{display:none!important;}
     .exam-select{width:100%!important;}
-    .table-wrap table{min-width:600px;}
+
+    /* Switch to card view */
+    .alert-desktop-table{display:none;}
+    .alert-mobile-list{display:flex;flex-direction:column;gap:10px;padding:14px;}
+
+    /* Stat chips: 2 per row */
+    .stats-row .stat-chip{min-width:calc(50% - 5px)!important;flex:1 1 calc(50% - 5px)!important;}
   }
 `;
 
@@ -134,7 +157,6 @@ const Alerts = () => {
     finally { setLoading(false); }
   };
 
-  // Derive stats from is_flagged + cpi_score (NOT flag_status which may be unreliable)
   const stats = {
     total:   summaries.length,
     flagged: summaries.filter(s => getAlertClass(s) === "flagged").length,
@@ -152,9 +174,9 @@ const Alerts = () => {
     return true;
   });
 
-  const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage    = Math.min(page, totalPages);
-  const paginated   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages);
+  const paginated  = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const changeFilter = (key) => { setRiskFilter(riskFilter === key ? "all" : key); setPage(1); };
   const changeSearch = (val) => { setSearch(val); setPage(1); };
@@ -170,10 +192,10 @@ const Alerts = () => {
   const selectedExam = exams.find(e => String(e.id) === String(selectedExamId));
 
   const STAT_CHIPS = [
-    { key:"flagged", label:"Flagged",        value:stats.flagged, color:"#dc2626", bg:"#fef2f2", icon:"bi-shield-x"            },
-    { key:"warning", label:"Warning",         value:stats.warning, color:"#c2410c", bg:"#fff7ed", icon:"bi-exclamation-triangle" },
-    { key:"clear",   label:"Clear",           value:stats.clear,   color:"#15803d", bg:"#f0fdf4", icon:"bi-shield-check"         },
-    { key:"all",     label:"Total Monitored", value:stats.total,   color:"#0056b3", bg:"#e8f0fe", icon:"bi-people"               },
+    { key: "flagged", label: "Flagged",        value: stats.flagged, color: "#dc2626", bg: "#fef2f2", icon: "bi-shield-x"             },
+    { key: "warning", label: "Warning",         value: stats.warning, color: "#c2410c", bg: "#fff7ed", icon: "bi-exclamation-triangle"  },
+    { key: "clear",   label: "Clear",           value: stats.clear,   color: "#15803d", bg: "#f0fdf4", icon: "bi-shield-check"          },
+    { key: "all",     label: "Total Monitored", value: stats.total,   color: "#0056b3", bg: "#e8f0fe", icon: "bi-people"                },
   ];
 
   const PaginationBar = () => {
@@ -210,7 +232,7 @@ const Alerts = () => {
       <style>{STYLES}</style>
       <div style={{ background: "#f0f4fb", minHeight: "100vh" }}>
 
-        {/* Topbar */}
+        {/* ── Topbar ── */}
         <div className="topbar d-flex align-items-center px-3 px-lg-4 gap-3">
           <span style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 700, fontSize: 15, color: "#0056b3", letterSpacing: "-.3px", flexShrink: 0 }}>
             SECT Instructor
@@ -236,7 +258,7 @@ const Alerts = () => {
         </div>
 
         <div className="d-flex">
-          {/* Sidebar */}
+          {/* ── Sidebar ── */}
           <nav className="glass-sidebar d-none d-lg-flex flex-column align-items-center py-4 gap-1"
             style={{ width: 80, minHeight: "calc(100vh - 56px)", position: "sticky", top: 56, alignSelf: "flex-start", flexShrink: 0 }}>
             {NAV_ITEMS.map(({ to, icon, label }) => (
@@ -246,20 +268,19 @@ const Alerts = () => {
             ))}
           </nav>
 
-          {/* Main */}
-          <main style={{ flex: 1, padding: "24px 16px", paddingBottom: 100, minWidth: 0 }}>
+          {/* ── Main ── */}
+          <main className="main-content" style={{ flex: 1, padding: "24px 16px", paddingBottom: 100, minWidth: 0 }}>
 
             {/* Page header */}
             <div className="fade-up" style={{ marginBottom: 20 }}>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a" }}>
-                🚨 Cheating Alerts & Anomalies
-              </h1>
+              <p style={{ margin: 0, fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Monitoring</p>
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a" }}>Cheating Alerts</h1>
               <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>
                 Review flagged students and anomalous events per exam
               </p>
             </div>
 
-            {/* Stat Chips */}
+            {/* ── Stat Chips ── */}
             <div className="fade-up stats-row" style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
               {STAT_CHIPS.map(({ key, label, value, color, bg, icon }) => (
                 <div key={key} className={`stat-chip${riskFilter === key ? " selected" : ""}`}
@@ -275,7 +296,7 @@ const Alerts = () => {
               ))}
             </div>
 
-            {/* Table Card */}
+            {/* ── Table Card ── */}
             <div className="dash-card fade-up">
 
               {/* Card header */}
@@ -286,15 +307,9 @@ const Alerts = () => {
                       <i className="bi bi-people me-2" style={{ color: "#0056b3" }}></i>Student Risk Summary
                     </h2>
                     {riskFilter !== "all" && (
-                      <span style={{
-                        display: "inline-flex", alignItems: "center", gap: 5,
-                        padding: "2px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700,
-                        background: FLAG_STYLES[riskFilter]?.bg || "#f1f5f9",
-                        color: FLAG_STYLES[riskFilter]?.color || "#64748b",
-                      }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, background: FLAG_STYLES[riskFilter]?.bg || "#f1f5f9", color: FLAG_STYLES[riskFilter]?.color || "#64748b" }}>
                         {FLAG_STYLES[riskFilter]?.label || riskFilter} only
-                        <button onClick={() => changeFilter("all")}
-                          style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11, color: "inherit" }}>✕</button>
+                        <button onClick={() => changeFilter("all")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11, color: "inherit" }}>✕</button>
                       </span>
                     )}
                   </div>
@@ -312,11 +327,12 @@ const Alerts = () => {
                     <input className="search-input" style={{ width: "100%" }} placeholder="Search student…"
                       value={search} onChange={e => changeSearch(e.target.value)} />
                     {search && (
-                      <button onClick={() => changeSearch("")}
-                        style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 13 }}>✕</button>
+                      <button onClick={() => changeSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 13 }}>✕</button>
                     )}
                   </div>
-                  <select value={selectedExamId} onChange={e => { setSelectedExamId(e.target.value); setRiskFilter("all"); setSearch(""); }}
+                  <select
+                    value={selectedExamId}
+                    onChange={e => { setSelectedExamId(e.target.value); setRiskFilter("all"); setSearch(""); }}
                     className="exam-select"
                     style={{ border: "1px solid rgba(0,86,179,.15)", borderRadius: 10, padding: "7px 12px", fontSize: 13, color: "#1e293b", background: "#f8faff", outline: "none", fontFamily: "'DM Sans',sans-serif", minWidth: 180, maxWidth: "100%" }}>
                     {exams.length === 0 && <option value="">No exams found</option>}
@@ -332,9 +348,9 @@ const Alerts = () => {
                     <i className="bi bi-file-earmark-text" style={{ color: "#0056b3" }}></i>
                     <span style={{ fontWeight: 700, color: "#1e293b" }}>{selectedExam.title}</span>
                     {selectedExam.course?.code && <span>— {selectedExam.course.code}</span>}
-                    <span style={{ display:"inline-flex",alignItems:"center",padding:"2px 8px",borderRadius:99,fontSize:10,fontWeight:700,textTransform:"uppercase",
-                      background:selectedExam.status==="active"?"#f0fdf4":selectedExam.status==="scheduled"?"#fff7ed":"#eff6ff",
-                      color:selectedExam.status==="active"?"#15803d":selectedExam.status==="scheduled"?"#c2410c":"#1d4ed8" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+                      background: selectedExam.status === "active" ? "#f0fdf4" : selectedExam.status === "scheduled" ? "#fff7ed" : "#eff6ff",
+                      color: selectedExam.status === "active" ? "#15803d" : selectedExam.status === "scheduled" ? "#c2410c" : "#1d4ed8" }}>
                       {selectedExam.status}
                     </span>
                     <span style={{ marginLeft: "auto" }}>{filtered.length} of {summaries.length} student{summaries.length !== 1 ? "s" : ""}</span>
@@ -342,7 +358,7 @@ const Alerts = () => {
                 )}
               </div>
 
-              {/* Table / States */}
+              {/* ── Content states ── */}
               {loading ? (
                 <div style={{ padding: "40px 0", textAlign: "center" }}>
                   <div className="spinner-border" style={{ color: "#0056b3", width: 32, height: 32 }} />
@@ -365,11 +381,12 @@ const Alerts = () => {
                 </div>
               ) : (
                 <>
-                  <div className="table-wrap" style={{ overflowX: "auto" }}>
+                  {/* ── Desktop table ── */}
+                  <div className="alert-desktop-table" style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr style={{ background: "#f8faff", borderBottom: "1px solid #f1f5f9" }}>
-                          {["STUDENT","RISK SCORE","FLAG","TABS","KEYS","RESPONSE","KEYSTROKE"].map(h => (
+                          {["STUDENT", "RISK SCORE", "FLAG", "TABS", "KEYS", "RESPONSE", "KEYSTROKE"].map(h => (
                             <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: ".06em", textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
                           ))}
                         </tr>
@@ -415,6 +432,49 @@ const Alerts = () => {
                       </tbody>
                     </table>
                   </div>
+
+                  {/* ── Mobile card list ── */}
+                  <div className="alert-mobile-list">
+                    {paginated.map(s => {
+                      const cpi       = s.cpi_score ?? 0;
+                      const cls       = getAlertClass(s);
+                      const flagStyle = FLAG_STYLES[cls];
+                      const avatarBg  = cls === "flagged" ? "#fef2f2" : cls === "warning" ? "#fff7ed" : "#f0fdf4";
+                      const avatarCol = cls === "flagged" ? "#dc2626" : cls === "warning" ? "#c2410c" : "#15803d";
+                      return (
+                        <div key={s.submission_id} className="alert-mobile-card">
+                          <div className="alert-mobile-card-body">
+                            {/* Avatar */}
+                            <div style={{ width: 40, height: 40, borderRadius: "50%", background: avatarBg, color: avatarCol, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16, flexShrink: 0 }}>
+                              {s.student?.name?.charAt(0).toUpperCase() ?? "?"}
+                            </div>
+                            {/* Info */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.student?.name}</div>
+                              <div style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 6 }}>{s.student?.email}</div>
+                              {/* Risk bar */}
+                              <div className="risk-bar-wrap">
+                                <div className="risk-bar">
+                                  <div className="risk-bar-fill" style={{ width: `${Math.min(cpi, 100)}%`, background: riskColor(cpi) }} />
+                                </div>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: riskColor(cpi), flexShrink: 0 }}>{cpi.toFixed(1)}%</span>
+                              </div>
+                            </div>
+                          </div>
+                          {/* Meta row */}
+                          <div className="alert-mobile-card-meta">
+                            <span className="flag-badge" style={{ background: flagStyle.bg, color: flagStyle.color }}>{flagStyle.label}</span>
+                            <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#64748b" }}>
+                              <span title="Tab switches"><i className="bi bi-window-stack me-1"></i>{s.tab_switch_count ?? 0} tabs</span>
+                              <span title="Keyboard shortcuts"><i className="bi bi-keyboard me-1"></i>{s.keyboard_shortcut_count ?? 0} keys</span>
+                              <span title="Response anomalies"><i className="bi bi-clock-history me-1"></i>{s.response_time_anomaly_count ?? 0}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
                   <PaginationBar />
                 </>
               )}
@@ -423,22 +483,18 @@ const Alerts = () => {
               {!loading && summaries.length > 0 && (
                 <div style={{ padding: "8px 16px", borderTop: filtered.length > 0 ? "none" : "1px solid #f1f5f9", fontSize: 12, color: "#94a3b8" }}>
                   <i className="bi bi-info-circle me-1"></i>
-                  Flag status: <strong style={{ color: "#dc2626" }}>Flagged</strong> = is_flagged &amp; CPI ≥ 50% · <strong style={{ color: "#c2410c" }}>Warning</strong> = CPI ≥ 25% · <strong style={{ color: "#15803d" }}>Clear</strong> = CPI &lt; 25%
+                  <strong style={{ color: "#dc2626" }}>Flagged</strong> = is_flagged &amp; CPI ≥ 50% ·{" "}
+                  <strong style={{ color: "#c2410c" }}>Warning</strong> = CPI ≥ 25% ·{" "}
+                  <strong style={{ color: "#15803d" }}>Clear</strong> = CPI &lt; 25%
                 </div>
               )}
             </div>
           </main>
         </div>
 
-        {/* Bottom Nav */}
+        {/* ── Bottom Nav ── */}
         <nav className="instructor-bottom-nav d-lg-none">
-          {[
-            { to:"/instructor",                  icon:"bi-speedometer2",      label:"Home"     },
-            { to:"/instructor/courses",          icon:"bi-book",              label:"Courses"  },
-            { to:"/instructor/exams",            icon:"bi-file-earmark-text", label:"Exams"    },
-            { to:"/instructor/alerts",           icon:"bi-exclamation-triangle",label:"Alerts" },
-            { to:"/instructor/account-settings", icon:"bi-gear",              label:"Settings" },
-          ].map(({ to, icon, label }) => (
+          {BOTTOM_NAV.map(({ to, icon, label }) => (
             <Link key={to} to={to} className="bnav-item"
               style={{ color: isActive(to) ? "#0056b3" : "#94a3b8", borderTop: isActive(to) ? "2px solid #0056b3" : "2px solid transparent" }}>
               <i className={`bi ${icon}`}></i>{label}

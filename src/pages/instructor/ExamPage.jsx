@@ -14,6 +14,15 @@ const NAV_ITEMS = [
   { to: "/instructor/account-settings", icon: "bi-gear",                 label: "Settings"  },
 ];
 
+/* Bottom nav: Dashboard, Courses, Exams, Students, Alerts — NO Settings */
+const BOTTOM_NAV = [
+  { to: "/instructor",         icon: "bi-speedometer2",         label: "Home"     },
+  { to: "/instructor/courses", icon: "bi-book",                 label: "Courses"  },
+  { to: "/instructor/exams",   icon: "bi-file-earmark-text",    label: "Exams"    },
+  { to: "/instructor/students",icon: "bi-people",               label: "Students" },
+  { to: "/instructor/alerts",  icon: "bi-exclamation-triangle", label: "Alerts"   },
+];
+
 const STATUS_STYLE = {
   active:    { bg: "#f0fdf4", color: "#15803d", label: "Active"    },
   scheduled: { bg: "#fff7ed", color: "#c2410c", label: "Scheduled" },
@@ -63,17 +72,8 @@ const SHARED_CSS = `
   .fade-up{animation:fadeUp .4s ease both;}
 
   /* ── Stat chips ── */
-  .stat-chips-grid{
-    display:grid;
-    grid-template-columns:repeat(5,1fr);
-    gap:8px;
-  }
-  .stat-chip{
-    border-radius:12px;padding:10px 10px;display:flex;align-items:center;gap:8px;
-    cursor:pointer;border:2px solid transparent;
-    transition:border-color .15s,box-shadow .15s,transform .15s;
-    background:#f8faff;overflow:hidden;min-width:0;
-  }
+  .stat-chips-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+  .stat-chip{border-radius:12px;padding:10px;display:flex;align-items:center;gap:8px;cursor:pointer;border:2px solid transparent;transition:border-color .15s,box-shadow .15s,transform .15s;background:#f8faff;overflow:hidden;min-width:0;}
   .stat-chip:hover{transform:translateY(-1px);}
   .stat-chip.selected{border-color:currentColor;box-shadow:0 4px 16px rgba(0,86,179,.12);}
   .stat-chip-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
@@ -81,7 +81,7 @@ const SHARED_CSS = `
   .stat-chip-value{margin:0;font-size:17px;font-weight:700;line-height:1;}
   .stat-chip-label{margin:2px 0 0;font-size:10px;font-weight:600;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
 
-  /* ── Table (desktop) ── */
+  /* ── Table ── */
   .dash-table{width:100%;border-collapse:collapse;font-family:'DM Sans',sans-serif;}
   .dash-table th{padding:10px 14px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.06em;white-space:nowrap;border-bottom:1px solid #f1f5f9;text-align:left;background:#f8faff;}
   .dash-table td{padding:12px 14px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
@@ -90,21 +90,13 @@ const SHARED_CSS = `
   .dash-table tbody tr:last-child td{border-bottom:none;}
 
   /* ── Exam card (mobile) ── */
-  .exam-card{
-    background:#fff;border-radius:14px;border:1px solid rgba(0,86,179,.06);
-    box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;
-  }
+  .exam-card{background:#fff;border-radius:14px;border:1px solid rgba(0,86,179,.06);box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;}
   .exam-card-body{padding:14px 16px;display:flex;flex-direction:column;gap:6px;}
-  .exam-card-title{font-size:14px;font-weight:700;color:#0f172a;text-decoration:none;display:block;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .exam-card-course{font-size:11px;color:#64748b;text-decoration:none;display:flex;align-items:center;gap:4px;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .exam-card-title{font-size:14px;font-weight:700;color:#0f172a;text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .exam-card-course{font-size:11px;color:#64748b;text-decoration:none;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .exam-card-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
   .exam-card-meta-item{font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:3px;white-space:nowrap;}
-  .exam-card-action-bar{
-    padding:9px 16px;border-top:1px solid rgba(0,86,179,.06);background:#fafbff;
-    display:flex;align-items:center;justify-content:space-between;
-  }
+  .exam-card-action-bar{padding:9px 16px;border-top:1px solid rgba(0,86,179,.06);background:#fafbff;display:flex;align-items:center;justify-content:space-between;}
 
   /* ── Shared badge/button styles ── */
   .action-btn{width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,86,179,.15);background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;font-size:13px;text-decoration:none;color:#64748b;flex-shrink:0;}
@@ -141,23 +133,18 @@ const SHARED_CSS = `
   .pagination-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
   .pagination-btn:disabled{opacity:.4;cursor:not-allowed;}
 
-  /* ── Responsive breakpoints ── */
   /* Desktop: show table, hide cards */
   .mobile-exam-list{display:none;}
   .desktop-exam-table{display:block;}
 
   @media(max-width:991px){
-    /* Stat chips: 3 on first row, 2 on second */
     .stat-chips-grid{grid-template-columns:repeat(3,1fr);}
     .hide-mobile{display:none!important;}
   }
   @media(max-width:767px){
-    /* Switch to card view */
     .mobile-exam-list{display:flex;flex-direction:column;gap:10px;padding:14px;}
     .desktop-exam-table{display:none;}
-    /* Stat chips: 2-2-1 layout */
     .stat-chips-grid{grid-template-columns:repeat(2,1fr);}
-    /* Modal time fields: stack on mobile */
     .modal-time-grid{grid-template-columns:1fr!important;}
     .modal-title-type-grid{grid-template-columns:1fr!important;}
   }
@@ -167,29 +154,20 @@ const SHARED_CSS = `
 `;
 
 /* ─── Bottom Nav ─────────────────────────────────────────────────────────── */
-const InstructorBottomNav = ({ active }) => {
-  const items = [
-    { to: "/instructor",                  icon: "bi-speedometer2",      label: "Home"     },
-    { to: "/instructor/courses",          icon: "bi-book",              label: "Courses"  },
-    { to: "/instructor/exams",            icon: "bi-file-earmark-text", label: "Exams"    },
-    { to: "/instructor/students",         icon: "bi-people",            label: "Students" },
-    { to: "/instructor/account-settings", icon: "bi-gear",              label: "Settings" },
-  ];
-  return (
-    <nav className="instructor-bottom-nav d-lg-none">
-      {items.map(({ to, icon, label }) => (
-        <Link key={to} to={to} className="bnav-item"
-          style={{
-            color: active === label ? "#0056b3" : "#94a3b8",
-            borderTop: active === label ? "2px solid #0056b3" : "2px solid transparent",
-          }}>
-          <i className={`bi ${icon}`}></i>
-          {label}
-        </Link>
-      ))}
-    </nav>
-  );
-};
+const InstructorBottomNav = ({ active }) => (
+  <nav className="instructor-bottom-nav d-lg-none">
+    {BOTTOM_NAV.map(({ to, icon, label }) => (
+      <Link key={to} to={to} className="bnav-item"
+        style={{
+          color: active === label ? "#0056b3" : "#94a3b8",
+          borderTop: active === label ? "2px solid #0056b3" : "2px solid transparent",
+        }}>
+        <i className={`bi ${icon}`}></i>
+        {label}
+      </Link>
+    ))}
+  </nav>
+);
 
 /* ─── Pagination ─────────────────────────────────────────────────────────── */
 const Pagination = ({ total, page, perPage, onChange }) => {
@@ -228,56 +206,30 @@ const ExamCard = ({ exam, onDelete }) => {
   return (
     <div className="exam-card">
       <div className="exam-card-body">
-        {/* Title row */}
-        <Link to={`/instructor/exams/${exam.id}`} className="exam-card-title">
-          {exam.title}
-        </Link>
-
-        {/* Course */}
+        <Link to={`/instructor/exams/${exam.id}`} className="exam-card-title">{exam.title}</Link>
         <Link to={`/instructor/courses/${exam.course?.id}`} className="exam-card-course">
           <i className="bi bi-folder2"></i>
           <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
             {exam.course?.code} — {exam.course?.name}
           </span>
         </Link>
-
-        {/* Badges + meta */}
         <div className="exam-card-meta">
           <span className="type-badge">{exam.type}</span>
-          <span className="exam-card-meta-item">
-            <i className="bi bi-clock"></i>
-            {exam.duration_minutes}m
-          </span>
-          <span className="exam-card-meta-item">
-            <i className="bi bi-question-circle"></i>
-            {exam.questions_count || 0} Qs
-          </span>
+          <span className="exam-card-meta-item"><i className="bi bi-clock"></i>{exam.duration_minutes}m</span>
+          <span className="exam-card-meta-item"><i className="bi bi-question-circle"></i>{exam.questions_count || 0} Qs</span>
         </div>
-
-        {/* Start time */}
         {exam.start_time && (
           <span className="exam-card-meta-item" style={{ fontSize: 11 }}>
-            <i className="bi bi-calendar3"></i>
-            {new Date(exam.start_time).toLocaleString()}
+            <i className="bi bi-calendar3"></i>{new Date(exam.start_time).toLocaleString()}
           </span>
         )}
       </div>
-
-      {/* Action bar */}
       <div className="exam-card-action-bar">
-        <span className="status-pill" style={{ background: ss.bg, color: ss.color, fontSize: 11 }}>
-          {ss.label}
-        </span>
+        <span className="status-pill" style={{ background: ss.bg, color: ss.color, fontSize: 11 }}>{ss.label}</span>
         <div style={{ display: "flex", gap: 6 }}>
-          <Link to={`/instructor/exams/${exam.id}`} className="action-btn" title="View">
-            <i className="bi bi-eye"></i>
-          </Link>
-          <Link to={`/instructor/exams/${exam.id}/edit`} className="action-btn" title="Edit">
-            <i className="bi bi-pencil"></i>
-          </Link>
-          <button className="action-btn del" onClick={() => onDelete(exam.id)} title="Delete">
-            <i className="bi bi-trash"></i>
-          </button>
+          <Link to={`/instructor/exams/${exam.id}`} className="action-btn" title="View"><i className="bi bi-eye"></i></Link>
+          <Link to={`/instructor/exams/${exam.id}/edit`} className="action-btn" title="Edit"><i className="bi bi-pencil"></i></Link>
+          <button className="action-btn del" onClick={() => onDelete(exam.id)} title="Delete"><i className="bi bi-trash"></i></button>
         </div>
       </div>
     </div>
@@ -482,7 +434,6 @@ const ExamPage = () => {
                       );
                     })}
                   </div>
-                  {/* Filter context */}
                   {(searchQuery || statusFilter !== "all") && (
                     <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <span style={{ fontSize: 11, color: "#94a3b8" }}>
@@ -509,9 +460,7 @@ const ExamPage = () => {
                     <div style={{ textAlign: "center", padding: "40px 20px", color: "#94a3b8" }}>
                       <i className="bi bi-file-earmark-x" style={{ fontSize: 28, display: "block", marginBottom: 10 }}></i>
                       <span style={{ fontSize: 13 }}>
-                        {searchQuery || statusFilter !== "all"
-                          ? "No exams match your search or filter."
-                          : "No exams yet."}
+                        {searchQuery || statusFilter !== "all" ? "No exams match your search or filter." : "No exams yet."}
                       </span>
                       {!searchQuery && statusFilter === "all" && (
                         <div style={{ marginTop: 12 }}>
@@ -702,7 +651,6 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
           <div className="dash-modal-body">
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
-              {/* Course */}
               <div>
                 <label className="form-lbl">Course <span style={{ color: "#ef4444" }}>*</span></label>
                 <select className="form-ctrl" value={formData.course_id}
@@ -713,7 +661,6 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
                 </select>
               </div>
 
-              {/* Title + Type: side-by-side on desktop, stacked on mobile */}
               <div className="modal-title-type-grid" style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
                 <div>
                   <label className="form-lbl">Exam Title <span style={{ color: "#ef4444" }}>*</span></label>
@@ -730,7 +677,6 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
                 </div>
               </div>
 
-              {/* Duration */}
               <div>
                 <label className="form-lbl">Duration (minutes) <span style={{ color: "#ef4444" }}>*</span></label>
                 <input type="number" className="form-ctrl" min="1" step="1"
@@ -739,7 +685,6 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
                   required disabled={submitting} />
               </div>
 
-              {/* Start + End: side-by-side on desktop, stacked on mobile */}
               <div className="modal-time-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div>
                   <label className="form-lbl">Start Time <span style={{ color: "#ef4444" }}>*</span></label>
@@ -756,7 +701,6 @@ const CreateExamModal = ({ show, onHide, courses, onSuccess }) => {
                 </div>
               </div>
 
-              {/* Description */}
               <div>
                 <label className="form-lbl">Description</label>
                 <textarea className="form-ctrl" rows="2" placeholder="Optional instructions for students"

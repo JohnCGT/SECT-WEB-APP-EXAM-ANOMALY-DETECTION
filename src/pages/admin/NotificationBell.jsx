@@ -5,22 +5,37 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 
-/* ─── Inject dropdown animation once ─────────────────────────────────── */
-(function injectDropAnim() {
+(function injectStyles() {
   if (document.getElementById("nb-styles")) return;
   const s = document.createElement("style");
   s.id = "nb-styles";
   s.textContent = `
-    @keyframes nb-dropIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
-    .nb-item{transition:background .12s;cursor:pointer;text-decoration:none;display:flex}
-    .nb-item:hover{background:#F5F4FF!important}
-    .nb-bell{transition:all .15s;cursor:pointer;border:none}
-    .nb-bell:hover{filter:brightness(1.05)}
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+    @keyframes nb-drop { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes nb-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.15)} }
+    .nb-bell-btn { transition:all .15s; border:none; cursor:pointer; background:none; padding:0; position:relative; }
+    .nb-row { display:flex; text-decoration:none; transition:background .1s; cursor:pointer; }
+    .nb-row:hover { background:#f8faff !important; }
+    .nb-dropdown {
+      position:fixed;
+      right:12px;
+      top:60px;
+      z-index:9999;
+      width:min(360px, calc(100vw - 24px));
+      background:#fff;
+      border:1px solid #e2e8f0;
+      border-radius:14px;
+      box-shadow:0 16px 50px rgba(0,86,179,.15);
+      animation:nb-drop .18s ease;
+      overflow:hidden;
+      font-family:'DM Sans',system-ui,sans-serif;
+    }
   `;
   document.head.appendChild(s);
 })();
 
 const BASE = import.meta?.env?.VITE_API_URL ?? "/api";
+
 async function fetchNotifs() {
   try {
     const res = await fetch(BASE + "/admin/notifications", {
@@ -35,16 +50,11 @@ async function fetchNotifs() {
   }
 }
 
-const C = {
-  accent: "#6C63FF", text: "#0D0C1D", muted: "#7A788F",
-  danger: "#E53935", border: "#E6E4FF", bg: "#F4F3FF", card: "#FFFFFF",
-};
-
 const NOTIF_CFG = {
-  new_ticket:    { icon: "🎫", color: C.accent,  bg: "#EDE9FF", link: "/admin/support"   },
-  high_cpi:      { icon: "🚨", color: C.danger,  bg: "#FFEBEE", link: "/admin/anomalies" },
-  exam_flagged:  { icon: "🚩", color: "#FB8C00", bg: "#FFF3E0", link: "/admin/anomalies" },
-  exam_completed:{ icon: "✅", color: "#2E7D32", bg: "#E8F5E9", link: "/admin/exams"     },
+  new_ticket:     { icon: "🎫", color: "#0056b3", bg: "#e8f0fe", link: "/admin/support"   },
+  high_cpi:       { icon: "🚨", color: "#dc3545", bg: "#fff0f0", link: "/admin/anomalies" },
+  exam_flagged:   { icon: "🚩", color: "#fd7e14", bg: "#fff8f0", link: "/admin/anomalies" },
+  exam_completed: { icon: "✅", color: "#16a34a", bg: "#f0fdf4", link: "/admin/exams"     },
 };
 
 export default function NotificationBell() {
@@ -54,12 +64,14 @@ export default function NotificationBell() {
     catch { return new Set(); }
   });
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const ref = useRef(null);
 
-  /* Poll every 45 s */
   const load = useCallback(async () => {
+    setLoading(true);
     const data = await fetchNotifs();
     setNotifications(data);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -68,23 +80,22 @@ export default function NotificationBell() {
     return () => clearInterval(t);
   }, [load]);
 
-  /* Close on outside click */
   useEffect(() => {
-    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const unread = notifications.filter(n => !readIds.has(n.id)).length;
+  const unread = notifications.filter((n) => !readIds.has(n.id)).length;
 
   const markAll = () => {
-    const ids = new Set(notifications.map(n => n.id));
+    const ids = new Set(notifications.map((n) => n.id));
     setReadIds(ids);
     try { localStorage.setItem("al_read_notifs", JSON.stringify([...ids])); } catch {}
   };
 
   const markOne = (id) => {
-    setReadIds(prev => {
+    setReadIds((prev) => {
       const next = new Set(prev);
       next.add(id);
       try { localStorage.setItem("al_read_notifs", JSON.stringify([...next])); } catch {}
@@ -93,118 +104,131 @@ export default function NotificationBell() {
   };
 
   const recent = notifications.slice(0, 8);
+  const hasBadge = unread > 0;
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      {/* Bell button */}
       <button
-        className="nb-bell"
-        onClick={() => setOpen(v => !v)}
-        style={{
-          border: `1.5px solid ${open ? C.accent : C.border}`,
-          background: open ? "#EDE9FF" : C.card,
-          borderRadius: 10, width: 40, height: 40,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          position: "relative", fontSize: 18,
-        }}
+        className="nb-bell-btn"
+        onClick={() => setOpen((v) => !v)}
+        aria-label={`${unread} notification${unread !== 1 ? "s" : ""}`}
       >
-        🔔
-        {unread > 0 && (
+        <div style={{
+          width: 36, height: 36, borderRadius: 10, fontSize: 16,
+          background: open ? "#e8f0fe" : "#f8f9fa",
+          border: `1.5px solid ${open ? "#0056b3" : "#dee2e6"}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "all .15s",
+        }}>
+          🔔
+        </div>
+        {hasBadge && (
           <span style={{
             position: "absolute", top: -4, right: -4,
-            background: C.danger, color: "#fff",
-            width: 18, height: 18, borderRadius: "50%",
-            fontSize: 10, fontWeight: 800, fontFamily: "'Syne',sans-serif",
+            background: "#dc3545", color: "#fff",
+            minWidth: 16, height: 16, borderRadius: 8,
+            fontSize: 9, fontWeight: 800, lineHeight: 1,
             display: "flex", alignItems: "center", justifyContent: "center",
-            border: "2px solid #fff", lineHeight: 1,
+            border: "2px solid #fff", padding: "0 3px",
+            animation: "nb-pulse 2s ease infinite",
           }}>
             {unread > 9 ? "9+" : unread}
           </span>
         )}
       </button>
 
-      {/* Dropdown */}
       {open && (
-        <div style={{
-          position: "absolute", top: 48, right: 0, zIndex: 1100,
-          width: 340, background: C.card,
-          border: `1px solid ${C.border}`,
-          borderRadius: 14, boxShadow: "0 16px 50px rgba(0,0,0,.16)",
-          animation: "nb-dropIn .18s ease",
-          overflow: "hidden",
-        }}>
+        <div className="nb-dropdown">
           {/* Header */}
           <div style={{
-            padding: "14px 16px", borderBottom: `1px solid ${C.border}`,
+            padding: "12px 14px", borderBottom: "1px solid #f0f0f0",
             display: "flex", justifyContent: "space-between", alignItems: "center",
+            background: unread > 0 ? "#f8faff" : "#f8f9fa",
           }}>
-            <span style={{ fontSize: 13, fontWeight: 800, fontFamily: "'Syne',sans-serif", color: C.text }}>
-              Notifications
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a2e" }}>Notifications</span>
               {unread > 0 && (
                 <span style={{
-                  marginLeft: 8, background: C.accent, color: "#fff",
-                  padding: "1px 7px", borderRadius: 10, fontSize: 11,
+                  background: "#0056b3", color: "#fff", padding: "1px 7px",
+                  borderRadius: 10, fontSize: 10, fontWeight: 600,
                 }}>
                   {unread} new
                 </span>
               )}
-            </span>
-            {unread > 0 && (
-              <button onClick={markAll} style={{
-                border: "none", background: "none", fontSize: 11,
-                color: C.accent, fontWeight: 600, cursor: "pointer",
-                fontFamily: "'Epilogue',sans-serif",
-              }}>
-                Mark all read
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); load(); }}
+                style={{ border: "none", background: "none", cursor: "pointer", color: "#888", fontSize: 14 }}
+                title="Refresh"
+              >
+                {loading
+                  ? <span style={{ display: "inline-block", width: 11, height: 11, border: "2px solid #dee2e6", borderTopColor: "#0056b3", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} />
+                  : "↻"}
               </button>
-            )}
+              {unread > 0 && (
+                <button onClick={markAll} style={{
+                  border: "none", background: "none", fontSize: 11,
+                  color: "#888", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+                  fontFamily: "'DM Sans', system-ui, sans-serif",
+                }}>
+                  Mark all read
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Items */}
-          {recent.length === 0 ? (
-            <div style={{ padding: "30px 16px", textAlign: "center", color: C.muted, fontSize: 13 }}>
-              No notifications yet
-            </div>
-          ) : (
-            <div style={{ maxHeight: 340, overflowY: "auto" }}>
-              {recent.map(n => {
-                const cfg     = NOTIF_CFG[n.type] ?? { icon: "📌", color: C.muted, bg: C.bg, link: "/admin" };
+          {/* Body */}
+          <div style={{ maxHeight: 320, overflowY: "auto" }}>
+            {recent.length === 0 ? (
+              <div style={{ padding: "28px 16px", textAlign: "center", color: "#aaa" }}>
+                <div style={{ fontSize: 28, marginBottom: 6 }}>🔔</div>
+                <div style={{ fontSize: 13 }}>No notifications yet</div>
+                <div style={{ fontSize: 11, marginTop: 3, color: "#bbb" }}>
+                  {loading ? "Checking…" : "Refreshes every 45s"}
+                </div>
+              </div>
+            ) : (
+              recent.map((n) => {
+                const cfg = NOTIF_CFG[n.type] ?? { icon: "📌", color: "#64748b", bg: "#f1f5f9", link: "/admin" };
                 const isUnread = !readIds.has(n.id);
                 return (
                   <Link
                     key={n.id}
                     to={cfg.link}
-                    className="nb-item"
+                    className="nb-row"
                     onClick={() => { markOne(n.id); setOpen(false); }}
                     style={{
-                      gap: 12, padding: "12px 16px",
-                      borderBottom: `1px solid ${C.border}`,
-                      background: isUnread ? "#FAFAFE" : "transparent",
+                      gap: 10, padding: "10px 12px",
+                      borderBottom: "1px solid #f5f5f5",
+                      background: isUnread ? "#f8faff" : "#fff",
+                      alignItems: "flex-start",
                     }}
                   >
                     <div style={{
-                      width: 36, height: 36, borderRadius: 9, flexShrink: 0,
-                      background: cfg.bg, display: "flex",
-                      alignItems: "center", justifyContent: "center", fontSize: 17,
+                      width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                      background: cfg.bg,
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15,
                     }}>
                       {cfg.icon}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{
-                        margin: 0, fontSize: 13, color: C.text, lineHeight: 1.4,
+                        margin: 0, fontSize: 12, color: "#1e293b", lineHeight: 1.4,
                         fontWeight: isUnread ? 700 : 500,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>
                         {n.title}
                       </p>
                       <p style={{
-                        margin: "2px 0 0", fontSize: 11, color: C.muted,
+                        margin: "2px 0 0", fontSize: 11, color: "#64748b",
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>
                         {n.body}
                       </p>
-                      <p style={{ margin: "3px 0 0", fontSize: 10, color: C.muted }}>
+                      <p style={{ margin: "3px 0 0", fontSize: 10, color: "#94a3b8" }}>
                         {n.created_at
-                          ? new Date(n.created_at).toLocaleString("en-PH", {
+                          ? new Date(n.created_at).toLocaleString(undefined, {
                               month: "short", day: "numeric",
                               hour: "2-digit", minute: "2-digit",
                             })
@@ -214,21 +238,21 @@ export default function NotificationBell() {
                     {isUnread && (
                       <div style={{
                         width: 7, height: 7, borderRadius: "50%",
-                        background: C.accent, flexShrink: 0, marginTop: 6,
+                        background: "#0056b3", flexShrink: 0, marginTop: 4,
                       }} />
                     )}
                   </Link>
                 );
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
 
           {/* Footer */}
-          <div style={{ padding: "10px 16px", borderTop: `1px solid ${C.border}`, textAlign: "center" }}>
+          <div style={{ padding: "8px 14px", borderTop: "1px solid #f0f0f0", textAlign: "center" }}>
             <Link
               to="/admin/support"
               onClick={() => setOpen(false)}
-              style={{ fontSize: 12, color: C.accent, fontWeight: 600, textDecoration: "none" }}
+              style={{ fontSize: 12, color: "#0056b3", fontWeight: 600, textDecoration: "none" }}
             >
               View all support tickets →
             </Link>

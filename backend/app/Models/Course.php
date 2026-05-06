@@ -15,6 +15,7 @@ class Course extends Model
         'name',
         'description',
         'semester',
+        'academic_year',
         'credits',
     ];
 

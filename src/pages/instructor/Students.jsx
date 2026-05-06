@@ -22,24 +22,59 @@ const STYLES = `
   @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   .fade-up{animation:fadeUp .4s ease both;}
-  .stat-chip{flex:1;min-width:130px;background:#fff;border-radius:var(--card-br);box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);padding:16px 18px;}
+
+  /* Stat chips */
+  .stat-chip{flex:1;min-width:130px;background:#fff;border-radius:var(--card-br);box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);padding:14px 16px;}
+
+  /* Inputs / selects */
   .search-input{border:1.5px solid rgba(0,86,179,.15);border-radius:10px;background:#f8faff;padding:7px 14px 7px 36px;font-size:13px;color:#1e293b;outline:none;font-family:'DM Sans',sans-serif;transition:border-color .2s,box-shadow .2s;}
   .search-input:focus{border-color:#0056b3;box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
   .form-select-dash{border:1.5px solid rgba(0,86,179,.15);border-radius:10px;padding:8px 14px;font-size:13px;color:#1e293b;background:#f8faff;outline:none;font-family:'DM Sans',sans-serif;transition:border-color .2s;}
   .form-select-dash:focus{border-color:#0056b3;box-shadow:0 0 0 3px rgba(0,86,179,.10);}
+
+  /* Buttons */
   .btn-primary-dash{display:inline-flex;align-items:center;gap:8px;background:#0056b3;color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:opacity .15s;text-decoration:none;}
   .btn-primary-dash:hover{opacity:.87;color:#fff;}
   .btn-outline-dash{display:inline-flex;align-items:center;gap:6px;background:transparent;color:#0056b3;border:1.5px solid rgba(0,86,179,.25);border-radius:10px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s;text-decoration:none;}
   .btn-outline-dash:hover{background:var(--blue-lite);}
   .btn-danger-dash{display:inline-flex;align-items:center;gap:6px;background:transparent;color:#dc2626;border:1.5px solid rgba(220,38,38,.25);border-radius:10px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s;}
   .btn-danger-dash:hover{background:#fef2f2;}
+
+  /* Sort button */
   .sort-btn{background:none;border:none;cursor:pointer;color:#94a3b8;font-size:11px;padding:0 4px;vertical-align:middle;}
   .sort-btn.active{color:#0056b3;}
+
+  /* ── Mobile student card ── */
+  .student-mobile-card{
+    background:#fff;border-radius:14px;border:1px solid rgba(0,86,179,.07);
+    box-shadow:0 1px 4px rgba(0,0,0,.04);overflow:hidden;
+  }
+  .student-mobile-card-body{padding:14px 16px;display:flex;align-items:center;gap:12px;}
+  .student-mobile-card-info{flex:1;min-width:0;}
+  .student-mobile-card-action{padding:9px 16px;border-top:1px solid rgba(0,86,179,.06);background:#fafbff;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+
+  /* Desktop table / mobile card toggle */
+  .student-desktop-table{display:block;}
+  .student-mobile-list{display:none;}
+
+  /* Bottom nav */
   .bottom-nav{position:fixed;bottom:0;left:0;right:0;height:64px;background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);border-top:1px solid rgba(0,86,179,.10);display:flex;align-items:stretch;z-index:1030;box-shadow:0 -4px 24px rgba(0,86,179,.08);}
   .bottom-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:600;gap:3px;text-decoration:none;transition:color .2s;}
   .bottom-nav-item i{font-size:19px;}
+
   @media(max-width:991px){.main-content{padding:16px 12px 88px!important;}}
-  @media(max-width:767px){.stats-row{flex-wrap:wrap!important;}.filter-row{flex-direction:column!important;align-items:stretch!important;}.search-input{width:100%!important;}}
+  @media(max-width:767px){
+    .stats-row{flex-wrap:wrap!important;}
+    .filter-row{flex-direction:column!important;align-items:stretch!important;}
+    .search-input{width:100%!important;}
+
+    /* Switch to card view */
+    .student-desktop-table{display:none;}
+    .student-mobile-list{display:flex;flex-direction:column;gap:10px;padding:14px;}
+
+    /* Stat chips: 2 per row */
+    .stats-row .stat-chip{min-width:calc(50% - 6px)!important;flex:1 1 calc(50% - 6px)!important;}
+  }
 `;
 
 const NAV_ITEMS = [
@@ -50,6 +85,14 @@ const NAV_ITEMS = [
   { to: "/instructor/alerts",           icon: "bi-exclamation-triangle", label: "Alerts"    },
   { to: "/instructor/support",          icon: "bi-headset",              label: "Support"   },
   { to: "/instructor/account-settings", icon: "bi-gear",                 label: "Settings"  },
+];
+
+const BOTTOM_NAV = [
+  { to: "/instructor",         icon: "bi-speedometer2",         label: "Home"     },
+  { to: "/instructor/courses", icon: "bi-book",                 label: "Courses"  },
+  { to: "/instructor/exams",   icon: "bi-file-earmark-text",    label: "Exams"    },
+  { to: "/instructor/students",icon: "bi-people",               label: "Students" },
+  { to: "/instructor/alerts",  icon: "bi-exclamation-triangle", label: "Alerts"   },
 ];
 
 const Students = () => {
@@ -174,11 +217,10 @@ const Students = () => {
       <style>{STYLES}</style>
       <div style={{ background: "#f0f4fb", minHeight: "100vh" }}>
 
-        {/* Topbar */}
+        {/* ── Topbar ── */}
         <div className="topbar d-flex align-items-center px-3 px-lg-4 gap-3">
           <span style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 700, fontSize: 15, color: "#0056b3", letterSpacing: "-.3px", flexShrink: 0 }}>SECT Instructor</span>
 
-          {/* Inline search */}
           <div className="d-none d-md-flex align-items-center ms-3" style={{ position: "relative" }}>
             <i className="bi bi-search" style={{ position: "absolute", left: 12, color: "#94a3b8", fontSize: 12 }}></i>
             <input className="search-input" style={{ width: 240 }} placeholder="Search students…"
@@ -206,7 +248,7 @@ const Students = () => {
         </div>
 
         <div className="d-flex align-items-stretch">
-          {/* Sidebar */}
+          {/* ── Sidebar ── */}
           <nav className="glass-sidebar d-none d-lg-flex flex-column align-items-center py-4 gap-1"
             style={{ width: 80, minHeight: "calc(100vh - 56px)", position: "sticky", top: 56, alignSelf: "flex-start", flexShrink: 0 }}>
             {NAV_ITEMS.map(({ to, icon, label }) => (
@@ -216,19 +258,22 @@ const Students = () => {
             ))}
           </nav>
 
-          {/* Main */}
+          {/* ── Main ── */}
           <main className="main-content" style={{ flex: 1, padding: "24px 20px", paddingBottom: 100, minWidth: 0 }}>
 
             {/* Header */}
-            <div className="fade-up" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+            <div className="fade-up" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
               <div>
-                <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a" }}>👥 Student Management</h1>
+                <p style={{ margin: 0, fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Management</p>
+                <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a" }}>Students</h1>
                 <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>
                   Enrolled students across your {courses.length} course{courses.length !== 1 ? "s" : ""}
                 </p>
               </div>
-              <Link to="/instructor/courses" className="btn-primary-dash">
-                <i className="bi bi-person-plus"></i>Enroll via Courses
+              <Link to="/instructor/courses" className="btn-primary-dash" style={{ flexShrink: 0 }}>
+                <i className="bi bi-person-plus"></i>
+                <span className="d-none d-sm-inline">Enroll via Courses</span>
+                <span className="d-sm-none">Enroll</span>
               </Link>
             </div>
 
@@ -292,7 +337,7 @@ const Students = () => {
               </div>
             </div>
 
-            {/* Students table */}
+            {/* ── Students List ── */}
             <div className="dash-card fade-up">
               <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
@@ -317,65 +362,109 @@ const Students = () => {
                   )}
                 </div>
               ) : (
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: "#f8faff", borderBottom: "1px solid #f1f5f9" }}>
-                        <th style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: ".06em", textTransform: "uppercase", width: 40 }}>#</th>
-                        <th style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: ".06em", textTransform: "uppercase", cursor: "pointer" }} onClick={() => handleSort("name")}>
-                          Name <SortIcon field="name" />
-                        </th>
-                        <th style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: ".06em", textTransform: "uppercase", cursor: "pointer" }} onClick={() => handleSort("email")}>
-                          Email <SortIcon field="email" />
-                        </th>
-                        <th style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: ".06em", textTransform: "uppercase", cursor: "pointer" }} onClick={() => handleSort("courseCode")}>
-                          Course <SortIcon field="courseCode" />
-                        </th>
-                        <th style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: ".06em", textTransform: "uppercase", cursor: "pointer" }} onClick={() => handleSort("enrolled_at")}>
-                          Enrolled <SortIcon field="enrolled_at" />
-                        </th>
-                        <th style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: ".06em", textTransform: "uppercase" }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filtered.map((student, index) => (
-                        <tr key={`${student.id}-${student.courseId}`} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                          <td style={{ padding: "12px 16px", color: "#94a3b8", fontSize: 12 }}>{index + 1}</td>
-                          <td style={{ padding: "12px 16px" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#e8f0fe", color: "#0056b3", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
-                                {student.name.charAt(0).toUpperCase()}
-                              </div>
-                              <span style={{ fontWeight: 600, color: "#1e293b" }}>{student.name}</span>
-                            </div>
-                          </td>
-                          <td style={{ padding: "12px 16px", color: "#64748b", fontSize: 12 }}>{student.email}</td>
-                          <td style={{ padding: "12px 16px" }}>
-                            <Link to={`/instructor/courses/${student.courseId}`} style={{ textDecoration: "none" }}>
-                              <span style={{ display: "inline-flex", padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, background: "#e8f0fe", color: "#0056b3" }}>
-                                {student.courseCode}
-                              </span>
-                              <span className="d-none d-xl-inline" style={{ marginLeft: 8, fontSize: 12, color: "#94a3b8" }}>{student.courseName}</span>
-                            </Link>
-                          </td>
-                          <td style={{ padding: "12px 16px", fontSize: 12, color: "#94a3b8" }}>
-                            {student.enrolled_at ? new Date(student.enrolled_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "—"}
-                          </td>
-                          <td style={{ padding: "12px 16px" }}>
-                            <div style={{ display: "flex", gap: 6 }}>
-                              <Link to={`/instructor/courses/${student.courseId}`} className="btn-outline-dash" title="View in Course">
-                                <i className="bi bi-eye"></i>
-                              </Link>
-                              <button className="btn-danger-dash" title="Remove from course" onClick={() => handleRemove(student)}>
-                                <i className="bi bi-person-dash"></i>
-                              </button>
-                            </div>
-                          </td>
+                <>
+                  {/* ── Desktop Table ── */}
+                  <div className="student-desktop-table" style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: "#f8faff", borderBottom: "1px solid #f1f5f9" }}>
+                          <th style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: ".06em", textTransform: "uppercase", width: 40 }}>#</th>
+                          <th style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: ".06em", textTransform: "uppercase", cursor: "pointer" }} onClick={() => handleSort("name")}>
+                            Name <SortIcon field="name" />
+                          </th>
+                          <th style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: ".06em", textTransform: "uppercase", cursor: "pointer" }} onClick={() => handleSort("email")}>
+                            Email <SortIcon field="email" />
+                          </th>
+                          <th style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: ".06em", textTransform: "uppercase", cursor: "pointer" }} onClick={() => handleSort("courseCode")}>
+                            Course <SortIcon field="courseCode" />
+                          </th>
+                          <th style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: ".06em", textTransform: "uppercase", cursor: "pointer" }} onClick={() => handleSort("enrolled_at")}>
+                            Enrolled <SortIcon field="enrolled_at" />
+                          </th>
+                          <th style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: ".06em", textTransform: "uppercase" }}>Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {filtered.map((student, index) => (
+                          <tr key={`${student.id}-${student.courseId}`} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                            <td style={{ padding: "12px 16px", color: "#94a3b8", fontSize: 12 }}>{index + 1}</td>
+                            <td style={{ padding: "12px 16px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#e8f0fe", color: "#0056b3", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+                                  {student.name.charAt(0).toUpperCase()}
+                                </div>
+                                <span style={{ fontWeight: 600, color: "#1e293b" }}>{student.name}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: "12px 16px", color: "#64748b", fontSize: 12 }}>{student.email}</td>
+                            <td style={{ padding: "12px 16px" }}>
+                              <Link to={`/instructor/courses/${student.courseId}`} style={{ textDecoration: "none" }}>
+                                <span style={{ display: "inline-flex", padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, background: "#e8f0fe", color: "#0056b3" }}>
+                                  {student.courseCode}
+                                </span>
+                                <span className="d-none d-xl-inline" style={{ marginLeft: 8, fontSize: 12, color: "#94a3b8" }}>{student.courseName}</span>
+                              </Link>
+                            </td>
+                            <td style={{ padding: "12px 16px", fontSize: 12, color: "#94a3b8" }}>
+                              {student.enrolled_at ? new Date(student.enrolled_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "—"}
+                            </td>
+                            <td style={{ padding: "12px 16px" }}>
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <Link to={`/instructor/courses/${student.courseId}`} className="btn-outline-dash" title="View in Course">
+                                  <i className="bi bi-eye"></i>
+                                </Link>
+                                <button className="btn-danger-dash" title="Remove from course" onClick={() => handleRemove(student)}>
+                                  <i className="bi bi-person-dash"></i>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* ── Mobile Card List ── */}
+                  <div className="student-mobile-list">
+                    {filtered.map((student, index) => (
+                      <div key={`${student.id}-${student.courseId}`} className="student-mobile-card">
+                        <div className="student-mobile-card-body">
+                          {/* Avatar */}
+                          <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#e8f0fe", color: "#0056b3", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16, flexShrink: 0 }}>
+                            {student.name.charAt(0).toUpperCase()}
+                          </div>
+                          {/* Info */}
+                          <div className="student-mobile-card-info">
+                            <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{student.name}</div>
+                            <div style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{student.email}</div>
+                            {student.enrolled_at && (
+                              <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>
+                                <i className="bi bi-calendar3 me-1"></i>
+                                {new Date(student.enrolled_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {/* Action bar */}
+                        <div className="student-mobile-card-action">
+                          <Link to={`/instructor/courses/${student.courseId}`} style={{ textDecoration: "none" }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, background: "#e8f0fe", color: "#0056b3" }}>
+                              <i className="bi bi-book"></i>{student.courseCode}
+                            </span>
+                          </Link>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <Link to={`/instructor/courses/${student.courseId}`} className="btn-outline-dash" style={{ padding: "5px 10px" }}>
+                              <i className="bi bi-eye"></i>
+                            </Link>
+                            <button className="btn-danger-dash" style={{ padding: "5px 10px" }} onClick={() => handleRemove(student)}>
+                              <i className="bi bi-person-dash"></i>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
 
               {filtered.length > 0 && (
@@ -388,9 +477,9 @@ const Students = () => {
           </main>
         </div>
 
-        {/* Bottom Nav */}
+        {/* ── Bottom Nav ── */}
         <nav className="bottom-nav d-lg-none">
-          {NAV_ITEMS.slice(0, 5).map(({ to, icon, label }) => (
+          {BOTTOM_NAV.map(({ to, icon, label }) => (
             <Link key={to} to={to} className="bottom-nav-item"
               style={{ color: isActive(to) ? "#0056b3" : "#94a3b8", borderTop: isActive(to) ? "2px solid #0056b3" : "2px solid transparent" }}>
               <i className={`bi ${icon}`}></i>{label}

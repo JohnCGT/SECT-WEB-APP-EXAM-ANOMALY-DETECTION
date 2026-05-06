@@ -15,14 +15,14 @@ const NAV_ITEMS = [
 ];
 
 const TYPE_LABELS = {
-  tab_switch:         "Tab Switching",
-  keyboard_shortcut:  "Keyboard Shortcut",
-  response_time:      "Response Time",
-  keystroke_dynamics: "Keystroke Dynamics",
+  tab_switch:         "Tab Switch",
+  keyboard_shortcut:  "Keyboard",
+  response_time:      "Response",
+  keystroke_dynamics: "Keystroke",
 };
 const SEVERITY_MAP = {
   high:   { bg: "#fef2f2", color: "#dc2626", label: "High"   },
-  medium: { bg: "#fff7ed", color: "#d97706", label: "Medium" },
+  medium: { bg: "#fff7ed", color: "#d97706", label: "Med"    },
   low:    { bg: "#f1f5f9", color: "#64748b", label: "Low"    },
 };
 const QTYPE_ICON = {
@@ -35,6 +35,36 @@ const riskColor   = (s) => s >= 50 ? "#ef4444"  : s >= 20 ? "#d97706"  : "#22c55
 const riskBgColor = (s) => s >= 50 ? "#fef2f2"  : s >= 20 ? "#fff7ed"  : "#f0fdf4";
 const cpiLabel    = (s) => s >= 75 ? "Highly Likely" : s >= 50 ? "Likely" : s >= 25 ? "Possible" : "Unlikely";
 const isEssayGraded = (e) => e.points_earned !== null && e.points_earned !== undefined;
+
+/* ─── Pagination ─────────────────────────────────────────────────────────── */
+const Pagination = ({ total, page, perPage, onChange }) => {
+  const totalPages = Math.ceil(total / perPage);
+  if (totalPages <= 1) return null;
+  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: "1px solid #f1f5f9", flexWrap: "wrap", gap: 8 }}>
+      <span style={{ fontSize: 12, color: "#94a3b8" }}>
+        {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
+      </span>
+      <div style={{ display: "flex", gap: 4 }}>
+        <button onClick={() => onChange(page - 1)} disabled={page === 1}
+          style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid rgba(0,86,179,.15)", background: "#fff", cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? .4 : 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#64748b" }}>
+          <i className="bi bi-chevron-left"></i>
+        </button>
+        {pages.map(p => (
+          <button key={p} onClick={() => onChange(p)}
+            style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${p === page ? "#0056b3" : "rgba(0,86,179,.15)"}`, background: p === page ? "#0056b3" : "#fff", color: p === page ? "#fff" : "#64748b", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans',sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {p}
+          </button>
+        ))}
+        <button onClick={() => onChange(page + 1)} disabled={page === totalPages}
+          style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid rgba(0,86,179,.15)", background: "#fff", cursor: page === totalPages ? "not-allowed" : "pointer", opacity: page === totalPages ? .4 : 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#64748b" }}>
+          <i className="bi bi-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  );
+};
 
 /* ─── jsPDF (CDN, on-demand) ────────────────────────────────────────────── */
 let jsPDFPromise = null;
@@ -260,17 +290,22 @@ const SHARED_CSS = `
   @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   .fade-up{animation:fadeUp .4s ease both;}
+
   /* Tabs */
   .dash-tabs{display:flex;gap:4px;border-bottom:2px solid #f1f5f9;margin-bottom:20px;overflow-x:auto;scrollbar-width:none;padding-bottom:0;}
   .dash-tabs::-webkit-scrollbar{display:none;}
   .dash-tab{
-    padding:10px 16px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;
+    padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;
     color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;
     transition:color .15s,border-color .15s;border-radius:8px 8px 0 0;font-family:'DM Sans',sans-serif;
-    display:flex;align-items:center;gap:6px;
+    display:flex;align-items:center;gap:6px;flex-shrink:0;
   }
   .dash-tab:hover{color:#0056b3;background:#f8faff;}
   .dash-tab.active{color:#0056b3;border-bottom-color:#0056b3;background:#e8f0fe;}
+  /* On mobile: show icon + short label */
+  .tab-label-full{display:inline;}
+  .tab-label-short{display:none;}
+
   /* Table */
   .dash-table{width:100%;border-collapse:collapse;font-family:'DM Sans',sans-serif;}
   .dash-table th{padding:10px 16px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.06em;white-space:nowrap;border-bottom:1px solid #f1f5f9;background:#f8faff;}
@@ -278,6 +313,11 @@ const SHARED_CSS = `
   .dash-table tbody tr{transition:background .15s;}
   .dash-table tbody tr:hover{background:#f8faff;}
   .dash-table tbody tr:last-child td{border-bottom:none;}
+
+  /* Mobile card list (hidden on desktop) */
+  .mobile-card-list{display:none;}
+  .desktop-table{display:block;}
+
   /* Buttons */
   .dash-btn-primary{
     background:var(--blue);color:#fff;border:none;border-radius:10px;
@@ -315,11 +355,13 @@ const SHARED_CSS = `
   }
   .action-btn:hover{background:var(--blue-lite);border-color:var(--blue);color:var(--blue);}
   .action-btn.del:hover{background:#fef2f2;border-color:#ef4444;color:#ef4444;}
+
   /* Pills / badges */
   .badge-pill{
     display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;
     font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
   }
+
   /* Modals */
   .dash-modal-overlay{
     position:fixed;inset:0;background:rgba(15,23,42,.5);
@@ -337,6 +379,7 @@ const SHARED_CSS = `
   .dash-modal-hdr{padding:20px 24px 16px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;}
   .dash-modal-body{overflow-y:auto;padding:20px 24px;flex:1;}
   .dash-modal-ftr{padding:14px 24px;border-top:1px solid #f1f5f9;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;}
+
   /* Form */
   .form-lbl{font-size:11px;font-weight:700;color:#64748b;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;display:block;}
   .form-ctrl{
@@ -347,18 +390,21 @@ const SHARED_CSS = `
   }
   .form-ctrl:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
   .form-ctrl:disabled{opacity:.6;cursor:not-allowed;}
+
   /* Info strip */
   .info-strip{display:flex;flex-wrap:wrap;gap:0;border-bottom:1px solid #f1f5f9;}
-  .info-item{padding:14px 18px;border-right:1px solid #f1f5f9;flex:0 0 auto;}
+  .info-item{padding:12px 16px;border-right:1px solid #f1f5f9;flex:0 0 auto;}
   .info-item:last-child{border-right:none;}
   .info-item-label{font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.05em;text-transform:uppercase;margin-bottom:3px;}
   .info-item-value{font-size:13px;font-weight:700;color:#1e293b;}
+
   /* Essay card */
   .essay-card-hdr{
     padding:14px 18px;display:flex;align-items:center;gap:12px;cursor:pointer;
     border-bottom:1px solid #f1f5f9;transition:background .15s;
   }
   .essay-card-hdr:hover{background:#f8faff;}
+
   /* Shuffle toggle */
   .shuffle-toggle{
     display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:99px;
@@ -366,17 +412,19 @@ const SHARED_CSS = `
     background:#f8faff;
   }
   .shuffle-toggle.on{background:#f0fdf4;border-color:#bbf7d0;}
+
   /* Stats grid for anomaly / essay */
-  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;}
   .stat-card{
     background:#fff;border-radius:14px;border:1px solid rgba(0,86,179,.06);
-    box-shadow:0 1px 3px rgba(0,0,0,.04);padding:14px 16px;
-    display:flex;align-items:center;gap:12px;cursor:pointer;transition:box-shadow .15s,transform .15s;
+    box-shadow:0 1px 3px rgba(0,0,0,.04);padding:12px 14px;
+    display:flex;align-items:center;gap:10px;cursor:pointer;transition:box-shadow .15s,transform .15s;
   }
   .stat-card:hover{box-shadow:0 4px 16px rgba(0,86,179,.10);transform:translateY(-1px);}
   .stat-card.selected{box-shadow:0 4px 16px rgba(0,86,179,.15);outline:2px solid currentColor;}
-  .stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-  .stat-icon i{font-size:17px;}
+  .stat-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .stat-icon i{font-size:16px;}
+
   /* Bottom nav */
   .instructor-bottom-nav{
     position:fixed;bottom:0;left:0;right:0;height:64px;
@@ -387,16 +435,42 @@ const SHARED_CSS = `
   }
   .bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:600;gap:3px;text-decoration:none;transition:color .2s;}
   .bnav-item i{font-size:19px;}
+
   /* Q card */
-  .q-card{padding:20px;border-bottom:1px solid #f1f5f9;transition:background .15s;}
+  .q-card{padding:16px 20px;border-bottom:1px solid #f1f5f9;transition:background .15s;}
   .q-card:hover{background:#f8faff;}
   .q-card:last-child{border-bottom:none;}
-  @media(max-width:991px){.hide-lg{display:none!important;}}
+
+  /* Mobile student/anomaly cards */
+  .mobile-item-card{
+    background:#fff;border-radius:14px;border:1px solid rgba(0,86,179,.07);
+    box-shadow:0 1px 4px rgba(0,0,0,.04);overflow:hidden;margin-bottom:8px;
+  }
+  .mobile-item-card-body{padding:14px 16px;}
+  .mobile-item-card-footer{
+    padding:9px 16px;border-top:1px solid rgba(0,86,179,.06);
+    background:#fafbff;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  }
+
   @media(max-width:767px){
-    .info-strip{flex-direction:column;}
-    .info-item{border-right:none;border-bottom:1px solid #f1f5f9;padding:10px 16px;}
+    .dash-tab{padding:8px 10px;font-size:12px;gap:4px;}
+    .tab-label-full{display:none;}
+    .tab-label-short{display:inline;}
+    .info-strip{flex-wrap:wrap;}
+    .info-item{flex:1 0 calc(50% - 1px);border-right:none;border-bottom:1px solid #f1f5f9;}
+    .info-item:nth-child(odd){border-right:1px solid #f1f5f9;}
     .info-item:last-child{border-bottom:none;}
+    .mobile-card-list{display:flex;flex-direction:column;}
+    .desktop-table{display:none;}
+    .stats-grid{grid-template-columns:1fr 1fr;}
     .modal-grid-2{grid-template-columns:1fr!important;}
+    .page-header-actions{flex-direction:column;align-items:stretch!important;}
+    .page-header-actions .dash-btn-ghost,
+    .page-header-actions .dash-btn-primary{justify-content:center;}
+  }
+  @media(max-width:480px){
+    .dash-tab{padding:8px 8px;font-size:11px;}
+    .stats-grid{grid-template-columns:1fr 1fr;}
   }
 `;
 
@@ -424,10 +498,10 @@ const InstructorBottomNav = ({ active }) => {
 const MetadataSummary = ({ type, meta }) => {
   if (!meta) return <span style={{ fontSize: 12, color: "#94a3b8" }}>—</span>;
   switch (type) {
-    case "tab_switch":         return <span style={{ fontSize: 12 }}>Hidden {((meta.hidden_duration_ms??0)/1000).toFixed(1)}s · Switch #{meta.count_in_session}</span>;
+    case "tab_switch":         return <span style={{ fontSize: 12 }}>Hidden {((meta.hidden_duration_ms??0)/1000).toFixed(1)}s · #{meta.count_in_session}</span>;
     case "keyboard_shortcut":  return <span style={{ fontSize: 12 }}><kbd style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 4, padding: "1px 5px", fontSize: 11 }}>{meta.keys}</kbd></span>;
-    case "response_time":      return <span style={{ fontSize: 12 }}>{meta.direction==="too_fast"?"⚡ Too fast":"🐢 Too slow"} · z={meta.z_score} · {((meta.response_time_ms??0)/1000).toFixed(1)}s</span>;
-    case "keystroke_dynamics": return <span style={{ fontSize: 12 }}>{meta.reason==="impossible_speed"?"🚀 Impossible speed":"📊 Deviation"} · {meta.wpm?.toFixed(0)} WPM</span>;
+    case "response_time":      return <span style={{ fontSize: 12 }}>{meta.direction==="too_fast"?"⚡ Fast":"🐢 Slow"} · {((meta.response_time_ms??0)/1000).toFixed(1)}s</span>;
+    case "keystroke_dynamics": return <span style={{ fontSize: 12 }}>{meta.wpm?.toFixed(0)} WPM</span>;
     default:                   return <span style={{ fontSize: 12, color: "#94a3b8" }}>—</span>;
   }
 };
@@ -435,12 +509,15 @@ const MetadataSummary = ({ type, meta }) => {
 /* ════════════════════════════════════════════════════════════════════════════
    STUDENT RESULTS TAB
 ════════════════════════════════════════════════════════════════════════════ */
+const PER_PAGE_RESULTS = 10;
+
 const StudentResultsTab = ({ examId, anomalySummaries }) => {
   const [submissions, setSubmissions]     = useState([]);
   const [loading, setLoading]             = useState(true);
   const [search, setSearch]               = useState("");
   const [statusFilter, setStatusFilter]   = useState("all");
   const [downloadingId, setDownloadingId] = useState(null);
+  const [page, setPage]                   = useState(1);
 
   const load = async () => {
     setLoading(true);
@@ -471,14 +548,22 @@ const StudentResultsTab = ({ examId, anomalySummaries }) => {
     not_started: rows.filter(r => r.status === "not_started").length,
   }), [rows]);
 
-  const filtered = useMemo(() => rows.filter((r) => {
-    if (statusFilter !== "all" && r.status !== statusFilter) return false;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      return r.student?.name?.toLowerCase().includes(q) || r.student?.email?.toLowerCase().includes(q);
-    }
-    return true;
-  }), [rows, statusFilter, search]);
+  const filtered = useMemo(() => {
+    setPage(1);
+    return rows.filter((r) => {
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        return r.student?.name?.toLowerCase().includes(q) || r.student?.email?.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [rows, statusFilter, search]);
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PER_PAGE_RESULTS;
+    return filtered.slice(start, start + PER_PAGE_RESULTS);
+  }, [filtered, page]);
 
   const handleDownloadPDF = async (submissionId) => {
     setDownloadingId(submissionId);
@@ -506,55 +591,58 @@ const StudentResultsTab = ({ examId, anomalySummaries }) => {
     </div>
   );
 
+  const statusStyle = {
+    submitted:   { bg: "#f0fdf4", color: "#15803d", label: "Submitted"   },
+    in_progress: { bg: "#fff7ed", color: "#c2410c", label: "In Progress" },
+    not_started: { bg: "#f1f5f9", color: "#64748b", label: "Not Started" },
+  };
+
   return (
     <>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
+      {/* Filters */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
         {PILL_FILTERS.map(({ key, label, bg, color }) => {
           const active = statusFilter === key;
           return (
             <button key={key}
-              style={{ padding: "6px 14px", borderRadius: 99, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "'DM Sans',sans-serif", background: active ? bg : "#f1f5f9", color: active ? color : "#64748b", display: "flex", alignItems: "center", gap: 6, transition: "all .15s" }}
+              style={{ padding: "5px 12px", borderRadius: 99, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, fontFamily: "'DM Sans',sans-serif", background: active ? bg : "#f1f5f9", color: active ? color : "#64748b", display: "flex", alignItems: "center", gap: 5, transition: "all .15s" }}
               onClick={() => setStatusFilter(key)}>
               {label}
-              <span style={{ background: active ? "rgba(0,0,0,.1)" : "rgba(0,0,0,.06)", borderRadius: 99, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>{counts[key]}</span>
+              <span style={{ background: active ? "rgba(0,0,0,.1)" : "rgba(0,0,0,.06)", borderRadius: 99, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>{counts[key]}</span>
             </button>
           );
         })}
         <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
           <div style={{ position: "relative" }}>
-            <i className="bi bi-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13 }}></i>
-            <input className="form-ctrl" style={{ paddingLeft: 32, maxWidth: 200 }} placeholder="Search student…"
+            <i className="bi bi-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 12 }}></i>
+            <input className="form-ctrl" style={{ paddingLeft: 30, maxWidth: 180, fontSize: 12 }} placeholder="Search…"
               value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <button className="action-btn" onClick={load} title="Refresh"><i className="bi bi-arrow-clockwise"></i></button>
         </div>
       </div>
 
-      <div className="dash-card">
+      {/* ── Desktop Table ── */}
+      <div className="dash-card desktop-table">
         <div style={{ overflowX: "auto" }}>
           <table className="dash-table">
             <thead>
               <tr>
-                {["STUDENT","STATUS","SCORE","%","CPI","STARTED","SUBMITTED","ESSAYS","ACTIONS"].map(h => (
+                {["STUDENT","STATUS","SCORE","%","CPI","SUBMITTED","ESSAYS","PDF"].map(h => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
-                <tr><td colSpan="9" style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+              {paginated.length === 0 ? (
+                <tr><td colSpan="8" style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
                   <i className="bi bi-inbox" style={{ fontSize: 28, display: "block", marginBottom: 8 }}></i>No students match.
                 </td></tr>
-              ) : filtered.map((row) => {
+              ) : paginated.map((row) => {
                 const status      = row.status ?? "not_started";
                 const pct         = row.total_points > 0 && row.score != null ? ((row.score / row.total_points) * 100).toFixed(1) : null;
                 const isNotStarted = status === "not_started";
                 const downloading  = downloadingId === row.id;
-                const statusStyle = {
-                  submitted:   { bg: "#f0fdf4", color: "#15803d", label: "Submitted"   },
-                  in_progress: { bg: "#fff7ed", color: "#c2410c", label: "In Progress" },
-                  not_started: { bg: "#f1f5f9", color: "#64748b", label: "Not Started" },
-                };
                 const ss = statusStyle[status] || statusStyle.not_started;
                 return (
                   <tr key={row.student_id ?? row.id} style={{ opacity: isNotStarted ? .7 : 1 }}>
@@ -571,7 +659,6 @@ const StudentResultsTab = ({ examId, anomalySummaries }) => {
                     </td>
                     <td>
                       <span className="badge-pill" style={{ background: ss.bg, color: ss.color }}>{ss.label}</span>
-                      {status==="in_progress" && <span className="spinner-grow spinner-grow-sm text-warning ms-1" style={{width:"0.4rem",height:"0.4rem"}}></span>}
                     </td>
                     <td>
                       {row.score != null
@@ -580,8 +667,8 @@ const StudentResultsTab = ({ examId, anomalySummaries }) => {
                     </td>
                     <td>
                       {pct != null ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ height: 6, borderRadius: 99, background: "#f1f5f9", flex: 1, minWidth: 50, overflow: "hidden" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ height: 5, borderRadius: 99, background: "#f1f5f9", flex: 1, minWidth: 40, overflow: "hidden" }}>
                             <div style={{ height: "100%", borderRadius: 99, width: `${pct}%`, background: pct>=75?"#22c55e":pct>=50?"#f59e0b":"#ef4444" }} />
                           </div>
                           <span style={{ fontSize: 12, fontWeight: 700 }}>{pct}%</span>
@@ -593,18 +680,17 @@ const StudentResultsTab = ({ examId, anomalySummaries }) => {
                         ? <span className="badge-pill" style={{ background: riskBgColor(row.cpi_score), color: riskColor(row.cpi_score) }}>{row.cpi_score.toFixed(1)}%</span>
                         : <span style={{ color: "#94a3b8", fontSize: 12 }}>—</span>}
                     </td>
-                    <td style={{ fontSize: 12, color: "#64748b" }}>{dtFmt(row.started_at)}</td>
                     <td style={{ fontSize: 12, color: "#64748b" }}>{dtFmt(row.submitted_at)}</td>
                     <td>
                       {row.essay_count > 0
                         ? row.ungraded_count > 0
-                          ? <span className="badge-pill" style={{ background: "#fff7ed", color: "#c2410c" }}><i className="bi bi-hourglass-split me-1"></i>{row.ungraded_count} pending</span>
-                          : <span className="badge-pill" style={{ background: "#f0fdf4", color: "#15803d" }}><i className="bi bi-check-all me-1"></i>Graded</span>
+                          ? <span className="badge-pill" style={{ background: "#fff7ed", color: "#c2410c" }}>{row.ungraded_count} pending</span>
+                          : <span className="badge-pill" style={{ background: "#f0fdf4", color: "#15803d" }}>Graded</span>
                         : <span style={{ color: "#94a3b8", fontSize: 12 }}>—</span>}
                     </td>
                     <td>
                       {status==="submitted" && row.id
-                        ? <button className="dash-btn-danger" style={{ fontSize: 12, padding: "5px 12px" }} disabled={downloading} onClick={() => handleDownloadPDF(row.id)}>
+                        ? <button className="dash-btn-danger" style={{ fontSize: 11, padding: "4px 10px" }} disabled={downloading} onClick={() => handleDownloadPDF(row.id)}>
                             {downloading ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-file-earmark-pdf"></i>PDF</>}
                           </button>
                         : <span style={{ color: "#94a3b8", fontSize: 12 }}>—</span>}
@@ -615,7 +701,75 @@ const StudentResultsTab = ({ examId, anomalySummaries }) => {
             </tbody>
           </table>
         </div>
+        <Pagination total={filtered.length} page={page} perPage={PER_PAGE_RESULTS} onChange={setPage} />
       </div>
+
+      {/* ── Mobile Card List ── */}
+      <div className="mobile-card-list">
+        {paginated.length === 0 ? (
+          <div className="dash-card" style={{ textAlign: "center", padding: "36px 20px", color: "#94a3b8" }}>
+            <i className="bi bi-inbox" style={{ fontSize: 28, display: "block", marginBottom: 8 }}></i>No students match.
+          </div>
+        ) : paginated.map((row) => {
+          const status = row.status ?? "not_started";
+          const pct    = row.total_points > 0 && row.score != null ? ((row.score / row.total_points) * 100).toFixed(1) : null;
+          const ss     = statusStyle[status] || statusStyle.not_started;
+          const downloading = downloadingId === row.id;
+          return (
+            <div key={row.student_id ?? row.id} className="mobile-item-card">
+              <div className="mobile-item-card-body">
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#0056b3", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+                    {row.student?.name?.charAt(0).toUpperCase() || "?"}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.student?.name || "—"}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.student?.email || "—"}</div>
+                  </div>
+                  <span className="badge-pill" style={{ background: ss.bg, color: ss.color, flexShrink: 0 }}>{ss.label}</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                  <div style={{ background: "#f8faff", borderRadius: 10, padding: "8px 10px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, marginBottom: 2 }}>SCORE</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b" }}>
+                      {row.score != null ? `${row.score}/${row.total_points}` : "—"}
+                    </div>
+                  </div>
+                  <div style={{ background: "#f8faff", borderRadius: 10, padding: "8px 10px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, marginBottom: 2 }}>PCT</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: pct != null ? (pct>=75?"#22c55e":pct>=50?"#f59e0b":"#ef4444") : "#94a3b8" }}>
+                      {pct != null ? `${pct}%` : "—"}
+                    </div>
+                  </div>
+                  <div style={{ background: "#f8faff", borderRadius: 10, padding: "8px 10px" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, marginBottom: 2 }}>CPI</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: row.cpi_score != null ? riskColor(row.cpi_score) : "#94a3b8" }}>
+                      {row.cpi_score != null ? `${row.cpi_score.toFixed(1)}%` : "—"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mobile-item-card-footer">
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {row.essay_count > 0 && (
+                    row.ungraded_count > 0
+                      ? <span className="badge-pill" style={{ background: "#fff7ed", color: "#c2410c" }}>{row.ungraded_count} essay pending</span>
+                      : <span className="badge-pill" style={{ background: "#f0fdf4", color: "#15803d" }}>Essays graded</span>
+                  )}
+                  <span style={{ fontSize: 11, color: "#94a3b8" }}>{dtFmt(row.submitted_at)}</span>
+                </div>
+                {status === "submitted" && row.id && (
+                  <button className="dash-btn-danger" style={{ fontSize: 11, padding: "5px 10px", flexShrink: 0 }} disabled={downloading} onClick={() => handleDownloadPDF(row.id)}>
+                    {downloading ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-file-earmark-pdf"></i>PDF</>}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        <Pagination total={filtered.length} page={page} perPage={PER_PAGE_RESULTS} onChange={setPage} />
+      </div>
+
       <p style={{ marginTop: 10, fontSize: 12, color: "#94a3b8" }}>
         <i className="bi bi-info-circle me-1"></i>PDF download only for submitted exams.
       </p>
@@ -670,17 +824,17 @@ const EssaySubmissionCard = ({ sub, examId, onGraded }) => {
         <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#0056b3", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
           {sub.student?.name?.charAt(0).toUpperCase()}
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{sub.student?.name}</div>
-          <div style={{ fontSize: 12, color: "#94a3b8" }}>{sub.student?.email}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub.student?.name}</div>
+          <div style={{ fontSize: 12, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub.student?.email}</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "#0056b3" }}>{sub.score ?? "—"} / {sub.total_points}</div>
-            <div style={{ fontSize: 11, color: "#94a3b8" }}>current score</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#0056b3" }}>{sub.score ?? "—"}/{sub.total_points}</div>
+            <div style={{ fontSize: 10, color: "#94a3b8" }}>pts</div>
           </div>
           <span className="badge-pill" style={allGraded ? { background: "#f0fdf4", color: "#15803d" } : { background: "#fff7ed", color: "#c2410c" }}>
-            {allGraded ? <><i className="bi bi-check-all me-1"></i>All graded</> : <><i className="bi bi-hourglass-split me-1"></i>{pendingCount} pending</>}
+            {allGraded ? "Done" : `${pendingCount} left`}
           </span>
           <i className={`bi ${expanded ? "bi-chevron-up" : "bi-chevron-down"}`} style={{ color: "#94a3b8" }}></i>
         </div>
@@ -718,7 +872,7 @@ const EssaySubmissionCard = ({ sub, examId, onGraded }) => {
               </div>
               <div className="modal-grid-2" style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 12 }}>
                 <div>
-                  <label className="form-lbl">Points Earned <span style={{ color: "#ef4444" }}>*</span> <span style={{ color: "#94a3b8", textTransform: "none" }}>/ {essay.points}</span></label>
+                  <label className="form-lbl">Points <span style={{ color: "#ef4444" }}>*</span> <span style={{ color: "#94a3b8", textTransform: "none" }}>/ {essay.points}</span></label>
                   <input type="number" className="form-ctrl" min="0" max={essay.points} step="1"
                     placeholder={`0 – ${essay.points}`}
                     value={grades[essay.question_id]?.points_earned ?? ""}
@@ -728,7 +882,7 @@ const EssaySubmissionCard = ({ sub, examId, onGraded }) => {
                 </div>
                 <div>
                   <label className="form-lbl">Feedback <span style={{ color: "#94a3b8", textTransform: "none", fontWeight: 400 }}>(optional)</span></label>
-                  <textarea className="form-ctrl" rows="2" placeholder="Write feedback for the student…"
+                  <textarea className="form-ctrl" rows="2" placeholder="Write feedback…"
                     value={grades[essay.question_id]?.feedback || ""}
                     onChange={e => handleGradeChange(essay.question_id, "feedback", e.target.value)}
                     disabled={submitting} style={{ resize: "vertical" }} />
@@ -744,8 +898,7 @@ const EssaySubmissionCard = ({ sub, examId, onGraded }) => {
             </div>
           ))}
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
-            <button className="dash-btn-success" onClick={handleSubmitGrades} disabled={submitting}
-              style={{ padding: "10px 24px" }}>
+            <button className="dash-btn-success" onClick={handleSubmitGrades} disabled={submitting} style={{ padding: "10px 24px" }}>
               {submitting ? <><span className="spinner-border spinner-border-sm me-2"/>Saving…</> : <><i className="bi bi-check2-circle"></i>Save Grades</>}
             </button>
           </div>
@@ -785,14 +938,13 @@ const StudentDetailModal = ({ loading, data, onClose, onMarkReviewed }) => (
                 { label:"Keystroke ⚠",value:data.summary?.keystroke_anomaly_count??0,      color:"#0369a1", bg:"#f0f9ff" },
               ].map(({ label, value, color, bg }) => (
                 <div key={label} style={{ background: bg, borderRadius: 12, padding: "12px 14px", textAlign: "center" }}>
-                  <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
                   <div style={{ fontSize: 11, fontWeight: 600, color, opacity: .75, marginTop: 3 }}>{label}</div>
                 </div>
               ))}
             </div>
             <p style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>
               <strong>Started:</strong> {new Date(data.submission?.started_at).toLocaleString()} &nbsp;·&nbsp;
-              <strong>Submitted:</strong> {data.submission?.submitted_at ? new Date(data.submission.submitted_at).toLocaleString() : "In progress"} &nbsp;·&nbsp;
               <strong>Score:</strong> {data.submission?.score}/{data.submission?.total_points}
             </p>
             <h6 style={{ fontWeight: 700, marginBottom: 12, fontSize: 14, color: "#0f172a" }}>
@@ -808,7 +960,7 @@ const StudentDetailModal = ({ loading, data, onClose, onMarkReviewed }) => (
               <div style={{ overflowX: "auto" }}>
                 <table className="dash-table">
                   <thead>
-                    <tr>{["TIME","TYPE","SEVERITY","QUESTION","DETAIL","NOTES","STATUS","ACTION"].map(h => <th key={h}>{h}</th>)}</tr>
+                    <tr>{["TIME","TYPE","SEV","Q","DETAIL","STATUS","ACTION"].map(h => <th key={h}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {data.logs.map(log => (
@@ -818,10 +970,9 @@ const StudentDetailModal = ({ loading, data, onClose, onMarkReviewed }) => (
                         <td><span className="badge-pill" style={{ background: SEVERITY_MAP[log.severity]?.bg || "#f1f5f9", color: SEVERITY_MAP[log.severity]?.color || "#64748b" }}>{SEVERITY_MAP[log.severity]?.label??log.severity}</span></td>
                         <td>{log.question ? <span style={{ fontSize: 12 }}>Q{log.question.order}</span> : <span style={{ color: "#94a3b8", fontSize: 12 }}>—</span>}</td>
                         <td><MetadataSummary type={log.type} meta={log.metadata}/></td>
-                        <td style={{ fontSize: 12, color: "#64748b", fontStyle: "italic" }}>{log.reviewer_notes||"—"}</td>
                         <td>
                           <span className="badge-pill" style={log.reviewed ? { background: "#f0fdf4", color: "#15803d" } : { background: "#f1f5f9", color: "#64748b" }}>
-                            {log.reviewed ? "Reviewed" : "Pending"}
+                            {log.reviewed ? "Done" : "Pending"}
                           </span>
                         </td>
                         <td>
@@ -853,29 +1004,28 @@ const QuestionFormFields = ({ formData, setFormData, submitting }) => {
     const opts = [...formData.options]; opts[i] = v;
     setFormData({ ...formData, options: opts, correct_answer: formData.correct_answer === formData.options[i] ? "" : formData.correct_answer });
   };
-
   const TYPE_OPTS = [
     { value:"multiple_choice", label:"Multiple Choice", icon:"bi-ui-radios"  },
     { value:"true_false",      label:"True / False",    icon:"bi-toggle-on"  },
     { value:"essay",           label:"Essay",           icon:"bi-textarea"   },
   ];
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12 }}>
         <div>
           <label className="form-lbl">Type <span style={{ color: "#ef4444" }}>*</span></label>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 6 }}>
             {TYPE_OPTS.map(opt => (
               <button key={opt.value} type="button"
-                style={{ flex: 1, padding: "9px 10px", borderRadius: 10, border: `1px solid ${formData.type===opt.value?"#0056b3":"rgba(0,86,179,.15)"}`, background: formData.type===opt.value?"#0056b3":"#f8faff", color: formData.type===opt.value?"#fff":"#64748b", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, transition: "all .15s" }}
+                style={{ flex: 1, padding: "8px 6px", borderRadius: 10, border: `1px solid ${formData.type===opt.value?"#0056b3":"rgba(0,86,179,.15)"}`, background: formData.type===opt.value?"#0056b3":"#f8faff", color: formData.type===opt.value?"#fff":"#64748b", fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: "'DM Sans',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 4, transition: "all .15s" }}
                 onClick={() => setFormData({...formData,type:opt.value,correct_answer:"",options:["","","",""]})}>
-                <i className={`bi ${opt.icon}`}></i>{opt.label}
+                <i className={`bi ${opt.icon}`}></i>
+                <span className="d-none d-sm-inline">{opt.label}</span>
               </button>
             ))}
           </div>
         </div>
-        <div style={{ minWidth: 90 }}>
+        <div style={{ minWidth: 80 }}>
           <label className="form-lbl">Points <span style={{ color: "#ef4444" }}>*</span></label>
           <input type="number" className="form-ctrl" min="1" value={formData.points}
             onChange={e => setFormData({...formData,points:parseInt(e.target.value)})} required disabled={submitting}/>
@@ -925,7 +1075,6 @@ const QuestionFormFields = ({ formData, setFormData, submitting }) => {
               </button>
             ))}
           </div>
-          <input type="hidden" value={formData.correct_answer} required onChange={()=>{}}/>
         </div>
       )}
       {formData.type==="essay" && (
@@ -950,11 +1099,10 @@ const QuestionFormFields = ({ formData, setFormData, submitting }) => {
 
 const BLANK_QUESTION = { type:"multiple_choice", question_text:"", points:1, options:["","","",""], correct_answer:"", max_words:null, rubric:"" };
 
-/* ─── Add Question Modal ──────────────────────────────────────────────────── */
+/* ─── Add Question Modal ── */
 const AddQuestionModal = ({ show, onHide, examId, onSuccess }) => {
   const [formData, setFormData] = useState(BLANK_QUESTION);
   const [submitting, setSubmitting] = useState(false);
-
   const handleSubmit = async (e) => {
     e.preventDefault(); setSubmitting(true);
     try {
@@ -969,7 +1117,6 @@ const AddQuestionModal = ({ show, onHide, examId, onSuccess }) => {
     } catch (err) { Swal.fire("Error!", err.response?.data?.message||"Failed to add question", "error"); }
     finally { setSubmitting(false); }
   };
-
   if (!show) return null;
   return (
     <div className="dash-modal-overlay">
@@ -993,7 +1140,7 @@ const AddQuestionModal = ({ show, onHide, examId, onSuccess }) => {
         <div className="dash-modal-ftr">
           <button type="button" className="dash-btn-ghost" onClick={onHide} disabled={submitting}>Cancel</button>
           <button type="submit" form="add-q-form" className="dash-btn-primary" disabled={submitting}>
-            {submitting ? <><span className="spinner-border spinner-border-sm me-2"/>Adding…</> : <><i className="bi bi-plus-circle"></i>Add Question</>}
+            {submitting ? <><span className="spinner-border spinner-border-sm me-2"/>Adding…</> : <><i className="bi bi-plus-circle"></i>Add</>}
           </button>
         </div>
       </div>
@@ -1001,11 +1148,10 @@ const AddQuestionModal = ({ show, onHide, examId, onSuccess }) => {
   );
 };
 
-/* ─── Edit Question Modal ──────────────────────────────────────────────────── */
+/* ─── Edit Question Modal ── */
 const EditQuestionModal = ({ question, onHide, onSave }) => {
   const [formData, setFormData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-
   useEffect(() => {
     if (!question) { setFormData(null); return; }
     setFormData({
@@ -1014,7 +1160,6 @@ const EditQuestionModal = ({ question, onHide, onSave }) => {
       correct_answer: question.correct_answer||"", max_words: question.max_words||null, rubric: question.rubric||"",
     });
   }, [question]);
-
   const handleSubmit = async (e) => {
     e.preventDefault(); if (!formData) return; setSubmitting(true);
     const p = { type:formData.type, question_text:formData.question_text, points:formData.points };
@@ -1024,7 +1169,6 @@ const EditQuestionModal = ({ question, onHide, onSave }) => {
     await onSave(question.id, p);
     setSubmitting(false);
   };
-
   if (!question || !formData) return null;
   return (
     <div className="dash-modal-overlay">
@@ -1034,7 +1178,6 @@ const EditQuestionModal = ({ question, onHide, onSave }) => {
             <h5 style={{ margin: 0, fontWeight: 700, fontSize: 17, color: "#0f172a" }}>
               <i className="bi bi-pencil-square me-2" style={{ color: "#f59e0b" }}></i>Edit Question
             </h5>
-            <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94a3b8" }}>Changes save on click</p>
           </div>
           <button onClick={onHide} disabled={submitting} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#94a3b8", padding: 4 }}>
             <i className="bi bi-x-lg"></i>
@@ -1046,12 +1189,9 @@ const EditQuestionModal = ({ question, onHide, onSave }) => {
           </div>
         </form>
         <div className="dash-modal-ftr">
-          <span style={{ fontSize: 12, color: "#94a3b8", marginRight: "auto", display: "flex", alignItems: "center", gap: 4 }}>
-            <i className="bi bi-lock"></i> Edits won't be lost until you cancel
-          </span>
           <button type="button" className="dash-btn-ghost" onClick={onHide} disabled={submitting}>Cancel</button>
-          <button type="submit" form="edit-q-form" className="dash-btn-primary" style={{ background: "#f59e0b", color: "#fff" }} disabled={submitting}>
-            {submitting ? <><span className="spinner-border spinner-border-sm me-2"/>Saving…</> : <><i className="bi bi-check2"></i>Save Changes</>}
+          <button type="submit" form="edit-q-form" className="dash-btn-primary" style={{ background: "#f59e0b" }} disabled={submitting}>
+            {submitting ? <><span className="spinner-border spinner-border-sm me-2"/>Saving…</> : <><i className="bi bi-check2"></i>Save</>}
           </button>
         </div>
       </div>
@@ -1062,6 +1202,9 @@ const EditQuestionModal = ({ question, onHide, onSave }) => {
 /* ════════════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
 ════════════════════════════════════════════════════════════════════════════ */
+const PER_PAGE_QUESTIONS = 15;
+const PER_PAGE_ANOMALY   = 10;
+
 const ExamDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -1079,6 +1222,7 @@ const ExamDetail = () => {
   const [detailLoading, setDetailLoading]     = useState(false);
   const [anomalySearch, setAnomalySearch]     = useState("");
   const [anomalyFilter, setAnomalyFilter]     = useState("all");
+  const [anomalyPage, setAnomalyPage]         = useState(1);
 
   const [essayData, setEssayData]       = useState(null);
   const [essayLoading, setEssayLoading] = useState(false);
@@ -1087,14 +1231,14 @@ const ExamDetail = () => {
 
   const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [editingQuestion, setEditingQuestion]     = useState(null);
+  const [questionPage, setQuestionPage]           = useState(1);
 
   const [shuffleEnabled, setShuffleEnabled] = useState(false);
   const [shuffleSaving, setShuffleSaving]   = useState(false);
   const shuffleKey = `exam_shuffle_${id}`;
 
   const isNewExam = !!location.state?.openAddQuestion;
-  const isNavActive = (to) =>
-    to === "/instructor" ? location.pathname === to : location.pathname.startsWith(to);
+  const isNavActive = (to) => to === "/instructor" ? location.pathname === to : location.pathname.startsWith(to);
 
   useEffect(() => {
     if (isNewExam && !loading) {
@@ -1104,11 +1248,7 @@ const ExamDetail = () => {
   }, [loading, isNewExam]);
 
   useEffect(() => { fetchExamDetails(); }, [id]);
-
-  useEffect(() => {
-    if (!loading && exam) fetchEssayStats();
-  }, [loading, exam]);
-
+  useEffect(() => { if (!loading && exam) fetchEssayStats(); }, [loading, exam]);
   useEffect(() => {
     if (activeTab==="anomalies" && !anomalyLoaded) fetchAnomalySummaries();
     if (activeTab==="essays"    && !essayLoaded)   fetchEssayData();
@@ -1226,7 +1366,7 @@ const ExamDetail = () => {
       const msg = err?.response?.data?.message || err?.message || "";
       const dbMissing = [422,500].includes(err?.response?.status) || msg.toLowerCase().includes("column") || msg.toLowerCase().includes("shuffle");
       if (dbMissing) {
-        Swal.fire({ toast:true, position:"top-end", icon:"warning", title:`Shuffle ${next?"ON":"OFF"} (saved locally)`, text:"Add the shuffle_questions migration to persist permanently.", showConfirmButton:false, timer:5000 });
+        Swal.fire({ toast:true, position:"top-end", icon:"warning", title:`Shuffle ${next?"ON":"OFF"} (saved locally)`, showConfirmButton:false, timer:5000 });
       } else {
         setShuffleEnabled(!next); localStorage.setItem(shuffleKey, JSON.stringify(!next));
         Swal.fire({ icon:"error", title:"Could not save shuffle setting", text:msg });
@@ -1234,24 +1374,35 @@ const ExamDetail = () => {
     } finally { setShuffleSaving(false); }
   };
 
-  // ─── FIX: Use is_flagged + cpi_score to match the table's own display logic ───
   const anomalyStats = {
     flagged: summaries.filter(s => s.is_flagged).length,
     warning: summaries.filter(s => !s.is_flagged && (s.cpi_score ?? 0) >= 25).length,
     clear:   summaries.filter(s => !s.is_flagged && (s.cpi_score ?? 0) < 25).length,
   };
 
-  // ─── FIX: Filter summaries using the same is_flagged + cpi_score logic ───
-  const filteredSummaries = summaries.filter(s => {
-    if (anomalyFilter === "flagged" && !s.is_flagged) return false;
-    if (anomalyFilter === "warning" && (s.is_flagged || (s.cpi_score ?? 0) < 25)) return false;
-    if (anomalyFilter === "none"    && (s.is_flagged || (s.cpi_score ?? 0) >= 25)) return false;
-    if (anomalySearch.trim()) {
-      const q = anomalySearch.toLowerCase();
-      return s.student?.name?.toLowerCase().includes(q) || s.student?.email?.toLowerCase().includes(q);
-    }
-    return true;
-  });
+  const filteredSummaries = useMemo(() => {
+    setAnomalyPage(1);
+    return summaries.filter(s => {
+      if (anomalyFilter === "flagged" && !s.is_flagged) return false;
+      if (anomalyFilter === "warning" && (s.is_flagged || (s.cpi_score ?? 0) < 25)) return false;
+      if (anomalyFilter === "none"    && (s.is_flagged || (s.cpi_score ?? 0) >= 25)) return false;
+      if (anomalySearch.trim()) {
+        const q = anomalySearch.toLowerCase();
+        return s.student?.name?.toLowerCase().includes(q) || s.student?.email?.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [summaries, anomalyFilter, anomalySearch]);
+
+  const paginatedSummaries = useMemo(() => {
+    const start = (anomalyPage - 1) * PER_PAGE_ANOMALY;
+    return filteredSummaries.slice(start, start + PER_PAGE_ANOMALY);
+  }, [filteredSummaries, anomalyPage]);
+
+  const paginatedQuestions = useMemo(() => {
+    const start = (questionPage - 1) * PER_PAGE_QUESTIONS;
+    return questions.slice(start, start + PER_PAGE_QUESTIONS);
+  }, [questions, questionPage]);
 
   const totalPoints = questions.reduce((sum, q) => sum + (q.points||0), 0);
   const hasEssays   = questions.some(q => q.type==="essay");
@@ -1265,11 +1416,11 @@ const ExamDetail = () => {
   const ss = STATUS_STYLE[exam?.status] || STATUS_STYLE.draft;
 
   const TABS = [
-    { key:"questions", icon:"bi-list-ol",          label:"Questions",       badge:questions.length, badgeBg:"#e8f0fe", badgeColor:"#0056b3" },
-    { key:"results",   icon:"bi-people",            label:"Student Results"  },
-    ...(hasEssays ? [{ key:"essays", icon:"bi-textarea", label:"Essay Grading",
+    { key:"questions", icon:"bi-list-ol",           label:"Questions",   short:"Qs",       badge:questions.length, badgeBg:"#e8f0fe", badgeColor:"#0056b3" },
+    { key:"results",   icon:"bi-people",             label:"Results",     short:"Results"   },
+    ...(hasEssays ? [{ key:"essays", icon:"bi-textarea", label:"Essays",   short:"Essays",
       badge:essayStats?.pending_count>0 ? essayStats.pending_count : null, badgeBg:"#fff7ed", badgeColor:"#c2410c" }] : []),
-    { key:"anomalies", icon:"bi-shield-exclamation",label:"Anomaly Monitor",
+    { key:"anomalies", icon:"bi-shield-exclamation", label:"Anomalies",   short:"Anomaly",
       badge:anomalyLoaded&&anomalyStats.flagged>0 ? anomalyStats.flagged : null, badgeBg:"#fef2f2", badgeColor:"#ef4444" },
   ];
 
@@ -1310,7 +1461,6 @@ const ExamDetail = () => {
         </div>
 
         <div className="d-flex">
-
           {/* ── Sidebar ── */}
           <nav className="glass-sidebar d-none d-lg-flex flex-column align-items-center py-4 gap-1"
             style={{ width: 80, minHeight: "calc(100vh - 56px)", position: "sticky", top: 56, alignSelf: "flex-start", flexShrink: 0 }}>
@@ -1322,58 +1472,53 @@ const ExamDetail = () => {
           </nav>
 
           {/* ── Main ── */}
-          <main style={{ flex: 1, padding: "24px 20px", paddingBottom: 100, minWidth: 0 }}>
+          <main style={{ flex: 1, padding: "20px 16px", paddingBottom: 100, minWidth: 0 }}>
 
             {/* Breadcrumb */}
-            <nav style={{ marginBottom: 16 }}>
+            <nav style={{ marginBottom: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#94a3b8", flexWrap: "wrap" }}>
                 <Link to="/instructor/exams" style={{ color: "#94a3b8", textDecoration: "none" }}>Exams</Link>
                 <i className="bi bi-chevron-right" style={{ fontSize: 10 }}></i>
-                <span style={{ color: "#0f172a", fontWeight: 600 }}>{exam.title}</span>
+                <span style={{ color: "#0f172a", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{exam.title}</span>
               </div>
             </nav>
 
             {/* Page header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-              <div>
-                <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#0f172a", letterSpacing: "-.5px" }}>{exam.title}</h1>
-                <Link to={`/instructor/courses/${exam.course?.id}`} style={{ fontSize: 13, color: "#64748b", textDecoration: "none" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#0f172a", letterSpacing: "-.5px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exam.title}</h1>
+                <Link to={`/instructor/courses/${exam.course?.id}`} style={{ fontSize: 12, color: "#64748b", textDecoration: "none" }}>
                   <i className="bi bi-folder2 me-1"></i>{exam.course?.code} — {exam.course?.name}
                 </Link>
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <Link to={`/instructor/exams/${id}/edit`} className="dash-btn-ghost">
-                  <i className="bi bi-pencil"></i> Edit Exam
+              <div className="page-header-actions" style={{ display: "flex", gap: 6, flexWrap: "wrap", flexShrink: 0 }}>
+                <Link to={`/instructor/exams/${id}/edit`} className="dash-btn-ghost" style={{ fontSize: 12, padding: "7px 12px" }}>
+                  <i className="bi bi-pencil"></i> Edit
                 </Link>
                 {activeTab==="questions" && (
-                  <button className="dash-btn-primary" onClick={() => setShowQuestionModal(true)}>
-                    <i className="bi bi-plus-circle"></i> Add Question
+                  <button className="dash-btn-primary" style={{ fontSize: 12, padding: "7px 12px" }} onClick={() => setShowQuestionModal(true)}>
+                    <i className="bi bi-plus-circle"></i> Add Q
                   </button>
                 )}
-                {activeTab==="anomalies" && (
-                  <button className="dash-btn-ghost" onClick={() => { setAnomalyLoaded(false); fetchAnomalySummaries(); }}>
-                    <i className="bi bi-arrow-clockwise"></i> Refresh
-                  </button>
-                )}
-                {activeTab==="essays" && (
-                  <button className="dash-btn-ghost" onClick={() => { setEssayLoaded(false); fetchEssayData(); }}>
-                    <i className="bi bi-arrow-clockwise"></i> Refresh
+                {(activeTab==="anomalies" || activeTab==="essays") && (
+                  <button className="dash-btn-ghost" style={{ fontSize: 12, padding: "7px 12px" }}
+                    onClick={() => { if(activeTab==="anomalies"){ setAnomalyLoaded(false); fetchAnomalySummaries(); } else { setEssayLoaded(false); fetchEssayData(); } }}>
+                    <i className="bi bi-arrow-clockwise"></i>
                   </button>
                 )}
               </div>
             </div>
 
             {/* Exam Info Strip */}
-            <div className="dash-card fade-up" style={{ marginBottom: 20 }}>
+            <div className="dash-card fade-up" style={{ marginBottom: 16 }}>
               <div className="info-strip">
                 {[
-                  { icon:"bi-tag",           label:"Type",         value:<span className="badge-pill" style={{ background:"#f1f5f9", color:"#64748b" }}>{exam.type}</span> },
-                  { icon:"bi-clock",         label:"Duration",     value:`${exam.duration_minutes} min` },
-                  { icon:"bi-trophy",        label:"Total Points", value:`${totalPoints} pts` },
-                  { icon:"bi-list-ol",       label:"Questions",    value:questions.length },
-                  { icon:"bi-calendar-event",label:"Start",        value:new Date(exam.start_time).toLocaleString() },
-                  { icon:"bi-calendar-x",    label:"End",          value:new Date(exam.end_time).toLocaleString() },
-                  { icon:"bi-circle-fill",   label:"Status",       value:<span className="badge-pill" style={{ background:ss.bg, color:ss.color }}>{ss.label}</span> },
+                  { icon:"bi-tag",           label:"Type",     value:<span className="badge-pill" style={{ background:"#f1f5f9", color:"#64748b" }}>{exam.type}</span> },
+                  { icon:"bi-clock",         label:"Duration", value:`${exam.duration_minutes} min` },
+                  { icon:"bi-trophy",        label:"Points",   value:`${totalPoints} pts` },
+                  { icon:"bi-list-ol",       label:"Qs",       value:questions.length },
+                  { icon:"bi-calendar-event",label:"Start",    value:new Date(exam.start_time).toLocaleString("en-PH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) },
+                  { icon:"bi-circle-fill",   label:"Status",   value:<span className="badge-pill" style={{ background:ss.bg, color:ss.color }}>{ss.label}</span> },
                 ].map(({ icon, label, value }) => (
                   <div key={label} className="info-item">
                     <div className="info-item-label"><i className={`bi ${icon} me-1`}></i>{label}</div>
@@ -1385,11 +1530,11 @@ const ExamDetail = () => {
 
             {/* New exam alert */}
             {isNewExam && questions.length===0 && (
-              <div style={{ padding: "14px 18px", background: "#e8f0fe", borderRadius: 12, border: "1px solid rgba(0,86,179,.15)", marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ padding: "14px 18px", background: "#e8f0fe", borderRadius: 12, border: "1px solid rgba(0,86,179,.15)", marginBottom: 14, display: "flex", alignItems: "center", gap: 12 }}>
                 <i className="bi bi-lightbulb-fill" style={{ color: "#0056b3", fontSize: 18, flexShrink: 0 }}></i>
                 <div>
-                  <strong style={{ color: "#0056b3" }}>Exam created! Next step: add your questions.</strong>
-                  <p style={{ margin: "4px 0 8px", fontSize: 12, color: "#64748b" }}>Your exam has no questions yet.</p>
+                  <strong style={{ color: "#0056b3" }}>Exam created! Add your questions next.</strong>
+                  <p style={{ margin: "4px 0 8px", fontSize: 12, color: "#64748b" }}>No questions yet.</p>
                   <button className="dash-btn-primary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={() => setShowQuestionModal(true)}>
                     <i className="bi bi-plus-circle"></i> Add First Question
                   </button>
@@ -1397,11 +1542,13 @@ const ExamDetail = () => {
               </div>
             )}
 
-            {/* Tabs */}
+            {/* ── Tabs ── */}
             <div className="dash-tabs">
-              {TABS.map(({ key, icon, label, badge, badgeBg, badgeColor }) => (
+              {TABS.map(({ key, icon, label, short, badge, badgeBg, badgeColor }) => (
                 <button key={key} className={`dash-tab ${activeTab===key?"active":""}`} onClick={() => setActiveTab(key)}>
-                  <i className={`bi ${icon}`}></i>{label}
+                  <i className={`bi ${icon}`}></i>
+                  <span className="tab-label-full">{label}</span>
+                  <span className="tab-label-short">{short || label}</span>
                   {badge != null && (
                     <span className="badge-pill" style={{ background: badgeBg, color: badgeColor, fontSize: 10 }}>{badge}</span>
                   )}
@@ -1412,33 +1559,32 @@ const ExamDetail = () => {
             {/* ══ QUESTIONS TAB ══ */}
             {activeTab==="questions" && (
               <div className="dash-card fade-up">
-                <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                   <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
                     <i className="bi bi-list-ol me-2" style={{ color: "#0056b3" }}></i>
-                    {questions.length} Question{questions.length!==1?"s":""} · {totalPoints} total pts
+                    {questions.length} Q{questions.length!==1?"s":""} · {totalPoints} pts
                   </h2>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div className={`shuffle-toggle ${shuffleEnabled?"on":""}`} onClick={!shuffleSaving ? handleShuffleToggle : undefined}
                       style={{ cursor: shuffleSaving?"wait":"pointer" }}>
                       {shuffleSaving
                         ? <span className="spinner-border spinner-border-sm" style={{ color: "#64748b" }}/>
-                        : <i className={`bi ${shuffleEnabled?"bi-shuffle":"bi-list-ol"}`} style={{ color: shuffleEnabled?"#15803d":"#64748b", fontSize: 14 }}></i>}
-                      <span style={{ fontSize: 12, fontWeight: 700, color: shuffleEnabled?"#15803d":"#64748b" }}>
-                        {shuffleEnabled?"Shuffle ON":"Shuffle OFF"}
+                        : <i className={`bi ${shuffleEnabled?"bi-shuffle":"bi-list-ol"}`} style={{ color: shuffleEnabled?"#15803d":"#64748b", fontSize: 13 }}></i>}
+                      <span style={{ fontSize: 11, fontWeight: 700, color: shuffleEnabled?"#15803d":"#64748b" }}>
+                        {shuffleEnabled?"Shuffle ON":"Shuffle"}
                       </span>
-                      <div style={{ width: 28, height: 16, borderRadius: 99, background: shuffleEnabled?"#22c55e":"#e2e8f0", position: "relative", flexShrink: 0 }}>
-                        <div style={{ position: "absolute", top: 2, left: shuffleEnabled?14:2, width: 12, height: 12, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+                      <div style={{ width: 26, height: 14, borderRadius: 99, background: shuffleEnabled?"#22c55e":"#e2e8f0", position: "relative", flexShrink: 0 }}>
+                        <div style={{ position: "absolute", top: 2, left: shuffleEnabled?12:2, width: 10, height: 10, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
                       </div>
                     </div>
-                    <button className="dash-btn-primary" style={{ fontSize: 12, padding: "7px 14px" }} onClick={() => setShowQuestionModal(true)}>
+                    <button className="dash-btn-primary" style={{ fontSize: 11, padding: "6px 12px" }} onClick={() => setShowQuestionModal(true)}>
                       <i className="bi bi-plus"></i> Add
                     </button>
                   </div>
                 </div>
                 {shuffleEnabled && questions.length>1 && (
-                  <div style={{ padding: "10px 20px", background: "#f0fdf4", borderBottom: "1px solid #bbf7d0", fontSize: 13, color: "#15803d" }}>
-                    <i className="bi bi-shuffle me-2"></i>
-                    <strong>Shuffle is ON</strong> — each student receives questions in a randomised order.
+                  <div style={{ padding: "8px 16px", background: "#f0fdf4", borderBottom: "1px solid #bbf7d0", fontSize: 12, color: "#15803d" }}>
+                    <i className="bi bi-shuffle me-2"></i><strong>Shuffle is ON</strong> — questions randomised per student.
                   </div>
                 )}
                 <div>
@@ -1450,55 +1596,59 @@ const ExamDetail = () => {
                         <i className="bi bi-plus-circle"></i> Add First Question
                       </button>
                     </div>
-                  ) : questions.map((question, index) => (
-                    <div key={question.id} className="q-card">
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-                            <span className="badge-pill" style={{ background: "#f1f5f9", color: "#64748b" }}>Q{index+1}</span>
-                            <span className="badge-pill" style={{ background: "#e8f0fe", color: "#0056b3" }}>
-                              <i className={`bi ${QTYPE_ICON[question.type]||"bi-question"} me-1`}></i>
-                              {question.type.replace("_"," ")}
-                            </span>
-                            <span className="badge-pill" style={{ background: "#f0fdf4", color: "#15803d" }}>
-                              <i className="bi bi-trophy me-1"></i>{question.points} pts
-                            </span>
+                  ) : paginatedQuestions.map((question, idx) => {
+                    const realIndex = (questionPage - 1) * PER_PAGE_QUESTIONS + idx;
+                    return (
+                      <div key={question.id} className="q-card">
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+                              <span className="badge-pill" style={{ background: "#f1f5f9", color: "#64748b" }}>Q{realIndex+1}</span>
+                              <span className="badge-pill" style={{ background: "#e8f0fe", color: "#0056b3" }}>
+                                <i className={`bi ${QTYPE_ICON[question.type]||"bi-question"} me-1`}></i>
+                                {question.type.replace("_"," ")}
+                              </span>
+                              <span className="badge-pill" style={{ background: "#f0fdf4", color: "#15803d" }}>
+                                <i className="bi bi-trophy me-1"></i>{question.points} pts
+                              </span>
+                            </div>
+                            <p style={{ margin: "0 0 8px", fontWeight: 700, fontSize: 13, color: "#1e293b" }}>{question.question_text}</p>
+                            {question.type==="multiple_choice" && question.options && (
+                              <div style={{ paddingLeft: 6 }}>
+                                {question.options.map((opt, oidx) => (
+                                  <div key={oidx} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, color: opt===question.correct_answer?"#15803d":"#64748b", fontWeight: opt===question.correct_answer?700:400 }}>
+                                    <span className="badge-pill" style={{ minWidth: 22, justifyContent: "center", background: opt===question.correct_answer?"#f0fdf4":"#f1f5f9", color: opt===question.correct_answer?"#15803d":"#64748b", fontSize: 10 }}>
+                                      {String.fromCharCode(65+oidx)}
+                                    </span>
+                                    <span style={{ fontSize: 12 }}>{opt}</span>
+                                    {opt===question.correct_answer && <i className="bi bi-check-circle-fill" style={{ color: "#22c55e", fontSize: 12 }}></i>}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {question.type==="true_false" && (
+                              <div style={{ paddingLeft: 6, fontSize: 12 }}>
+                                <span style={{ color: "#64748b" }}>Correct: </span>
+                                <span className="badge-pill" style={{ background: "#f0fdf4", color: "#15803d" }}>{question.correct_answer}</span>
+                              </div>
+                            )}
+                            {question.type==="essay" && (
+                              <div style={{ paddingLeft: 6, display: "flex", gap: 12, flexWrap: "wrap" }}>
+                                {question.max_words && <span style={{ fontSize: 11, color: "#64748b" }}><i className="bi bi-type me-1"></i>Max {question.max_words} words</span>}
+                                {question.rubric && <span style={{ fontSize: 11, color: "#64748b", fontStyle: "italic" }}><i className="bi bi-journal-text me-1"></i>{question.rubric.slice(0,60)}{question.rubric.length>60?"…":""}</span>}
+                              </div>
+                            )}
                           </div>
-                          <p style={{ margin: "0 0 8px", fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{question.question_text}</p>
-                          {question.type==="multiple_choice" && question.options && (
-                            <div style={{ paddingLeft: 8 }}>
-                              {question.options.map((opt, idx) => (
-                                <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, color: opt===question.correct_answer?"#15803d":"#64748b", fontWeight: opt===question.correct_answer?700:400 }}>
-                                  <span className="badge-pill" style={{ minWidth: 24, justifyContent: "center", background: opt===question.correct_answer?"#f0fdf4":"#f1f5f9", color: opt===question.correct_answer?"#15803d":"#64748b", fontSize: 10 }}>
-                                    {String.fromCharCode(65+idx)}
-                                  </span>
-                                  <span style={{ fontSize: 13 }}>{opt}</span>
-                                  {opt===question.correct_answer && <i className="bi bi-check-circle-fill" style={{ color: "#22c55e", fontSize: 13 }}></i>}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {question.type==="true_false" && (
-                            <div style={{ paddingLeft: 8, fontSize: 13 }}>
-                              <span style={{ color: "#64748b" }}>Correct: </span>
-                              <span className="badge-pill" style={{ background: "#f0fdf4", color: "#15803d" }}>{question.correct_answer}</span>
-                            </div>
-                          )}
-                          {question.type==="essay" && (
-                            <div style={{ paddingLeft: 8, display: "flex", gap: 14, flexWrap: "wrap" }}>
-                              {question.max_words && <span style={{ fontSize: 12, color: "#64748b" }}><i className="bi bi-type me-1"></i>Max {question.max_words} words</span>}
-                              {question.rubric && <span style={{ fontSize: 12, color: "#64748b", fontStyle: "italic" }}><i className="bi bi-journal-text me-1"></i>{question.rubric.slice(0,80)}{question.rubric.length>80?"…":""}</span>}
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                          <button className="action-btn" onClick={() => setEditingQuestion(question)}><i className="bi bi-pencil"></i></button>
-                          <button className="action-btn del" onClick={() => handleDeleteQuestion(question.id)}><i className="bi bi-trash"></i></button>
+                          <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+                            <button className="action-btn" onClick={() => setEditingQuestion(question)}><i className="bi bi-pencil"></i></button>
+                            <button className="action-btn del" onClick={() => handleDeleteQuestion(question.id)}><i className="bi bi-trash"></i></button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+                <Pagination total={questions.length} page={questionPage} perPage={PER_PAGE_QUESTIONS} onChange={setQuestionPage} />
               </div>
             )}
 
@@ -1516,27 +1666,27 @@ const ExamDetail = () => {
                 <>
                   <div className="stats-grid">
                     {[
-                      { label:"Ungraded",          value:essayData?.pending_count??0,                                                                                      color:"#c2410c", bg:"#fff7ed", icon:"bi-hourglass-split" },
-                      { label:"Total Submissions", value:essayData?.submissions?.length??0,                                                                               color:"#0056b3", bg:"#e8f0fe", icon:"bi-people"          },
-                      { label:"Fully Graded",      value:(essayData?.submissions??[]).filter(s => s.essays.every(e => isEssayGraded(e))).length, color:"#15803d", bg:"#f0fdf4", icon:"bi-check2-all"    },
+                      { label:"Ungraded",    value:essayData?.pending_count??0,                                                                                      color:"#c2410c", bg:"#fff7ed", icon:"bi-hourglass-split" },
+                      { label:"Submissions", value:essayData?.submissions?.length??0,                                                                               color:"#0056b3", bg:"#e8f0fe", icon:"bi-people"          },
+                      { label:"Graded",      value:(essayData?.submissions??[]).filter(s => s.essays.every(e => isEssayGraded(e))).length, color:"#15803d", bg:"#f0fdf4", icon:"bi-check2-all" },
                     ].map(({ label, value, color, bg, icon }) => (
-                      <div key={label} style={{ background: "#fff", borderRadius: 14, border: "1px solid rgba(0,86,179,.06)", boxShadow: "0 1px 3px rgba(0,0,0,.04)", padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{ width: 44, height: 44, borderRadius: 12, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <i className={`bi ${icon}`} style={{ color, fontSize: 18 }}></i>
+                      <div key={label} style={{ background: "#fff", borderRadius: 14, border: "1px solid rgba(0,86,179,.06)", boxShadow: "0 1px 3px rgba(0,0,0,.04)", padding: "12px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <i className={`bi ${icon}`} style={{ color, fontSize: 17 }}></i>
                         </div>
                         <div>
-                          <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
-                          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{label}</div>
+                          <div style={{ fontSize: 20, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+                          <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{label}</div>
                         </div>
                       </div>
                     ))}
                   </div>
                   {essayData?.pending_count > 0 && (
-                    <div style={{ padding: "12px 16px", background: "#fff7ed", borderRadius: 12, border: "1px solid #fed7aa", marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#92400e" }}>
+                    <div style={{ padding: "10px 14px", background: "#fff7ed", borderRadius: 12, border: "1px solid #fed7aa", marginBottom: 14, display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#92400e" }}>
                       <i className="bi bi-exclamation-triangle-fill" style={{ flexShrink: 0 }}></i>
                       <div>
-                        <strong>{essayData.pending_count} essay answer{essayData.pending_count!==1?"s":""} need grading.</strong>
-                        <span style={{ marginLeft: 8, color: "#b45309" }}>Ungraded essays are excluded from the student's final score.</span>
+                        <strong>{essayData.pending_count} essay{essayData.pending_count!==1?"s":""} need grading.</strong>
+                        <span style={{ marginLeft: 6, color: "#b45309", fontSize: 12 }}>Ungraded essays excluded from final score.</span>
                       </div>
                     </div>
                   )}
@@ -1575,11 +1725,11 @@ const ExamDetail = () => {
                           style={{ color, outline: sel?`2px solid ${color}`:"none" }}
                           onClick={() => setAnomalyFilter(anomalyFilter===key?"all":key)}>
                           <div className="stat-icon" style={{ background: bg }}>
-                            <i className={`bi ${icon}`} style={{ color, fontSize: 17 }}></i>
+                            <i className={`bi ${icon}`} style={{ color, fontSize: 16 }}></i>
                           </div>
                           <div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color, opacity: .75, marginTop: 2 }}>{label}</div>
+                            <div style={{ fontSize: 20, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+                            <div style={{ fontSize: 11, fontWeight: 600, color, opacity: .75, marginTop: 2 }}>{label}</div>
                           </div>
                         </div>
                       );
@@ -1587,70 +1737,69 @@ const ExamDetail = () => {
                   </div>
 
                   <div className="dash-card fade-up">
-                    <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                       <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#0f172a", marginRight: "auto" }}>Student Risk Overview</h2>
                       <div style={{ position: "relative" }}>
-                        <i className="bi bi-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13 }}></i>
-                        <input className="form-ctrl" style={{ paddingLeft: 32, maxWidth: 220 }} placeholder="Search student…"
+                        <i className="bi bi-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 12 }}></i>
+                        <input className="form-ctrl" style={{ paddingLeft: 30, maxWidth: 180, fontSize: 12 }} placeholder="Search…"
                           value={anomalySearch} onChange={e => setAnomalySearch(e.target.value)}/>
                       </div>
                     </div>
-                    <div style={{ overflowX: "auto" }}>
+
+                    {/* Desktop Table */}
+                    <div className="desktop-table" style={{ overflowX: "auto" }}>
                       {summaries.length===0 ? (
                         <div style={{ textAlign: "center", padding: "48px", color: "#94a3b8" }}>
-                          <i className="bi bi-shield-check" style={{ fontSize: 36, display: "block", marginBottom: 10, color: "#22c55e" }}></i>
-                          No anomaly data yet.
+                          <i className="bi bi-shield-check" style={{ fontSize: 36, display: "block", marginBottom: 10, color: "#22c55e" }}></i>No anomaly data yet.
                         </div>
                       ) : (
                         <table className="dash-table">
                           <thead>
                             <tr>
-                              <th>STUDENT</th><th>CPI SCORE</th><th>FLAG</th>
-                              <th style={{ textAlign: "center" }}><i className="bi bi-box-arrow-up-right"></i> Tabs</th>
-                              <th style={{ textAlign: "center" }}><i className="bi bi-keyboard"></i> Keys</th>
-                              <th style={{ textAlign: "center" }}><i className="bi bi-clock"></i> Response</th>
-                              <th style={{ textAlign: "center" }}><i className="bi bi-activity"></i> Keystroke</th>
+                              <th>STUDENT</th><th>CPI</th><th>FLAG</th>
+                              <th style={{ textAlign: "center" }}>Tabs</th>
+                              <th style={{ textAlign: "center" }}>Keys</th>
+                              <th style={{ textAlign: "center" }}>RT</th>
+                              <th style={{ textAlign: "center" }}>KS</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {filteredSummaries.length===0 ? (
-                              <tr><td colSpan="7" style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>No students match your filter.</td></tr>
-                            ) : filteredSummaries.map(s => {
+                            {paginatedSummaries.length===0 ? (
+                              <tr><td colSpan="7" style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>No students match.</td></tr>
+                            ) : paginatedSummaries.map(s => {
                               const cpiClr = riskColor(s.cpi_score??0);
                               const cpiBg  = riskBgColor(s.cpi_score??0);
                               const flagStyle = s.is_flagged
-                                ? { bg:"#fef2f2", color:"#ef4444", label:"Flagged" }
+                                ? { bg:"#fef2f2", color:"#ef4444", label:"Flagged"  }
                                 : (s.cpi_score??0)>=25
                                   ? { bg:"#fff7ed", color:"#d97706", label:"Possible" }
                                   : { bg:"#f0fdf4", color:"#15803d", label:"Unlikely" };
                               return (
                                 <tr key={s.submission_id}>
                                   <td>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#0056b3", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#0056b3", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
                                         {s.student?.name?.charAt(0).toUpperCase()}
                                       </div>
                                       <div>
-                                        <div style={{ fontWeight: 600, fontSize: 13, color: "#1e293b" }}>{s.student?.name}</div>
-                                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{s.student?.email}</div>
+                                        <div style={{ fontWeight: 600, fontSize: 12, color: "#1e293b" }}>{s.student?.name}</div>
+                                        <div style={{ fontSize: 10, color: "#94a3b8" }}>{s.student?.email}</div>
                                       </div>
                                     </div>
                                   </td>
                                   <td>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                      <div style={{ height: 6, borderRadius: 99, background: "#f1f5f9", flex: 1, minWidth: 60, overflow: "hidden" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                      <div style={{ height: 5, borderRadius: 99, background: "#f1f5f9", flex: 1, minWidth: 40, overflow: "hidden" }}>
                                         <div style={{ height: "100%", borderRadius: 99, width: `${Math.min(s.cpi_score??0,100)}%`, background: cpiClr }} />
                                       </div>
-                                      <span style={{ fontWeight: 700, color: cpiClr, fontSize: 13 }}>{(s.cpi_score??0).toFixed(1)}%</span>
+                                      <span style={{ fontWeight: 700, color: cpiClr, fontSize: 12, whiteSpace: "nowrap" }}>{(s.cpi_score??0).toFixed(1)}%</span>
                                     </div>
                                   </td>
-                                  <td>
-                                    <span className="badge-pill" style={{ background: flagStyle.bg, color: flagStyle.color }}>{flagStyle.label}</span>
-                                  </td>
-                                  <td style={{ textAlign: "center", fontWeight: 600 }}>{s.tab_switch_count}</td>
-                                  <td style={{ textAlign: "center", fontWeight: 600 }}>{s.keyboard_shortcut_count}</td>
-                                  <td style={{ textAlign: "center", fontWeight: 600 }}>{s.response_time_anomaly_count}</td>
-                                  <td style={{ textAlign: "center", fontWeight: 600 }}>{s.keystroke_anomaly_count}</td>
+                                  <td><span className="badge-pill" style={{ background: flagStyle.bg, color: flagStyle.color }}>{flagStyle.label}</span></td>
+                                  <td style={{ textAlign: "center", fontWeight: 600, fontSize: 13 }}>{s.tab_switch_count}</td>
+                                  <td style={{ textAlign: "center", fontWeight: 600, fontSize: 13 }}>{s.keyboard_shortcut_count}</td>
+                                  <td style={{ textAlign: "center", fontWeight: 600, fontSize: 13 }}>{s.response_time_anomaly_count}</td>
+                                  <td style={{ textAlign: "center", fontWeight: 600, fontSize: 13 }}>{s.keystroke_anomaly_count}</td>
                                 </tr>
                               );
                             })}
@@ -1658,6 +1807,64 @@ const ExamDetail = () => {
                         </table>
                       )}
                     </div>
+
+                    {/* Mobile Card List */}
+                    <div className="mobile-card-list" style={{ padding: "10px 12px" }}>
+                      {paginatedSummaries.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>
+                          <i className="bi bi-shield-check" style={{ fontSize: 28, display: "block", marginBottom: 8, color: "#22c55e" }}></i>No students match.
+                        </div>
+                      ) : paginatedSummaries.map(s => {
+                        const cpiClr = riskColor(s.cpi_score??0);
+                        const flagStyle = s.is_flagged
+                          ? { bg:"#fef2f2", color:"#ef4444", label:"Flagged"  }
+                          : (s.cpi_score??0)>=25
+                            ? { bg:"#fff7ed", color:"#d97706", label:"Possible" }
+                            : { bg:"#f0fdf4", color:"#15803d", label:"Unlikely" };
+                        return (
+                          <div key={s.submission_id} className="mobile-item-card">
+                            <div className="mobile-item-card-body">
+                              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#0056b3", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+                                  {s.student?.name?.charAt(0).toUpperCase()}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontWeight: 700, fontSize: 13, color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.student?.name}</div>
+                                  <div style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.student?.email}</div>
+                                </div>
+                                <span className="badge-pill" style={{ background: flagStyle.bg, color: flagStyle.color, flexShrink: 0 }}>{flagStyle.label}</span>
+                              </div>
+                              {/* CPI bar */}
+                              <div style={{ marginBottom: 10 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                                  <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700 }}>CPI SCORE</span>
+                                  <span style={{ fontSize: 12, fontWeight: 700, color: cpiClr }}>{(s.cpi_score??0).toFixed(1)}%</span>
+                                </div>
+                                <div style={{ height: 6, borderRadius: 99, background: "#f1f5f9", overflow: "hidden" }}>
+                                  <div style={{ height: "100%", borderRadius: 99, width: `${Math.min(s.cpi_score??0,100)}%`, background: cpiClr }} />
+                                </div>
+                              </div>
+                              {/* Event counts */}
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6 }}>
+                                {[
+                                  { label: "Tabs",     value: s.tab_switch_count,             color: "#0056b3", bg: "#e8f0fe" },
+                                  { label: "Keys",     value: s.keyboard_shortcut_count,       color: "#6d28d9", bg: "#ede9fe" },
+                                  { label: "RT",       value: s.response_time_anomaly_count,   color: "#c2410c", bg: "#fff7ed" },
+                                  { label: "KS",       value: s.keystroke_anomaly_count,       color: "#0369a1", bg: "#f0f9ff" },
+                                ].map(({ label, value, color, bg }) => (
+                                  <div key={label} style={{ background: bg, borderRadius: 8, padding: "6px 8px", textAlign: "center" }}>
+                                    <div style={{ fontSize: 14, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+                                    <div style={{ fontSize: 9, fontWeight: 700, color, opacity: .75, marginTop: 2 }}>{label}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <Pagination total={filteredSummaries.length} page={anomalyPage} perPage={PER_PAGE_ANOMALY} onChange={setAnomalyPage} />
                   </div>
                 </>
               )

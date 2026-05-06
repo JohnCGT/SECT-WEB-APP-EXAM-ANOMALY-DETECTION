@@ -26,25 +26,27 @@ class CourseController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'code' => 'required|string|unique:courses,code',
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'semester' => 'nullable|string',
-            'credits' => 'nullable|integer|min:1|max:6',
+            'code'          => 'required|string|unique:courses,code',
+            'name'          => 'required|string|max:255',
+            'description'   => 'nullable|string',
+            'semester'      => 'nullable|string|in:First Semester,Second Semester,Summer',
+            'academic_year' => 'nullable|string|max:20',
+            'credits'       => 'nullable|integer|min:1|max:6',
         ]);
 
         $course = Course::create([
             'instructor_id' => $request->user()->id,
-            'code' => $request->code,
-            'name' => $request->name,
-            'description' => $request->description,
-            'semester' => $request->semester,
-            'credits' => $request->credits ?? 3,
+            'code'          => $request->code,
+            'name'          => $request->name,
+            'description'   => $request->description,
+            'semester'      => $request->semester,
+            'academic_year' => $request->academic_year,
+            'credits'       => $request->credits ?? 3,
         ]);
 
         return response()->json([
             'message' => 'Course created successfully',
-            'course' => $course
+            'course'  => $course,
         ], 201);
     }
 
@@ -55,7 +57,7 @@ class CourseController extends Controller
     {
         $course = Course::where('id', $id)
             ->where('instructor_id', $request->user()->id)
-            ->with(['exams' => function($query) {
+            ->with(['exams' => function ($query) {
                 $query->withCount('questions');
             }])
             ->firstOrFail();
@@ -73,18 +75,26 @@ class CourseController extends Controller
             ->firstOrFail();
 
         $request->validate([
-            'code' => 'required|string|unique:courses,code,' . $id,
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'semester' => 'nullable|string',
-            'credits' => 'nullable|integer|min:1|max:6',
+            'code'          => 'required|string|unique:courses,code,' . $id,
+            'name'          => 'required|string|max:255',
+            'description'   => 'nullable|string',
+            'semester'      => 'nullable|string|in:First Semester,Second Semester,Summer',
+            'academic_year' => 'nullable|string|max:20',
+            'credits'       => 'nullable|integer|min:1|max:6',
         ]);
 
-        $course->update($request->all());
+        $course->update($request->only([
+            'code',
+            'name',
+            'description',
+            'semester',
+            'academic_year',
+            'credits',
+        ]));
 
         return response()->json([
             'message' => 'Course updated successfully',
-            'course' => $course
+            'course'  => $course,
         ], 200);
     }
 
@@ -100,7 +110,7 @@ class CourseController extends Controller
         $course->delete();
 
         return response()->json([
-            'message' => 'Course deleted successfully'
+            'message' => 'Course deleted successfully',
         ], 200);
     }
 }

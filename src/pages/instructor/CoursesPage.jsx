@@ -4,7 +4,6 @@ import API from "../../api";
 import Swal from "sweetalert2";
 import InstructorAlertBell from "../../components/InstructorAlertBell";
 
-/* ─── Shared sidebar config ──────────────────────────────────────────────── */
 const NAV_ITEMS = [
   { to: "/instructor",                  icon: "bi-speedometer2",         label: "Dashboard" },
   { to: "/instructor/courses",          icon: "bi-book",                 label: "Courses"   },
@@ -15,9 +14,16 @@ const NAV_ITEMS = [
   { to: "/instructor/account-settings", icon: "bi-gear",                 label: "Settings"  },
 ];
 
-const BLANK_FORM = { name: "", code: "", description: "", semester: "", credits: 3 };
+const BLANK_FORM = { name: "", code: "", description: "", semester: "", academic_year: "", credits: 3 };
+const STUDENTS_PER_PAGE = 8;
 
-/* ─── Shared CSS ─────────────────────────────────────────────────────────── */
+const SEMESTER_OPTIONS = ["First Semester", "Second Semester", "Summer"];
+const currentYear = new Date().getFullYear();
+const AY_OPTIONS = Array.from({ length: 7 }, (_, i) => {
+  const y = currentYear + i - 1;
+  return `${y}-${y + 1}`;
+});
+
 const SHARED_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
   *,*::before,*::after{box-sizing:border-box;}
@@ -28,243 +34,104 @@ const SHARED_CSS = `
     --card-bg:#ffffff;--card-br:16px;
     --card-sh:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,86,179,.06);
   }
-  .dash-card{
-    background:var(--card-bg);border-radius:var(--card-br);
-    box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);
-    transition:box-shadow .2s,transform .2s;overflow:hidden;
-  }
+  .dash-card{background:var(--card-bg);border-radius:var(--card-br);box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);transition:box-shadow .2s,transform .2s;overflow:hidden;}
   .dash-card-hover:hover{box-shadow:0 2px 6px rgba(0,0,0,.07),0 8px 28px rgba(0,86,179,.10);transform:translateY(-1px);}
-  .glass-sidebar{
-    background:rgba(255,255,255,0.60);
-    backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
-    border-right:1px solid rgba(255,255,255,0.80);box-shadow:4px 0 24px rgba(0,86,179,.07);
-  }
-  .nav-pill{
-    display:flex;flex-direction:column;align-items:center;
-    padding:10px 8px;border-radius:12px;gap:4px;
-    font-size:11px;font-weight:600;text-decoration:none;
-    color:var(--slate);transition:background .15s,color .15s,transform .15s;width:100%;
-  }
+  .glass-sidebar{background:rgba(255,255,255,0.60);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-right:1px solid rgba(255,255,255,0.80);box-shadow:4px 0 24px rgba(0,86,179,.07);}
+  .nav-pill{display:flex;flex-direction:column;align-items:center;padding:10px 8px;border-radius:12px;gap:4px;font-size:11px;font-weight:600;text-decoration:none;color:var(--slate);transition:background .15s,color .15s,transform .15s;width:100%;}
   .nav-pill:hover{background:var(--blue-lite);color:var(--blue);transform:translateY(-1px);}
   .nav-pill.active{background:var(--blue);color:#fff;box-shadow:0 4px 14px rgba(0,86,179,.35);}
   .nav-pill i{font-size:18px;}
-  .topbar{
-    background:rgba(255,255,255,0.80);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-    border-bottom:1px solid rgba(0,86,179,.08);position:sticky;top:0;z-index:200;height:56px;
-    display:flex;align-items:center;padding:0 20px;gap:12px;
-  }
+  .topbar{background:rgba(255,255,255,0.80);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(0,86,179,.08);position:sticky;top:0;z-index:200;height:56px;display:flex;align-items:center;padding:0 20px;gap:12px;}
   .dash-avatar{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
-  .dash-search{
-    border:1px solid rgba(0,86,179,.15);border-radius:10px;
-    background:#f8faff;padding:7px 14px 7px 36px;
-    font-size:13px;color:#1e293b;outline:none;
-    font-family:'DM Sans',sans-serif;width:100%;
-    transition:border-color .2s,box-shadow .2s;
-  }
+  .dash-search{border:1px solid rgba(0,86,179,.15);border-radius:10px;background:#f8faff;padding:7px 14px 7px 36px;font-size:13px;color:#1e293b;outline:none;font-family:'DM Sans',sans-serif;width:100%;transition:border-color .2s,box-shadow .2s;}
   .dash-search:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
-  .skeleton{
-    background:linear-gradient(90deg,#f1f5f9 25%,#e8f0fe 50%,#f1f5f9 75%);
-    background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px;
-  }
+  .skeleton{background:linear-gradient(90deg,#f1f5f9 25%,#e8f0fe 50%,#f1f5f9 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px;}
   @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   .fade-up{animation:fadeUp .4s ease both;}
 
-  /* ── Stat chips ── */
-  .stat-chips-row{
-    display:flex;gap:8px;flex-wrap:nowrap;margin-bottom:20px;
-  }
-  .stat-chip{
-    flex:1;min-width:0;border-radius:14px;padding:10px 10px;
-    display:flex;align-items:center;gap:8px;
-    border:1px solid rgba(0,86,179,.06);background:#fff;
-    box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;
-  }
+  .stat-chips-row{display:flex;gap:8px;flex-wrap:nowrap;margin-bottom:20px;}
+  .stat-chip{flex:1;min-width:0;border-radius:14px;padding:10px 10px;display:flex;align-items:center;gap:8px;border:1px solid rgba(0,86,179,.06);background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;}
   .stat-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .stat-icon i{font-size:14px;}
   .stat-text{min-width:0;overflow:hidden;}
   .stat-value{margin:0;font-size:18px;font-weight:700;line-height:1;}
   .stat-label{margin:2px 0 0;font-size:10px;font-weight:600;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
 
-  /* ── Buttons ── */
-  .dash-btn-primary{
-    background:var(--blue);color:#fff;border:none;border-radius:10px;
-    padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;
-    font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
-    transition:opacity .15s,transform .15s;text-decoration:none;
-  }
+  .dash-btn-primary{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s,transform .15s;text-decoration:none;}
   .dash-btn-primary:hover{opacity:.87;transform:translateY(-1px);color:#fff;}
   .dash-btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;}
-  .dash-btn-ghost{
-    background:#fff;border:1px solid rgba(0,86,179,.15);color:#64748b;
-    border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;
-    cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
-    transition:all .15s;text-decoration:none;
-  }
+  .dash-btn-ghost{background:#fff;border:1px solid rgba(0,86,179,.15);color:#64748b;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;transition:all .15s;text-decoration:none;}
   .dash-btn-ghost:hover{background:#f1f5f9;color:#1e293b;}
-  .action-btn{
-    width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,86,179,.12);
-    background:#fff;display:inline-flex;align-items:center;justify-content:center;
-    cursor:pointer;transition:all .15s;font-size:13px;text-decoration:none;color:#64748b;
-    flex-shrink:0;
-  }
+  .action-btn{width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,86,179,.12);background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;font-size:13px;text-decoration:none;color:#64748b;flex-shrink:0;}
   .action-btn:hover{background:var(--blue-lite);border-color:var(--blue);color:var(--blue);}
   .action-btn.warn:hover{background:#fff7ed;border-color:#f59e0b;color:#f59e0b;}
   .action-btn.del:hover{background:#fef2f2;border-color:#ef4444;color:#ef4444;}
-  .action-btn.suc:hover{background:#f0fdf4;border-color:#22c55e;color:#22c55e;}
 
-  /* ── Badge pill ── */
-  .badge-pill{
-    display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;
-    font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
-    white-space:nowrap;flex-shrink:0;
-  }
+  .badge-pill{display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;flex-shrink:0;}
 
-  /* ── Course card ── */
-  .course-card{
-    background:#fff;border-radius:16px;border:1px solid rgba(0,86,179,.06);
-    box-shadow:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,86,179,.05);
-    transition:box-shadow .2s,transform .2s;overflow:hidden;
-  }
+  .course-card{background:#fff;border-radius:16px;border:1px solid rgba(0,86,179,.06);box-shadow:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,86,179,.05);transition:box-shadow .2s,transform .2s;overflow:hidden;}
   .course-card:hover{box-shadow:0 2px 6px rgba(0,0,0,.07),0 8px 28px rgba(0,86,179,.10);}
+  .course-card-body{padding:16px;display:flex;gap:12px;align-items:flex-start;}
+  .course-code-badge{width:48px;height:48px;border-radius:12px;background:var(--blue-lite);color:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;flex-shrink:0;letter-spacing:.03em;text-align:center;line-height:1.2;word-break:break-all;}
+  .course-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
+  .course-name{font-size:15px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .course-badges{display:flex;flex-wrap:wrap;gap:5px;align-items:center;}
+  .course-meta{display:flex;flex-wrap:wrap;gap:12px;margin-top:2px;}
+  .course-meta-item{font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:3px;white-space:nowrap;}
+  .course-action-bar{padding:10px 16px;border-top:1px solid rgba(0,86,179,.06);display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fafbff;}
+  .course-action-right{display:flex;align-items:center;gap:6px;}
+  .students-toggle-btn{padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:5px;transition:all .15s;border:none;}
 
-  /* Course card body: left badge + right content */
-  .course-card-body{
-    padding:16px;
-    display:flex;
-    gap:12px;
-    align-items:flex-start;
-  }
+  .enroll-panel{padding:16px;background:#f8faff;border-top:1px solid rgba(0,86,179,.08);animation:fadeUp .2s ease;}
 
-  .course-code-badge{
-    width:48px;height:48px;border-radius:12px;background:var(--blue-lite);
-    color:var(--blue);display:flex;align-items:center;justify-content:center;
-    font-weight:800;font-size:10px;flex-shrink:0;letter-spacing:.03em;
-    text-align:center;line-height:1.2;word-break:break-all;
-  }
+  .student-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:10px;border:1px solid rgba(0,86,179,.08);background:#fff;transition:background .12s;}
+  .student-row:hover{background:#f8faff;}
+  .student-row-info{flex:1;min-width:0;}
+  .student-row-name{font-size:12px;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .student-row-email{font-size:10px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .student-row-remove{width:26px;height:26px;border-radius:6px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;transition:all .15s;flex-shrink:0;}
+  .student-row-remove:hover{background:#fef2f2;color:#ef4444;}
 
-  /* The right content area */
-  .course-info{
-    flex:1;min-width:0;
-    display:flex;flex-direction:column;gap:4px;
-  }
-  .course-name{
-    font-size:15px;font-weight:700;color:#0f172a;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  }
-  .course-badges{
-    display:flex;flex-wrap:wrap;gap:5px;align-items:center;
-  }
-  .course-meta{
-    display:flex;flex-wrap:wrap;gap:12px;margin-top:2px;
-  }
-  .course-meta-item{
-    font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:3px;white-space:nowrap;
-  }
+  .enroll-page-btn{width:28px;height:28px;border-radius:7px;border:1px solid rgba(0,86,179,.15);background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;font-weight:600;color:#64748b;font-family:'DM Sans',sans-serif;transition:all .15s;}
+  .enroll-page-btn:hover{background:var(--blue-lite);border-color:var(--blue);color:var(--blue);}
+  .enroll-page-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .enroll-page-btn:disabled{opacity:.35;cursor:not-allowed;}
 
-  /* Action bar at the bottom of each card */
-  .course-action-bar{
-    padding:10px 16px;
-    border-top:1px solid rgba(0,86,179,.06);
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:8px;
-    background:#fafbff;
-  }
-  .course-action-right{
-    display:flex;align-items:center;gap:6px;
-  }
-  .students-toggle-btn{
-    padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;
-    cursor:pointer;font-family:'DM Sans',sans-serif;
-    display:inline-flex;align-items:center;gap:5px;
-    transition:all .15s;border:none;
-  }
-
-  /* Enroll panel */
-  .enroll-panel{
-    padding:16px;background:#f8faff;border-top:1px solid rgba(0,86,179,.08);
-    animation:fadeUp .2s ease;
-  }
-  /* Student chip */
-  .student-chip{
-    display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 6px;
-    border-radius:99px;border:1px solid rgba(0,86,179,.12);background:#fff;
-    font-size:12px;font-weight:600;color:#1e293b;
-  }
-  .student-chip button{
-    background:none;border:none;cursor:pointer;padding:0;line-height:1;
-    color:#94a3b8;font-size:12px;transition:color .15s;
-  }
-  .student-chip button:hover{color:#ef4444;}
-
-  /* Modal */
-  .dash-modal-overlay{
-    position:fixed;inset:0;background:rgba(15,23,42,.45);
-    backdrop-filter:blur(4px);z-index:1055;
-    display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;
-  }
-  .dash-modal{
-    background:#fff;border-radius:20px;width:100%;max-width:520px;
-    box-shadow:0 24px 64px rgba(0,0,0,.18);overflow:hidden;
-    display:flex;flex-direction:column;max-height:calc(100vh - 32px);
-    animation:fadeUp .25s ease;
-  }
+  .dash-modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(4px);z-index:1055;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;}
+  .dash-modal{background:#fff;border-radius:20px;width:100%;max-width:520px;box-shadow:0 24px 64px rgba(0,0,0,.18);overflow:hidden;display:flex;flex-direction:column;max-height:calc(100vh - 32px);animation:fadeUp .25s ease;}
   .dash-modal-hdr{padding:22px 24px 16px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;}
   .dash-modal-body{overflow-y:auto;padding:20px 24px;flex:1;}
   .dash-modal-ftr{padding:14px 24px;border-top:1px solid #f1f5f9;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;}
   .form-lbl{font-size:11px;font-weight:700;color:#64748b;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;display:block;}
-  .form-ctrl{
-    width:100%;border:1px solid rgba(0,86,179,.15);border-radius:10px;
-    padding:9px 13px;font-size:13px;color:#1e293b;outline:none;
-    font-family:'DM Sans',sans-serif;background:#f8faff;
-    transition:border-color .2s,box-shadow .2s;
-  }
+  .form-ctrl{width:100%;border:1px solid rgba(0,86,179,.15);border-radius:10px;padding:9px 13px;font-size:13px;color:#1e293b;outline:none;font-family:'DM Sans',sans-serif;background:#f8faff;transition:border-color .2s,box-shadow .2s;}
   .form-ctrl:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
   .form-ctrl:disabled{opacity:.6;cursor:not-allowed;}
   .form-ctrl.err{border-color:#ef4444;}
   .form-err{font-size:11px;color:#ef4444;margin-top:4px;}
-  .search-dropdown{
-    position:absolute;top:calc(100% + 4px);left:0;right:0;
-    background:#fff;border-radius:12px;border:1px solid rgba(0,86,179,.12);
-    box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:100;max-height:220px;overflow-y:auto;
-  }
-  .search-dropdown-item{
-    display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;
-    transition:background .12s;border-bottom:1px solid #f8faff;
-  }
+  .search-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border-radius:12px;border:1px solid rgba(0,86,179,.12);box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:100;max-height:220px;overflow-y:auto;}
+  .search-dropdown-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background .12s;border-bottom:1px solid #f8faff;}
   .search-dropdown-item:last-child{border-bottom:none;}
   .search-dropdown-item:hover{background:#f8faff;}
 
-  /* Bottom nav */
-  .instructor-bottom-nav{
-    position:fixed;bottom:0;left:0;right:0;height:64px;
-    background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);
-    border-top:1px solid rgba(0,86,179,0.10);
-    display:flex;align-items:stretch;z-index:1030;
-    box-shadow:0 -4px 24px rgba(0,86,179,0.08);
-  }
+  .instructor-bottom-nav{position:fixed;bottom:0;left:0;right:0;height:64px;background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);border-top:1px solid rgba(0,86,179,0.10);display:flex;align-items:stretch;z-index:1030;box-shadow:0 -4px 24px rgba(0,86,179,0.08);}
   .bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:600;gap:3px;text-decoration:none;transition:color .2s;}
   .bnav-item i{font-size:19px;}
 
-  /* Form grids */
   .form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-  .form-grid-34{display:grid;grid-template-columns:3fr 1fr;gap:12px;}
   @media(max-width:576px){
     .form-grid-2{grid-template-columns:1fr;}
-    .form-grid-34{grid-template-columns:3fr 1fr;}
   }
 `;
 
 /* ─── Bottom Nav ─────────────────────────────────────────────────────────── */
 const InstructorBottomNav = ({ active }) => {
   const items = [
-    { to: "/instructor",                  icon: "bi-speedometer2",      label: "Home"     },
-    { to: "/instructor/courses",          icon: "bi-book",              label: "Courses"  },
-    { to: "/instructor/exams",            icon: "bi-file-earmark-text", label: "Exams"    },
-    { to: "/instructor/students",         icon: "bi-people",            label: "Students" },
-    { to: "/instructor/account-settings", icon: "bi-gear",              label: "Settings" },
+    { to: "/instructor",          icon: "bi-speedometer2",         label: "Home"     },
+    { to: "/instructor/courses",  icon: "bi-book",                 label: "Courses"  },
+    { to: "/instructor/exams",    icon: "bi-file-earmark-text",    label: "Exams"    },
+    { to: "/instructor/students", icon: "bi-people",               label: "Students" },
+    { to: "/instructor/alerts",   icon: "bi-exclamation-triangle", label: "Alerts"   },
   ];
   return (
     <nav className="instructor-bottom-nav d-lg-none">
@@ -279,12 +146,36 @@ const InstructorBottomNav = ({ active }) => {
   );
 };
 
-/* ─── Mini Avatar ──────────────────────────────────────────────────────────── */
+/* ─── Mini Avatar ─────────────────────────────────────────────────────────── */
 const MiniAvatar = ({ name, size = 28, bg = "#0056b3" }) => (
   <div style={{ width: size, height: size, borderRadius: "50%", background: bg, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: size * 0.4, flexShrink: 0 }}>
     {name?.charAt(0)?.toUpperCase() || "?"}
   </div>
 );
+
+/* ─── Enroll Pagination ──────────────────────────────────────────────────── */
+const EnrollPagination = ({ total, page, perPage, onChange }) => {
+  const totalPages = Math.ceil(total / perPage);
+  if (totalPages <= 1) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+      <span style={{ fontSize: 11, color: "#94a3b8" }}>
+        {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total} students
+      </span>
+      <div style={{ display: "flex", gap: 4 }}>
+        <button className="enroll-page-btn" disabled={page === 1} onClick={() => onChange(page - 1)}>
+          <i className="bi bi-chevron-left" style={{ fontSize: 10 }}></i>
+        </button>
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+          <button key={p} className={`enroll-page-btn ${p === page ? "active" : ""}`} onClick={() => onChange(p)}>{p}</button>
+        ))}
+        <button className="enroll-page-btn" disabled={page === totalPages} onClick={() => onChange(page + 1)}>
+          <i className="bi bi-chevron-right" style={{ fontSize: 10 }}></i>
+        </button>
+      </div>
+    </div>
+  );
+};
 
 /* ════════════════════════════════════════════════════════════════════════════
    MAIN PAGE
@@ -310,6 +201,7 @@ export default function CoursesPage() {
   const [searchResults,  setSearchResults]  = useState([]);
   const [enrolledMap,    setEnrolledMap]    = useState({});
   const [enrollLoading,  setEnrollLoading]  = useState(false);
+  const [enrolledPage,   setEnrolledPage]   = useState(1);
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -320,7 +212,6 @@ export default function CoursesPage() {
       setUser(meRes.data.user);
       const fetchedCourses = coursesRes.data.courses || [];
       setCourses(fetchedCourses);
-
       const enrolledResults = await Promise.all(
         fetchedCourses.map(course =>
           API.get(`/courses/${course.id}/students`)
@@ -343,8 +234,8 @@ export default function CoursesPage() {
 
   const validate = () => {
     const e = {};
-    if (!form.name.trim()) e.name  = "Course name is required.";
-    if (!form.code.trim()) e.code  = "Course code is required.";
+    if (!form.name.trim()) e.name = "Course name is required.";
+    if (!form.code.trim()) e.code = "Course code is required.";
     const cr = Number(form.credits);
     if (!form.credits || isNaN(cr) || cr < 1 || cr > 6) e.credits = "Credits must be between 1 and 6.";
     setErrors(e);
@@ -357,7 +248,14 @@ export default function CoursesPage() {
 
   const openEdit = (course) => {
     setModalMode("edit"); setSelected(course);
-    setForm({ name: course.name, code: course.code, description: course.description || "", semester: course.semester || "", credits: course.credits ?? 3 });
+    setForm({
+      name:          course.name,
+      code:          course.code,
+      description:   course.description || "",
+      semester:      course.semester || "",
+      academic_year: course.academic_year || "",
+      credits:       course.credits ?? 3,
+    });
     setErrors({}); setShowModal(true);
   };
 
@@ -370,12 +268,12 @@ export default function CoursesPage() {
         const newCourse = res.data.course || res.data;
         setCourses(prev => [newCourse, ...prev]);
         setEnrolledMap(prev => ({ ...prev, [newCourse.id]: [] }));
-        Swal.fire({ icon:"success", title:"Course created!", timer:1400, showConfirmButton:false });
+        Swal.fire({ icon: "success", title: "Course created!", timer: 1400, showConfirmButton: false });
       } else {
         const res = await API.put(`/courses/${selected.id}`, form);
         const updated = res.data.course || res.data;
         setCourses(prev => prev.map(c => c.id === updated.id ? updated : c));
-        Swal.fire({ icon:"success", title:"Course updated!", timer:1400, showConfirmButton:false });
+        Swal.fire({ icon: "success", title: "Course updated!", timer: 1400, showConfirmButton: false });
       }
       setShowModal(false);
     } catch (err) {
@@ -385,21 +283,23 @@ export default function CoursesPage() {
 
   const handleDelete = async (course) => {
     const result = await Swal.fire({
-      title:`Delete "${course.code}"?`, text:"This will permanently delete the course and all associated data.",
-      icon:"warning", showCancelButton:true, confirmButtonColor:"#d33", confirmButtonText:"Yes, delete",
+      title: `Delete "${course.code}"?`, text: "This will permanently delete the course and all associated data.",
+      icon: "warning", showCancelButton: true, confirmButtonColor: "#d33", confirmButtonText: "Yes, delete",
     });
     if (!result.isConfirmed) return;
     try {
       await API.delete(`/courses/${course.id}`);
       setCourses(prev => prev.filter(c => c.id !== course.id));
       if (expandedCourse === course.id) setExpandedCourse(null);
-      Swal.fire({ icon:"success", title:"Deleted!", timer:1200, showConfirmButton:false });
+      Swal.fire({ icon: "success", title: "Deleted!", timer: 1200, showConfirmButton: false });
     } catch { Swal.fire("Error", "Failed to delete course.", "error"); }
   };
 
   const toggleExpand = async (courseId) => {
     if (expandedCourse === courseId) { setExpandedCourse(null); return; }
-    setExpandedCourse(courseId); setStudentSearch(""); setSearchResults([]);
+    setExpandedCourse(courseId);
+    setStudentSearch(""); setSearchResults([]);
+    setEnrolledPage(1);
     if (!enrolledMap[courseId]) await fetchEnrolled(courseId);
   };
 
@@ -428,9 +328,10 @@ export default function CoursesPage() {
     if (already) { Swal.fire("Already enrolled", `${student.name} is already in this course.`, "info"); return; }
     setEnrollLoading(true);
     try {
-      await API.post(`/courses/${expandedCourse}/students`, { mode:"existing", email:student.email });
+      await API.post(`/courses/${expandedCourse}/students`, { mode: "existing", email: student.email });
       await fetchEnrolled(expandedCourse);
       setStudentSearch(""); setSearchResults([]);
+      setEnrolledPage(1);
     } catch (err) {
       Swal.fire("Error", err.response?.data?.message || "Failed to enroll student.", "error");
     } finally { setEnrollLoading(false); }
@@ -438,22 +339,27 @@ export default function CoursesPage() {
 
   const handleUnenroll = async (student) => {
     const res = await Swal.fire({
-      title:`Remove ${student.name}?`, text:"This unenrolls them from this course only.",
-      icon:"warning", showCancelButton:true, confirmButtonColor:"#d33", confirmButtonText:"Remove",
+      title: `Remove ${student.name}?`, text: "This unenrolls them from this course only.",
+      icon: "warning", showCancelButton: true, confirmButtonColor: "#d33", confirmButtonText: "Remove",
     });
     if (!res.isConfirmed) return;
     try {
       await API.delete(`/courses/${expandedCourse}/students/${student.id}`);
-      setEnrolledMap(prev => ({ ...prev, [expandedCourse]: prev[expandedCourse].filter(s => s.id !== student.id) }));
+      setEnrolledMap(prev => {
+        const updated = prev[expandedCourse].filter(s => s.id !== student.id);
+        const newTotalPages = Math.ceil(updated.length / STUDENTS_PER_PAGE);
+        if (enrolledPage > newTotalPages) setEnrolledPage(Math.max(1, newTotalPages));
+        return { ...prev, [expandedCourse]: updated };
+      });
     } catch { Swal.fire("Error", "Failed to remove student.", "error"); }
   };
 
   const filtered = courses.filter(c => {
     const q = search.toLowerCase();
-    return !q || c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || (c.description||"").toLowerCase().includes(q);
+    return !q || c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || (c.description || "").toLowerCase().includes(q);
   });
 
-  const isActive = (to) => to === "/instructor" ? location.pathname === to : location.pathname.startsWith(to);
+  const isActive  = (to) => to === "/instructor" ? location.pathname === to : location.pathname.startsWith(to);
   const initial   = user?.name?.charAt(0)?.toUpperCase() ?? "I";
   const firstName = user?.name?.split(" ")[0] ?? "Instructor";
 
@@ -496,7 +402,6 @@ export default function CoursesPage() {
         </div>
 
         <div className="d-flex">
-
           {/* ── Sidebar ── */}
           <nav className="glass-sidebar d-none d-lg-flex flex-column align-items-center py-4 gap-1"
             style={{ width: 80, minHeight: "calc(100vh - 56px)", position: "sticky", top: 56, alignSelf: "flex-start", flexShrink: 0 }}>
@@ -534,9 +439,9 @@ export default function CoursesPage() {
             {/* ── Stat Chips ── */}
             <div className="stat-chips-row fade-up">
               {[
-                { label: "Courses",      value: courses.length,     color: "#0056b3", bg: "#e8f0fe", icon: "bi-book"   },
-                { label: "Enrollments",  value: totalEnrollments,   color: "#15803d", bg: "#f0fdf4", icon: "bi-people" },
-                { label: "Filtered",     value: filtered.length,    color: "#6d28d9", bg: "#ede9fe", icon: "bi-funnel" },
+                { label: "Courses",     value: courses.length,   color: "#0056b3", bg: "#e8f0fe", icon: "bi-book"   },
+                { label: "Enrollments", value: totalEnrollments, color: "#15803d", bg: "#f0fdf4", icon: "bi-people" },
+                { label: "Filtered",    value: filtered.length,  color: "#6d28d9", bg: "#ede9fe", icon: "bi-funnel" },
               ].map(({ label, value, color, bg, icon }) => (
                 <div key={label} className="stat-chip">
                   <div className="stat-icon" style={{ background: bg }}>
@@ -553,7 +458,7 @@ export default function CoursesPage() {
             {/* ── Course List ── */}
             {loading ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 80, borderRadius: 16 }} />)}
+                {[1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 80, borderRadius: 16 }} />)}
               </div>
             ) : filtered.length === 0 ? (
               <div className="dash-card" style={{ textAlign: "center", padding: "48px 20px", color: "#94a3b8" }}>
@@ -573,51 +478,43 @@ export default function CoursesPage() {
                   const enrolled   = enrolledMap[course.id] || [];
                   const isExpanded = expandedCourse === course.id;
 
+                  const totalPages    = Math.ceil(enrolled.length / STUDENTS_PER_PAGE);
+                  const safePage      = Math.min(enrolledPage, totalPages || 1);
+                  const pagedStudents = enrolled.slice((safePage - 1) * STUDENTS_PER_PAGE, safePage * STUDENTS_PER_PAGE);
+
                   return (
                     <div key={course.id} className="course-card fade-up">
 
-                      {/* ── Card body: square badge + course info ── */}
+                      {/* ── Card body ── */}
                       <div className="course-card-body">
-                        {/* Left: colour-coded code badge */}
                         <div className="course-code-badge">{course.code}</div>
-
-                        {/* Right: all course text */}
                         <div className="course-info">
-                          {/* Course name — never clips mid-word */}
                           <span className="course-name" title={course.name}>{course.name}</span>
-
-                          {/* Inline badge row */}
                           <div className="course-badges">
-                            <span className="badge-pill" style={{ background: "#e8f0fe", color: "#0056b3" }}>
-                              {course.code}
-                            </span>
+                            <span className="badge-pill" style={{ background: "#e8f0fe", color: "#0056b3" }}>{course.code}</span>
                             {course.semester && (
                               <span className="badge-pill" style={{ background: "#f1f5f9", color: "#64748b" }}>
                                 <i className="bi bi-calendar3" style={{ marginRight: 3 }}></i>{course.semester}
                               </span>
                             )}
-                            {course.credits != null && (
-                              <span className="badge-pill" style={{ background: "#f0f9ff", color: "#0369a1" }}>
-                                {course.credits} cr
+                            {course.academic_year && (
+                              <span className="badge-pill" style={{ background: "#fefce8", color: "#92400e" }}>
+                                <i className="bi bi-mortarboard" style={{ marginRight: 3 }}></i>AY {course.academic_year}
                               </span>
                             )}
+                            {course.credits != null && (
+                              <span className="badge-pill" style={{ background: "#f0f9ff", color: "#0369a1" }}>{course.credits} cr</span>
+                            )}
                           </div>
-
-                          {/* Description */}
                           {course.description && (
-                            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b", lineHeight: 1.5,
-                              display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                               {course.description}
                             </p>
                           )}
-
-                          {/* Meta row: students + date */}
                           <div className="course-meta">
                             <span className="course-meta-item">
                               <i className="bi bi-people"></i>
-                              {enrolled.length > 0
-                                ? `${enrolled.length} student${enrolled.length !== 1 ? "s" : ""}`
-                                : "No students"}
+                              {enrolled.length > 0 ? `${enrolled.length} student${enrolled.length !== 1 ? "s" : ""}` : "No students"}
                             </span>
                             {course.created_at && (
                               <span className="course-meta-item">
@@ -629,21 +526,15 @@ export default function CoursesPage() {
                         </div>
                       </div>
 
-                      {/* ── Action bar ── always at bottom of card ── */}
+                      {/* ── Action bar ── */}
                       <div className="course-action-bar">
-                        {/* Left: students toggle */}
                         <button
                           className="students-toggle-btn"
-                          style={{
-                            background: isExpanded ? "#0056b3" : "#e8f0fe",
-                            color: isExpanded ? "#fff" : "#0056b3",
-                          }}
+                          style={{ background: isExpanded ? "#0056b3" : "#e8f0fe", color: isExpanded ? "#fff" : "#0056b3" }}
                           onClick={() => toggleExpand(course.id)}>
                           <i className={`bi bi-people${isExpanded ? "-fill" : ""}`}></i>
                           {isExpanded ? "Close" : `Students${enrolled.length > 0 ? ` (${enrolled.length})` : ""}`}
                         </button>
-
-                        {/* Right: icon actions */}
                         <div className="course-action-right">
                           <Link to={`/instructor/courses/${course.id}`} className="action-btn" title="View detail">
                             <i className="bi bi-eye"></i>
@@ -666,7 +557,7 @@ export default function CoursesPage() {
                             </h3>
 
                             {/* Search box */}
-                            <div style={{ position: "relative", marginBottom: 12 }}>
+                            <div style={{ position: "relative", marginBottom: 14 }}>
                               <div style={{ display: "flex", alignItems: "center" }}>
                                 <span style={{ padding: "9px 11px", background: "#f8faff", border: "1px solid rgba(0,86,179,.15)", borderRight: "none", borderRadius: "10px 0 0 10px", color: "#94a3b8", fontSize: 13, flexShrink: 0 }}>
                                   {enrollLoading
@@ -709,27 +600,46 @@ export default function CoursesPage() {
                               )}
                             </div>
 
-                            {/* Enrolled list */}
+                            {/* Enrolled student list */}
                             {enrolled.length === 0 ? (
                               <p style={{ margin: 0, fontSize: 13, color: "#94a3b8", textAlign: "center", padding: "8px 0" }}>
                                 No students enrolled yet. Search above to add.
                               </p>
                             ) : (
                               <>
-                                <p style={{ margin: "0 0 8px", fontSize: 12, color: "#64748b" }}>
-                                  {enrolled.length} enrolled student{enrolled.length !== 1 ? "s" : ""}
-                                </p>
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                  {enrolled.map(s => (
-                                    <div key={s.id} className="student-chip">
-                                      <MiniAvatar name={s.name} size={20} />
-                                      <span>{s.name}</span>
-                                      <button onClick={() => handleUnenroll(s)} title="Remove">
-                                        <i className="bi bi-x-lg"></i>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                                  <p style={{ margin: 0, fontSize: 12, color: "#64748b", fontWeight: 600 }}>
+                                    <i className="bi bi-people me-1" style={{ color: "#0056b3" }}></i>
+                                    {enrolled.length} enrolled student{enrolled.length !== 1 ? "s" : ""}
+                                  </p>
+                                  {enrolled.length > STUDENTS_PER_PAGE && (
+                                    <span style={{ fontSize: 10, color: "#94a3b8" }}>
+                                      Page {safePage} of {totalPages}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                  {pagedStudents.map(s => (
+                                    <div key={s.id} className="student-row">
+                                      <MiniAvatar name={s.name} size={28} bg="#e8f0fe" />
+                                      <div className="student-row-info">
+                                        <div className="student-row-name">{s.name}</div>
+                                        <div className="student-row-email">{s.email}</div>
+                                      </div>
+                                      <button className="student-row-remove" onClick={() => handleUnenroll(s)} title="Remove student">
+                                        <i className="bi bi-person-dash"></i>
                                       </button>
                                     </div>
                                   ))}
                                 </div>
+
+                                <EnrollPagination
+                                  total={enrolled.length}
+                                  page={safePage}
+                                  perPage={STUDENTS_PER_PAGE}
+                                  onChange={setEnrolledPage}
+                                />
                               </>
                             )}
                           </div>
@@ -769,6 +679,7 @@ export default function CoursesPage() {
             <div className="dash-modal-body">
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
+                {/* Course Name */}
                 <div>
                   <label className="form-lbl">Course Name <span style={{ color: "#ef4444" }}>*</span></label>
                   <input type="text" className={`form-ctrl ${errors.name ? "err" : ""}`}
@@ -778,6 +689,7 @@ export default function CoursesPage() {
                   {errors.name && <p className="form-err">{errors.name}</p>}
                 </div>
 
+                {/* Course Code */}
                 <div>
                   <label className="form-lbl">Course Code <span style={{ color: "#ef4444" }}>*</span></label>
                   <input type="text" className={`form-ctrl ${errors.code ? "err" : ""}`}
@@ -787,32 +699,58 @@ export default function CoursesPage() {
                   {errors.code && <p className="form-err">{errors.code}</p>}
                 </div>
 
-                <div className="form-grid-34">
+                {/* Academic Year + Semester dropdowns */}
+                <div className="form-grid-2">
                   <div>
-                    <label className="form-lbl">Semester</label>
-                    <input type="text" className="form-ctrl"
-                      placeholder="e.g. Fall 2026"
-                      value={form.semester} onChange={e => setForm(f => ({ ...f, semester: e.target.value }))}
-                      maxLength={50} disabled={saving} />
+                    <label className="form-lbl">Academic Year</label>
+                    <select
+                      className="form-ctrl"
+                      value={form.academic_year}
+                      onChange={e => setForm(f => ({ ...f, academic_year: e.target.value }))}
+                      disabled={saving}>
+                      <option value="">— Select AY —</option>
+                      {AY_OPTIONS.map(ay => (
+                        <option key={ay} value={ay}>{ay}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
-                    <label className="form-lbl">Credits <span style={{ color: "#ef4444" }}>*</span></label>
-                    <input type="number" className={`form-ctrl ${errors.credits ? "err" : ""}`}
-                      placeholder="3" value={form.credits}
-                      onChange={e => setForm(f => ({ ...f, credits: e.target.value }))}
-                      min={1} max={6} disabled={saving} />
-                    {errors.credits && <p className="form-err">{errors.credits}</p>}
+                    <label className="form-lbl">Semester</label>
+                    <select
+                      className="form-ctrl"
+                      value={form.semester}
+                      onChange={e => setForm(f => ({ ...f, semester: e.target.value }))}
+                      disabled={saving}>
+                      <option value="">— Select —</option>
+                      {SEMESTER_OPTIONS.map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
+                {/* Credits */}
                 <div>
-                  <label className="form-lbl">Description <span style={{ color: "#94a3b8", fontWeight: 400, textTransform: "none" }}>(optional)</span></label>
+                  <label className="form-lbl">Credits <span style={{ color: "#ef4444" }}>*</span></label>
+                  <input type="number" className={`form-ctrl ${errors.credits ? "err" : ""}`}
+                    placeholder="3" value={form.credits}
+                    onChange={e => setForm(f => ({ ...f, credits: e.target.value }))}
+                    min={1} max={6} disabled={saving} />
+                  {errors.credits && <p className="form-err">{errors.credits}</p>}
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="form-lbl">
+                    Description <span style={{ color: "#94a3b8", fontWeight: 400, textTransform: "none" }}>(optional)</span>
+                  </label>
                   <textarea className="form-ctrl" rows={3}
                     placeholder="Brief description of the course…"
                     value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                     maxLength={500} disabled={saving} style={{ resize: "vertical" }} />
                   <p style={{ margin: "4px 0 0", fontSize: 11, color: "#94a3b8", textAlign: "right" }}>{form.description.length}/500</p>
                 </div>
+
               </div>
             </div>
 
