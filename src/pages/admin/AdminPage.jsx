@@ -121,7 +121,7 @@ const NAV_ITEMS = [
   { to: "/admin/users",     icon: "bi-people",               label: "Users"     },
   { to: "/admin/courses",   icon: "bi-book",                 label: "Courses"   },
   { to: "/admin/exams",     icon: "bi-file-earmark-text",    label: "Exams"     },
-  { to: "/admin/anomalies", icon: "bi-exclamation-triangle", label: "Anomalies" },
+  // { to: "/admin/anomalies", icon: "bi-exclamation-triangle", label: "Anomalies" },
   { to: "/admin/support",   icon: "bi-headset",              label: "Support"   },
 ];
 
@@ -129,7 +129,7 @@ const BOTTOM_NAV = [
   { to: "/admin",           icon: "bi-speedometer2",      label: "Home"      },
   { to: "/admin/users",     icon: "bi-people",            label: "Users"     },
   { to: "/admin/exams",     icon: "bi-file-earmark-text", label: "Exams"     },
-  { to: "/admin/anomalies", icon: "bi-exclamation-triangle", label: "Flags"  },
+  // { to: "/admin/anomalies", icon: "bi-exclamation-triangle", label: "Flags"  },
   { to: "/admin/support",   icon: "bi-headset",           label: "Support"   },
 ];
 
