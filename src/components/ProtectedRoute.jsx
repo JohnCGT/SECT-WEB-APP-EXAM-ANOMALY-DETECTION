@@ -50,14 +50,14 @@ const ProtectedRoute = ({ children, role }) => {
     checkAuth();
   }, []);
 
-  // ── Poll every 5 s — kick out if session changed ──
+  // ── Poll every 3 s — kick out if session changed ──
   useEffect(() => {
     const timer = setInterval(async () => {
       try {
         const res = await API.get("/me");
-        if (res.data.user.role !== role) window.location.href = "/";
+        if (res.data.user.role !== role) window.location.href = roleLoginPage(role);
       } catch {
-        window.location.href = "/";
+        window.location.href = roleLoginPage(role);
       }
     }, 3000);
     return () => clearInterval(timer);
@@ -91,6 +91,15 @@ const ProtectedRoute = ({ children, role }) => {
 
   // ── All good — render the page ──
   return children;
+};
+
+const roleLoginPage = (role) => {
+  const pages = {
+    admin:      "/admin/login",
+    instructor: "/instructor/login",
+    student:    "/",
+  };
+  return pages[role] ?? "/";
 };
 
 export default ProtectedRoute;
