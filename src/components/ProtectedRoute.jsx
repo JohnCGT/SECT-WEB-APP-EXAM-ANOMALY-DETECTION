@@ -50,6 +50,19 @@ const ProtectedRoute = ({ children, role }) => {
     checkAuth();
   }, []);
 
+  // ── Poll every 5 s — kick out if session changed ──
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      try {
+        const res = await API.get("/me");
+        if (res.data.user.role !== role) window.location.href = "/";
+      } catch {
+        window.location.href = "/";
+      }
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [role]);
+
   // ── Still waiting for /me response — show a full-screen spinner ──
   if (authState.checking) {
     return (
