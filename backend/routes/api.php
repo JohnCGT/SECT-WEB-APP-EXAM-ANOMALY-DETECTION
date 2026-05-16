@@ -2,24 +2,21 @@
 
 // backend/routes/api.php
 
-use App\Http\Controllers\AdminUserController;
-use App\Http\Controllers\AdminDashboardController;
-use App\Http\Controllers\AdminProfileController;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\AnomalyController;
-use App\Http\Controllers\CourseController;
-use App\Http\Controllers\CourseStudentController;
-use App\Http\Controllers\EssayGradingController;
-use App\Http\Controllers\ExamController;
-use App\Http\Controllers\QuestionController;
-use App\Http\Controllers\StudentCourseController;
-use App\Http\Controllers\StudentExamController;
-use App\Http\Controllers\SupportTicketController;
-use App\Http\Controllers\TypingBaselineController;
-use App\Http\Controllers\StudentDashboardController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\StudentSearchController;
-use App\Http\Controllers\StudentNotificationController;
+use App\Http\Controllers\Admin\AdminUserController;
+use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminProfileController;
+use App\Http\Controllers\Instructor\AnomalyController;
+use App\Http\Controllers\Instructor\CourseController;
+use App\Http\Controllers\Instructor\CourseStudentController;
+use App\Http\Controllers\Instructor\EssayGradingController;
+use App\Http\Controllers\Instructor\ExamController;
+use App\Http\Controllers\Instructor\QuestionController;
+use App\Http\Controllers\Student\StudentCourseController;
+use App\Http\Controllers\Student\StudentExamController;
+use App\Http\Controllers\Student\StudentDashboardController;
+use App\Http\Controllers\Student\StudentNotificationController;
+use App\Http\Controllers\Student\StudentSearchController;
+use App\Http\Controllers\Student\TypingBaselineController;
 use Illuminate\Support\Facades\Route;
 
 // ── Public ────────────────────────────────────────────────────────────────────

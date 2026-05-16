@@ -4,7 +4,8 @@
 // Changes vs previous version:
 //   + courses() method added for GET /api/admin/courses
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
+use App\Http\Controllers\Controller;
 
 use App\Models\Course;
 use App\Models\Exam;
