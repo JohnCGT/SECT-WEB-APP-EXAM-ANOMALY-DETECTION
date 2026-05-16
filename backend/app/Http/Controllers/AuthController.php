@@ -139,6 +139,19 @@ class AuthController extends Controller
             }
             // ─────────────────────────────────────────────────────────────
 
+
+            // ── ONE DEVICE / ONE ACCOUNT ──────────────────────────────────────
+            // If someone is already logged in on this browser session, log them
+            // out cleanly before logging in the new account. This prevents two
+            // different roles from sharing the same session cookie.
+            if (Auth::check()) {
+                Auth::guard('web')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
+            // ─────────────────────────────────────────────────────────────────            
+
+
             // Log the user in via session
             // This creates an authenticated session for the user
             Auth::login($user);
