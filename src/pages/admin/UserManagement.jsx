@@ -1,4 +1,11 @@
 // src/pages/admin/UserManagement.jsx
+// ─── CHANGE LOG ───────────────────────────────────────────────────────────────
+// • UserForm now includes a Confirm Password field, password-strength bar, and
+//   show/hide eye toggles — matching the RegisterPage design.
+// • checkPasswordStrength + PasswordStrengthBar ported from RegisterPage.jsx.
+// • Validation enforces full strength (passed === 5) and matching confirmation
+//   only when a password is being set (new user) or explicitly changed (edit).
+// ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import NotificationBell from "./NotificationBell";
@@ -28,68 +35,49 @@ const SHARED_CSS = `
   @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   .fade-up{animation:fadeUp .4s ease both;}
-
-  /* Buttons */
   .dash-btn-primary{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s,transform .15s;text-decoration:none;}
   .dash-btn-primary:hover{opacity:.87;transform:translateY(-1px);color:#fff;}
   .dash-btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;}
   .dash-btn-ghost{background:#fff;border:1px solid rgba(0,86,179,.15);color:#64748b;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;transition:all .15s;text-decoration:none;}
   .dash-btn-ghost:hover{background:#f1f5f9;color:#1e293b;}
-
-  /* Badge */
   .badge-pill{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;flex-shrink:0;}
-
-  /* Table */
   .dash-table{width:100%;border-collapse:collapse;font-family:'DM Sans',sans-serif;}
   .dash-table th{padding:10px 14px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.06em;white-space:nowrap;border-bottom:1px solid #f1f5f9;text-align:left;background:#f8faff;}
   .dash-table td{padding:12px 14px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
   .dash-table tbody tr{transition:background .15s;}
   .dash-table tbody tr:hover{background:#f8faff;}
   .dash-table tbody tr:last-child td{border-bottom:none;}
-
-  /* Action buttons inside table */
   .action-btn-sm{border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:4px;transition:all .15s;white-space:nowrap;}
   .action-btn-sm:hover{opacity:.85;transform:translateY(-1px);}
   .action-btn-sm:disabled{opacity:.5;cursor:not-allowed;transform:none;}
-
-  /* Stat chips */
   .stat-chip{flex:1;min-width:110px;border-radius:14px;padding:12px;display:flex;align-items:center;gap:8px;border:2px solid transparent;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.04);cursor:pointer;transition:all .15s;}
   .stat-chip:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,86,179,.10);}
   .stat-chip.selected{border-color:currentColor;}
-
-  /* Filter pills */
   .filter-btn{border:none;border-radius:20px;padding:5px 13px;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;}
   .filter-btn:hover{opacity:.85;}
-
-  /* Form */
   .form-lbl{font-size:11px;font-weight:700;color:#64748b;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;display:block;}
   .form-ctrl{width:100%;border:1px solid rgba(0,86,179,.15);border-radius:10px;padding:9px 13px;font-size:13px;color:#1e293b;outline:none;font-family:'DM Sans',sans-serif;background:#f8faff;transition:border-color .2s,box-shadow .2s;}
   .form-ctrl:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
   .form-ctrl:disabled{opacity:.6;cursor:not-allowed;}
   .form-ctrl.err{border-color:#dc3545;}
+  .form-ctrl-pw{padding-right:38px;}
   .form-err{font-size:11px;color:#dc3545;margin-top:4px;}
-
-  /* Modal */
+  .pw-wrap{position:relative;display:flex;align-items:center;}
+  .pw-eye{position:absolute;right:11px;background:none;border:none;cursor:pointer;color:#94a3b8;font-size:15px;padding:0;display:flex;align-items:center;transition:color .2s;line-height:1;}
+  .pw-eye:hover{color:var(--blue);}
   .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(4px);z-index:1055;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;}
   .modal-box{background:#fff;border-radius:20px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.18);overflow:hidden;display:flex;flex-direction:column;max-height:calc(100vh - 32px);animation:fadeUp .25s ease;}
   .modal-hdr{padding:20px 22px 14px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;}
   .modal-body{overflow-y:auto;padding:18px 22px;flex:1;}
   .modal-ftr{padding:12px 22px;border-top:1px solid #f1f5f9;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;}
-
-  /* User card (mobile) */
   .user-card{background:#fff;border-radius:14px;border:1px solid rgba(0,86,179,.06);box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;margin-bottom:8px;}
-
-  /* Bottom nav */
   .admin-bottom-nav{position:fixed;bottom:0;left:0;right:0;height:64px;background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);border-top:1px solid rgba(0,86,179,0.10);display:flex;align-items:stretch;z-index:1030;box-shadow:0 -4px 24px rgba(0,86,179,0.08);}
   .bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:600;gap:3px;text-decoration:none;transition:color .2s;}
   .bnav-item i{font-size:19px;}
-
-  /* Pagination */
   .page-btn{display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,86,179,.15);background:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;color:#64748b;padding:0 6px;}
   .page-btn:hover{background:var(--blue-lite);border-color:var(--blue);color:var(--blue);}
   .page-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
   .page-btn:disabled{opacity:.4;cursor:not-allowed;}
-
   @media(max-width:991px){.hide-md{display:none!important;}}
   @media(max-width:767px){
     .hide-mobile{display:none!important;}
@@ -101,19 +89,19 @@ const SHARED_CSS = `
 
 /* ─── Nav config ─────────────────────────────────────────────────────── */
 const NAV_ITEMS = [
-  { to: "/admin",           icon: "bi-speedometer2",         label: "Dashboard" },
-  { to: "/admin/users",     icon: "bi-people",               label: "Users"     },
-  { to: "/admin/courses",   icon: "bi-book",                 label: "Courses"   },
-  { to: "/admin/exams",     icon: "bi-file-earmark-text",    label: "Exams"     },
-  // { to: "/admin/anomalies", icon: "bi-exclamation-triangle", label: "Anomalies" },
-  { to: "/admin/support",   icon: "bi-headset",              label: "Support"   },
+  { to: "/admin",               icon: "bi-speedometer2",      label: "Dashboard" },
+  { to: "/admin/users",         icon: "bi-people",            label: "Users"     },
+  { to: "/admin/courses",       icon: "bi-book",              label: "Courses"   },
+  { to: "/admin/exams",         icon: "bi-file-earmark-text", label: "Exams"     },
+  { to: "/admin/activity-logs", icon: "bi-journal-text",      label: "Logs"      },
+  { to: "/admin/support",       icon: "bi-headset",           label: "Support"   },
 ];
 const BOTTOM_NAV = [
-  { to: "/admin",         icon: "bi-speedometer2",      label: "Home"    },
-  { to: "/admin/users",   icon: "bi-people",            label: "Users"   },
-  { to: "/admin/courses", icon: "bi-book",              label: "Courses" },
-  { to: "/admin/exams",   icon: "bi-file-earmark-text", label: "Exams"   },
-  { to: "/admin/support", icon: "bi-headset",           label: "Support" },
+  { to: "/admin",               icon: "bi-speedometer2",      label: "Home"    },
+  { to: "/admin/users",         icon: "bi-people",            label: "Users"   },
+  { to: "/admin/courses",       icon: "bi-book",              label: "Courses" },
+  { to: "/admin/exams",         icon: "bi-file-earmark-text", label: "Exams"   },
+  { to: "/admin/activity-logs", icon: "bi-journal-text",      label: "Logs"    },
 ];
 
 /* ─── Design tokens ──────────────────────────────────────────────────── */
@@ -127,7 +115,7 @@ const STATUS_CFG = {
   suspended: { bg: "#fff8f0", color: "#fd7e14" },
 };
 
-const BLANK_FORM = { name: "", email: "", password: "", role: "student" };
+const BLANK_FORM = { name: "", email: "", password: "", password_confirmation: "", role: "student" };
 
 /* ─── API helper ─────────────────────────────────────────────────────── */
 const BASE = import.meta?.env?.VITE_API_URL ?? "/api";
@@ -149,6 +137,54 @@ async function api(method, path, body) {
 }
 
 const PER_PAGE = 20;
+
+/* ─── Password helpers (ported from RegisterPage) ───────────────────── */
+const checkPasswordStrength = password => {
+  const checks = {
+    length:  password.length >= 8,
+    upper:   /[A-Z]/.test(password),
+    lower:   /[a-z]/.test(password),
+    number:  /[0-9]/.test(password),
+    special: /[^A-Za-z0-9]/.test(password),
+  };
+  const passed = Object.values(checks).filter(Boolean).length;
+  return { checks, passed, total: 5 };
+};
+
+const PasswordStrengthBar = ({ password }) => {
+  if (!password) return null;
+  const { checks, passed } = checkPasswordStrength(password);
+  const pct   = (passed / 5) * 100;
+  const color = passed <= 2 ? "#ef4444" : passed <= 3 ? "#f59e0b" : passed <= 4 ? "#3b82f6" : "#22c55e";
+  const label = passed <= 2 ? "Weak" : passed <= 3 ? "Fair" : passed <= 4 ? "Good" : "Strong";
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ height: 5, borderRadius: 99, background: "#f1f5f9", overflow: "hidden", marginBottom: 6 }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 99, transition: "width .3s" }} />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color }}>{label}</span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          {[
+            { key: "length",  label: "8+ chars"  },
+            { key: "upper",   label: "Uppercase"  },
+            { key: "lower",   label: "Lowercase"  },
+            { key: "number",  label: "Number"     },
+            { key: "special", label: "Special"    },
+          ].map(({ key, label }) => (
+            <span key={key} style={{
+              fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 6,
+              background: checks[key] ? "#dcfce7" : "#f1f5f9",
+              color:      checks[key] ? "#15803d" : "#94a3b8",
+            }}>
+              {checks[key] ? "✓" : "✗"} {label}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /* ─── Small reusable atoms ───────────────────────────────────────────── */
 function MiniAvatar({ name = "", size = 32 }) {
@@ -232,21 +268,38 @@ function Pagination({ total, page, perPage, onChange }) {
   );
 }
 
-/* ─── User Form (add / edit) ─────────────────────────────────────────── */
+/* ─── UserForm — with strength bar + confirm password ───────────────── */
 function UserForm({ initial = {}, isEdit, onSubmit, onCancel, saving }) {
-  const [form,   setForm]   = useState({ ...BLANK_FORM, ...initial });
-  const [errors, setErrors] = useState({});
+  const [form,        setForm]        = useState({ ...BLANK_FORM, ...initial });
+  const [errors,      setErrors]      = useState({});
+  const [showPw,      setShowPw]      = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  const set = (key) => (e) => setForm(f => ({ ...f, [key]: e.target.value }));
+  const set = (key) => (e) => {
+    setForm(f  => ({ ...f,    [key]: e.target.value }));
+    setErrors(er => ({ ...er, [key]: null            }));
+  };
+
+  // Whether the user is actually setting a new password in this session
+  const pwActive = !isEdit || form.password.trim() !== "";
 
   const validate = () => {
     const e = {};
-    if (!form.name.trim())                        e.name     = "Name is required.";
-    if (!form.email.trim())                       e.email    = "Email is required.";
-    if (!isEdit && !form.password.trim())         e.password = "Password is required.";
-    if (form.password && form.password.length < 8 && (!isEdit || form.password)) {
-      e.password = "Password must be at least 8 characters.";
+    if (!form.name.trim())  e.name  = "Name is required.";
+    if (!form.email.trim()) e.email = "Email is required.";
+
+    if (pwActive) {
+      if (!form.password.trim()) {
+        e.password = "Password is required.";
+      } else {
+        const { passed } = checkPasswordStrength(form.password);
+        if (passed < 5)
+          e.password = "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.";
+      }
+      if (form.password !== form.password_confirmation)
+        e.password_confirmation = "Passwords do not match.";
     }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -255,27 +308,118 @@ function UserForm({ initial = {}, isEdit, onSubmit, onCancel, saving }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+      {/* ── Full Name ── */}
       <div>
         <label className="form-lbl">Full Name <span style={{ color: "#dc3545" }}>*</span></label>
-        <input type="text" className={`form-ctrl ${errors.name ? "err" : ""}`}
-          value={form.name} onChange={set("name")} placeholder="e.g. Juan Dela Cruz" disabled={saving} />
+        <input
+          type="text"
+          className={`form-ctrl ${errors.name ? "err" : ""}`}
+          value={form.name}
+          onChange={set("name")}
+          placeholder="e.g. Juan Dela Cruz"
+          disabled={saving}
+        />
         {errors.name && <p className="form-err">{errors.name}</p>}
       </div>
+
+      {/* ── Email ── */}
       <div>
         <label className="form-lbl">Email Address <span style={{ color: "#dc3545" }}>*</span></label>
-        <input type="email" className={`form-ctrl ${errors.email ? "err" : ""}`}
-          value={form.email} onChange={set("email")} placeholder="user@school.edu" disabled={saving} />
+        <input
+          type="email"
+          className={`form-ctrl ${errors.email ? "err" : ""}`}
+          value={form.email}
+          onChange={set("email")}
+          placeholder="user@school.edu"
+          disabled={saving}
+        />
         {errors.email && <p className="form-err">{errors.email}</p>}
       </div>
+
+      {/* ── Password with strength bar ── */}
       <div>
         <label className="form-lbl">
-          {isEdit ? "New Password" : "Password"} <span style={{ color: "#dc3545" }}>{!isEdit ? "*" : ""}</span>
-          {isEdit && <span style={{ fontWeight: 400, textTransform: "none", color: "#94a3b8", marginLeft: 4 }}>(blank = keep current)</span>}
+          {isEdit ? "New Password" : "Password"}{" "}
+          {!isEdit && <span style={{ color: "#dc3545" }}>*</span>}
+          {isEdit && (
+            <span style={{ fontWeight: 400, textTransform: "none", color: "#94a3b8", marginLeft: 4 }}>
+              (blank = keep current)
+            </span>
+          )}
         </label>
-        <input type="password" className={`form-ctrl ${errors.password ? "err" : ""}`}
-          value={form.password} onChange={set("password")} placeholder="Min 8 chars · Aa1@" disabled={saving} />
+        <div className="pw-wrap">
+          <input
+            type={showPw ? "text" : "password"}
+            className={`form-ctrl form-ctrl-pw ${errors.password ? "err" : ""}`}
+            value={form.password}
+            onChange={set("password")}
+            placeholder="Min 8 chars · Aa1@"
+            autoComplete="new-password"
+            disabled={saving}
+          />
+          <button
+            type="button"
+            className="pw-eye"
+            onClick={() => setShowPw(v => !v)}
+            tabIndex={-1}
+          >
+            <i className={`bi bi-eye${showPw ? "-slash" : ""}`}></i>
+          </button>
+        </div>
         {errors.password && <p className="form-err">{errors.password}</p>}
+        {/* Show strength bar whenever a password is typed */}
+        <PasswordStrengthBar password={form.password} />
       </div>
+
+      {/* ── Confirm Password (shown when password field is active) ── */}
+      {pwActive && (
+        <div>
+          <label className="form-lbl">
+            Confirm Password{" "}
+            {!isEdit && <span style={{ color: "#dc3545" }}>*</span>}
+          </label>
+          <div className="pw-wrap">
+            <input
+              type={showConfirm ? "text" : "password"}
+              className={`form-ctrl form-ctrl-pw ${
+                errors.password_confirmation ||
+                (form.password_confirmation && form.password !== form.password_confirmation)
+                  ? "err"
+                  : ""
+              }`}
+              value={form.password_confirmation}
+              onChange={set("password_confirmation")}
+              placeholder="Repeat password"
+              autoComplete="new-password"
+              disabled={saving}
+            />
+            <button
+              type="button"
+              className="pw-eye"
+              onClick={() => setShowConfirm(v => !v)}
+              tabIndex={-1}
+            >
+              <i className={`bi bi-eye${showConfirm ? "-slash" : ""}`}></i>
+            </button>
+          </div>
+          {/* Inline match indicator */}
+          {form.password_confirmation && (
+            <p style={{
+              margin: "4px 0 0", fontSize: 11, fontWeight: 600,
+              color: form.password === form.password_confirmation ? "#22c55e" : "#ef4444",
+            }}>
+              <i className={`bi bi-${form.password === form.password_confirmation ? "check" : "x"}-circle me-1`}></i>
+              {form.password === form.password_confirmation ? "Passwords match" : "Passwords do not match"}
+            </p>
+          )}
+          {errors.password_confirmation && !form.password_confirmation && (
+            <p className="form-err">{errors.password_confirmation}</p>
+          )}
+        </div>
+      )}
+
+      {/* ── Role ── */}
       <div>
         <label className="form-lbl">Role <span style={{ color: "#dc3545" }}>*</span></label>
         <select className="form-ctrl" value={form.role} onChange={set("role")} disabled={saving}>
@@ -284,6 +428,8 @@ function UserForm({ initial = {}, isEdit, onSubmit, onCancel, saving }) {
           <option value="admin">Admin</option>
         </select>
       </div>
+
+      {/* ── Actions ── */}
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 4 }}>
         <button className="dash-btn-ghost" onClick={onCancel} disabled={saving}>Cancel</button>
         <button className="dash-btn-primary" onClick={submit} disabled={saving}>
@@ -296,7 +442,6 @@ function UserForm({ initial = {}, isEdit, onSubmit, onCancel, saving }) {
   );
 }
 
-/* ─── Confirm Delete Modal ───────────────────────────────────────────── */
 function DeleteModal({ user, onConfirm, onClose, saving }) {
   return (
     <div className="modal-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -321,7 +466,7 @@ function DeleteModal({ user, onConfirm, onClose, saving }) {
             </div>
           </div>
           <p style={{ margin: 0, fontSize: 13, color: "#64748b", lineHeight: 1.65 }}>
-            Are you sure you want to permanently delete this user? This action <strong style={{ color: "#dc3545" }}>cannot be undone</strong> and will remove all associated data.
+            Are you sure you want to permanently delete this user? This action <strong style={{ color: "#dc3545" }}>cannot be undone</strong>.
           </p>
         </div>
         <div className="modal-ftr">
@@ -350,20 +495,19 @@ export default function UserManagement() {
   const [search,     setSearch]     = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [toast,      setToast]      = useState(null);
-  const [modal,      setModal]      = useState(null); // { type: 'add'|'edit'|'delete', user? }
+  const [modal,      setModal]      = useState(null);
   const [saving,     setSaving]     = useState(false);
   const [page,       setPage]       = useState(1);
 
-  const notify    = (msg, type = "success") => setToast({ msg, type });
+  const notify     = (msg, type = "success") => setToast({ msg, type });
   const closeModal = () => setModal(null);
-  const isActive  = (to) => to === "/admin" ? location.pathname === to : location.pathname.startsWith(to);
+  const isActive   = (to) => to === "/admin" ? location.pathname === to : location.pathname.startsWith(to);
 
   const handleLogout = async () => {
     try { await api("POST", "/logout"); } catch {}
     navigate("/");
   };
 
-  /* ── Load ── */
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
@@ -379,12 +523,15 @@ export default function UserManagement() {
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
-  /* ── Add ── */
   const handleAdd = async (form) => {
     setSaving(true);
     try {
       const res = await api("POST", "/admin/users", {
-        name: form.name, email: form.email, password: form.password, role: form.role,
+        name:                  form.name,
+        email:                 form.email,
+        password:              form.password,
+        password_confirmation: form.password_confirmation,
+        role:                  form.role,
       });
       setUsers(u => [res.user ?? res, ...u]);
       notify("User registered successfully.");
@@ -393,13 +540,15 @@ export default function UserManagement() {
     finally { setSaving(false); }
   };
 
-  /* ── Edit ── */
   const handleEdit = async (form) => {
     const { id } = modal.user;
     setSaving(true);
     try {
       const payload = { name: form.name, email: form.email, role: form.role };
-      if (form.password.trim()) payload.password = form.password;
+      if (form.password.trim()) {
+        payload.password              = form.password;
+        payload.password_confirmation = form.password_confirmation;
+      }
       const res = await api("PUT", `/admin/users/${id}`, payload);
       setUsers(u => u.map(x => x.id === id ? (res.user ?? res) : x));
       notify("User updated successfully.");
@@ -408,22 +557,18 @@ export default function UserManagement() {
     finally { setSaving(false); }
   };
 
-  /* ── Suspend / Activate ── */
   const handleToggleSuspend = async (target) => {
     const newStatus = target.status?.toLowerCase() === "suspended" ? "active" : "suspended";
-    // Optimistic update
     setUsers(u => u.map(x => x.id === target.id ? { ...x, status: newStatus } : x));
     try {
       await api("PATCH", `/admin/users/${target.id}/status`, { status: newStatus });
       notify(`User ${newStatus === "suspended" ? "suspended" : "reactivated"} successfully.`);
     } catch (err) {
-      // Revert
       setUsers(u => u.map(x => x.id === target.id ? { ...x, status: target.status } : x));
       notify(err.message, "error");
     }
   };
 
-  /* ── Delete ── */
   const handleDelete = async () => {
     const { id } = modal.user;
     setSaving(true);
@@ -436,7 +581,6 @@ export default function UserManagement() {
     finally { setSaving(false); }
   };
 
-  /* ── Filtering ── */
   const filtered = users.filter(u => {
     const q  = search.toLowerCase();
     const ok = !q || u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
@@ -446,7 +590,6 @@ export default function UserManagement() {
   useEffect(() => { setPage(1); }, [search, roleFilter]);
 
   const pageData = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-
   const counts = {
     all:        users.length,
     student:    users.filter(u => u.role?.toLowerCase() === "student").length,
@@ -469,15 +612,13 @@ export default function UserManagement() {
       <style>{SHARED_CSS}</style>
       <div style={{ background: "#f0f4fb", minHeight: "100vh" }}>
 
-        {/* ── Topbar ── */}
         <div className="topbar">
           <span style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 700, fontSize: 15, color: "#0056b3", letterSpacing: "-.3px", flexShrink: 0 }}>
             SECT Admin
           </span>
           <div className="hide-mobile" style={{ flex: 1, maxWidth: 380, position: "relative" }}>
             <i className="bi bi-search" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13 }}></i>
-            <input className="dash-search" placeholder="Search by name or email…"
-              value={search} onChange={e => setSearch(e.target.value)} />
+            <input className="dash-search" placeholder="Search by name or email…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
             <NotificationBell />
@@ -503,8 +644,6 @@ export default function UserManagement() {
         </div>
 
         <div className="d-flex">
-
-          {/* ── Sidebar ── */}
           <nav className="glass-sidebar d-none d-lg-flex flex-column align-items-center py-4 gap-1"
             style={{ width: 80, minHeight: "calc(100vh - 56px)", position: "sticky", top: 56, alignSelf: "flex-start", flexShrink: 0 }}>
             {NAV_ITEMS.map(({ to, icon, label }) => (
@@ -514,17 +653,14 @@ export default function UserManagement() {
             ))}
           </nav>
 
-          {/* ── Main ── */}
           <main style={{ flex: 1, padding: "20px 16px", paddingBottom: 90, minWidth: 0 }}>
 
-            {/* Mobile search */}
             <div className="d-lg-none mb-3" style={{ position: "relative" }}>
               <i className="bi bi-search" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13, zIndex: 1 }}></i>
               <input className="dash-search" style={{ paddingLeft: 36 }} placeholder="Search by name or email…"
                 value={search} onChange={e => setSearch(e.target.value)} />
             </div>
 
-            {/* Page header */}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, gap: 12 }}>
               <div>
                 <p style={{ margin: 0, fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Admin</p>
@@ -540,13 +676,11 @@ export default function UserManagement() {
               </button>
             </div>
 
-            {/* Stat chips — clickable role filter */}
             <div className="fade-up" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
               {STAT_CHIPS.map(({ key, label, value, color, bg, icon }) => {
                 const sel = roleFilter === key;
                 return (
-                  <div key={key}
-                    className={`stat-chip ${sel ? "selected" : ""}`}
+                  <div key={key} className={`stat-chip ${sel ? "selected" : ""}`}
                     style={{ color, borderColor: sel ? color : "transparent" }}
                     onClick={() => setRoleFilter(roleFilter === key ? "all" : key)}>
                     <div style={{ width: 34, height: 34, borderRadius: 9, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -561,12 +695,8 @@ export default function UserManagement() {
               })}
             </div>
 
-            {/* Table card */}
             <div className="dash-card fade-up">
-
-              {/* Toolbar */}
               <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                {/* Role filter pills */}
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {[
                     { key: "all",        label: "All Roles"   },
@@ -579,10 +709,7 @@ export default function UserManagement() {
                     return (
                       <button key={key} className="filter-btn"
                         onClick={() => setRoleFilter(roleFilter === key ? "all" : key)}
-                        style={{
-                          background: active ? (cfg?.color ?? "#0056b3") : "#f1f5f9",
-                          color: active ? "#fff" : "#64748b",
-                        }}>
+                        style={{ background: active ? (cfg?.color ?? "#0056b3") : "#f1f5f9", color: active ? "#fff" : "#64748b" }}>
                         {label}
                       </button>
                     );
@@ -598,7 +725,6 @@ export default function UserManagement() {
                 </button>
               </div>
 
-              {/* Content */}
               {loading ? (
                 <div style={{ padding: "20px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
                   {[1, 2, 3, 4].map(i => <div key={i} className="skeleton" style={{ height: 56, borderRadius: 10 }} />)}
@@ -617,15 +743,10 @@ export default function UserManagement() {
                 </div>
               ) : (
                 <>
-                  {/* Desktop table */}
                   <div className="hide-mobile" style={{ overflowX: "auto" }}>
                     <table className="dash-table">
                       <thead>
-                        <tr>
-                          {["User", "Email", "Role", "Status", "Joined", "Actions"].map(h => (
-                            <th key={h}>{h}</th>
-                          ))}
-                        </tr>
+                        <tr>{["User", "Email", "Role", "Status", "Joined", "Actions"].map(h => <th key={h}>{h}</th>)}</tr>
                       </thead>
                       <tbody>
                         {pageData.map((u) => {
@@ -643,31 +764,23 @@ export default function UserManagement() {
                               <td><RolePill role={u.role} /></td>
                               <td><StatusPill status={u.status ?? "active"} /></td>
                               <td style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap" }}>
-                                {u.created_at
-                                  ? new Date(u.created_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
-                                  : "—"}
+                                {u.created_at ? new Date(u.created_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—"}
                               </td>
                               <td>
                                 {isAdminRole ? (
                                   <span style={{ fontSize: 11, color: "#94a3b8" }}>System</span>
                                 ) : (
                                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                    <button className="action-btn-sm"
-                                      onClick={() => setModal({ type: "edit", user: u })}
+                                    <button className="action-btn-sm" onClick={() => setModal({ type: "edit", user: u })}
                                       style={{ background: "#e8f0fe", color: "#0056b3" }}>
                                       <i className="bi bi-pencil"></i> Edit
                                     </button>
-                                    <button className="action-btn-sm"
-                                      onClick={() => handleToggleSuspend(u)}
-                                      style={{
-                                        background: isSuspended ? "#f0fdf4" : "#fff8f0",
-                                        color: isSuspended ? "#16a34a" : "#fd7e14",
-                                      }}>
+                                    <button className="action-btn-sm" onClick={() => handleToggleSuspend(u)}
+                                      style={{ background: isSuspended ? "#f0fdf4" : "#fff8f0", color: isSuspended ? "#16a34a" : "#fd7e14" }}>
                                       <i className={`bi ${isSuspended ? "bi-person-check" : "bi-person-dash"}`}></i>
                                       {isSuspended ? "Activate" : "Suspend"}
                                     </button>
-                                    <button className="action-btn-sm"
-                                      onClick={() => setModal({ type: "delete", user: u })}
+                                    <button className="action-btn-sm" onClick={() => setModal({ type: "delete", user: u })}
                                       style={{ background: "#fff0f0", color: "#dc3545" }}>
                                       <i className="bi bi-trash"></i> Delete
                                     </button>
@@ -681,7 +794,6 @@ export default function UserManagement() {
                     </table>
                   </div>
 
-                  {/* Mobile user cards */}
                   <div className="d-lg-none" style={{ padding: "12px", display: "flex", flexDirection: "column", gap: 8 }}>
                     {pageData.map((u) => {
                       const isSuspended = u.status?.toLowerCase() === "suspended";
@@ -689,7 +801,6 @@ export default function UserManagement() {
                       return (
                         <div key={u.id} className="user-card">
                           <div style={{ padding: "13px 15px" }}>
-                            {/* Top row */}
                             <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
                               <MiniAvatar name={u.name} size={38} />
                               <div style={{ flex: 1, minWidth: 0 }}>
@@ -697,9 +808,7 @@ export default function UserManagement() {
                                   <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{u.name}</span>
                                   <StatusPill status={u.status ?? "active"} />
                                 </div>
-                                <p style={{ margin: "1px 0 4px", fontSize: 11, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                  {u.email}
-                                </p>
+                                <p style={{ margin: "1px 0 4px", fontSize: 11, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.email}</p>
                                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                                   <RolePill role={u.role} />
                                   {u.created_at && (
@@ -711,22 +820,18 @@ export default function UserManagement() {
                                 </div>
                               </div>
                             </div>
-                            {/* Actions */}
                             {!isAdminRole && (
                               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                <button className="action-btn-sm"
-                                  onClick={() => setModal({ type: "edit", user: u })}
+                                <button className="action-btn-sm" onClick={() => setModal({ type: "edit", user: u })}
                                   style={{ background: "#e8f0fe", color: "#0056b3" }}>
                                   <i className="bi bi-pencil"></i> Edit
                                 </button>
-                                <button className="action-btn-sm"
-                                  onClick={() => handleToggleSuspend(u)}
+                                <button className="action-btn-sm" onClick={() => handleToggleSuspend(u)}
                                   style={{ background: isSuspended ? "#f0fdf4" : "#fff8f0", color: isSuspended ? "#16a34a" : "#fd7e14" }}>
                                   <i className={`bi ${isSuspended ? "bi-person-check" : "bi-person-dash"}`}></i>
                                   {isSuspended ? "Activate" : "Suspend"}
                                 </button>
-                                <button className="action-btn-sm"
-                                  onClick={() => setModal({ type: "delete", user: u })}
+                                <button className="action-btn-sm" onClick={() => setModal({ type: "delete", user: u })}
                                   style={{ background: "#fff0f0", color: "#dc3545" }}>
                                   <i className="bi bi-trash"></i> Delete
                                 </button>
@@ -745,7 +850,6 @@ export default function UserManagement() {
           </main>
         </div>
 
-        {/* ── Bottom Nav ── */}
         <nav className="admin-bottom-nav d-lg-none">
           {BOTTOM_NAV.map(({ to, icon, label }) => (
             <Link key={to} to={to} className="bnav-item"
@@ -756,7 +860,6 @@ export default function UserManagement() {
         </nav>
       </div>
 
-      {/* ── Add User Modal ── */}
       {modal?.type === "add" && (
         <div className="modal-overlay" onMouseDown={e => { if (e.target === e.currentTarget && !saving) closeModal(); }}>
           <div className="modal-box" style={{ maxWidth: 480 }} onMouseDown={e => e.stopPropagation()}>
@@ -779,7 +882,6 @@ export default function UserManagement() {
         </div>
       )}
 
-      {/* ── Edit User Modal ── */}
       {modal?.type === "edit" && (
         <div className="modal-overlay" onMouseDown={e => { if (e.target === e.currentTarget && !saving) closeModal(); }}>
           <div className="modal-box" style={{ maxWidth: 480 }} onMouseDown={e => e.stopPropagation()}>
@@ -798,7 +900,7 @@ export default function UserManagement() {
             <div className="modal-body">
               <UserForm
                 isEdit
-                initial={{ name: modal.user.name, email: modal.user.email, role: modal.user.role, password: "" }}
+                initial={{ name: modal.user.name, email: modal.user.email, role: modal.user.role, password: "", password_confirmation: "" }}
                 onSubmit={handleEdit}
                 onCancel={closeModal}
                 saving={saving}
@@ -808,7 +910,6 @@ export default function UserManagement() {
         </div>
       )}
 
-      {/* ── Delete User Modal ── */}
       {modal?.type === "delete" && (
         <DeleteModal user={modal.user} onConfirm={handleDelete} onClose={closeModal} saving={saving} />
       )}

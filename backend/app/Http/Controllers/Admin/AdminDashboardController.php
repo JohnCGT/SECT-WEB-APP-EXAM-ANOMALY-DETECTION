@@ -1,12 +1,11 @@
 <?php
 
 // backend/app/Http/Controllers/AdminDashboardController.php
-// Changes vs previous version:
-//   + courses() method added for GET /api/admin/courses
 
 namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 
+use App\Models\ActivityLog;
 use App\Models\Course;
 use App\Models\Exam;
 use App\Models\ExamResult;
@@ -35,21 +34,27 @@ class AdminDashboardController extends Controller
     {
         $this->authorizeAdmin();
 
+        // Last 5 activity logs for the dashboard preview
+        $recentActivity = ActivityLog::orderByDesc('occurred_at')
+            ->limit(5)
+            ->get()
+            ->map(fn($log) => [
+                'id'          => $log->id,
+                'user_name'   => $log->user_name,
+                'user_email'  => $log->user_email,
+                'user_role'   => $log->user_role,
+                'event'       => $log->event,
+                'description' => $log->description,
+                'occurred_at' => $log->occurred_at?->toISOString(),
+            ]);
+
         return response()->json([
             'total_users'      => User::count(),
             'active_exams'     => Exam::where('status', 'active')->count(),
             'flagged_sessions' => ExamResult::where('is_flagged', true)->count(),
             'high_cpi_risk'    => ExamResult::where('cpi_score', '>=', 0.70)->count(),
             'open_tickets'     => SupportTicket::where('status', 'open')->count(),
-
-            'recent_results' => ExamResult::with([
-                    'student:id,name,email',
-                    'exam:id,title,type',
-                ])
-                ->orderByDesc('processed_at')
-                ->limit(10)
-                ->get()
-                ->map(fn($r) => $this->formatResult($r)),
+            'recent_activity'  => $recentActivity,
         ]);
     }
 
@@ -90,7 +95,7 @@ class AdminDashboardController extends Controller
                     'type'       => 'high_cpi',
                     'title'      => "High CPI: {$r->student?->name}",
                     'body'       => "Score {$r->cpi_score} on \"{$r->exam?->title}\"",
-                    'link'       => '/admin/anomalies',
+                    'link'       => '/admin/activity-logs',
                     'created_at' => $r->processed_at?->toISOString(),
                 ]);
             });
@@ -102,10 +107,6 @@ class AdminDashboardController extends Controller
 
     // ══════════════════════════════════════════════════════════════════════════
     // GET /api/admin/courses
-    //
-    // Admin-wide view of ALL courses across all instructors.
-    // Response: { data: [{ id, code, name, semester, credits,
-    //   instructor: {id,name,email}, students_count, exams_count }] }
     // ══════════════════════════════════════════════════════════════════════════
     public function courses(Request $request)
     {
@@ -150,7 +151,6 @@ class AdminDashboardController extends Controller
         $query = Exam::with(['course:id,code,name', 'instructor:id,name,email'])
             ->withCount('submissions')
             ->withCount(['submissions as flagged_count' => function ($q) {
-                // Now works because ExamSubmission::examResult() HasOne exists
                 $q->whereHas('examResult', fn($r) => $r->where('is_flagged', true));
             }])
             ->orderByDesc('start_time');
@@ -216,17 +216,17 @@ class AdminDashboardController extends Controller
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // GET /api/admin/anomalies
+    // GET /api/admin/anomalies  (kept for any instructor-facing usage)
     // ══════════════════════════════════════════════════════════════════════════
     public function anomalies(Request $request)
     {
         $this->authorizeAdmin();
 
-        $type    = $request->input('type');
+        $type     = $request->input('type');
         $severity = $request->input('severity');
-        $examId  = $request->input('exam_id');
-        $perPage = min((int) $request->input('per_page', 50), 200);
-        $page    = max(1, (int) $request->input('page', 1));
+        $examId   = $request->input('exam_id');
+        $perPage  = min((int) $request->input('per_page', 50), 200);
+        $page     = max(1, (int) $request->input('page', 1));
 
         $sources = [];
         if (!$type || $type === 'tab_switch')        $sources[] = $this->queryTabSwitch($severity, $examId);
@@ -304,23 +304,5 @@ class AdminDashboardController extends Controller
                 'z_score'=>$l->z_score,'wpm'=>$l->wpm,'reason'=>$l->reason,
                 'hidden_duration_ms'=>null,'direction'=>null,'keys'=>null,'is_paste'=>null])
             ->all();
-    }
-
-    private function formatResult(ExamResult $r): array
-    {
-        return [
-            'id'              => $r->id,
-            'submission_id'   => $r->submission_id,
-            'student'         => $r->student,
-            'exam'            => $r->exam,
-            'cpi_score'       => $r->cpi_score,
-            'cpi_label'       => $r->cpi_label,
-            'is_flagged'      => $r->is_flagged,
-            'iso_tab_flagged' => $r->iso_tab_flagged,
-            'svm_flagged'     => $r->svm_flagged,
-            'rt_flagged'      => $r->rt_flagged,
-            'hmm_flagged'     => $r->hmm_flagged,
-            'processed_at'    => $r->processed_at?->toISOString(),
-        ];
     }
 }

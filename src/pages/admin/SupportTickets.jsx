@@ -7,13 +7,7 @@ const SHARED_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
   *,*::before,*::after{box-sizing:border-box;}
   body,html{margin:0;padding:0;background:#f0f4fb;font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
-  :root{
-    --blue:#0056b3;--blue-mid:#1a6ed8;--blue-lite:#e8f0fe;
-    --slate:#64748b;--slate-lt:#94a3b8;
-    --card-bg:#ffffff;--card-br:16px;
-    --card-sh:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,86,179,.06);
-    --danger:#dc3545;--warn:#fd7e14;--green:#16a34a;
-  }
+  :root{--blue:#0056b3;--blue-mid:#1a6ed8;--blue-lite:#e8f0fe;--slate:#64748b;--slate-lt:#94a3b8;--card-bg:#ffffff;--card-br:16px;--card-sh:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,86,179,.06);--danger:#dc3545;--warn:#fd7e14;--green:#16a34a;}
   .dash-card{background:var(--card-bg);border-radius:var(--card-br);box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);overflow:hidden;}
   .glass-sidebar{background:rgba(255,255,255,0.60);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-right:1px solid rgba(255,255,255,0.80);box-shadow:4px 0 24px rgba(0,86,179,.07);}
   .nav-pill{display:flex;flex-direction:column;align-items:center;padding:10px 8px;border-radius:12px;gap:4px;font-size:11px;font-weight:600;text-decoration:none;color:var(--slate);transition:background .15s,color .15s,transform .15s;width:100%;}
@@ -49,7 +43,6 @@ const SHARED_CSS = `
   .form-ctrl:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
   .form-lbl{font-size:11px;font-weight:700;color:#64748b;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;display:block;}
   .ticket-card{background:#fff;border-radius:14px;border:1px solid rgba(0,86,179,.06);box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;margin-bottom:8px;}
-  /* Modal */
   .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(4px);z-index:1055;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;}
   .modal-box{background:#fff;border-radius:20px;width:100%;max-width:560px;box-shadow:0 24px 64px rgba(0,0,0,.18);overflow:hidden;display:flex;flex-direction:column;max-height:calc(100vh - 32px);animation:fadeUp .25s ease;}
   .modal-hdr{padding:20px 22px 14px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;}
@@ -73,31 +66,28 @@ const SHARED_CSS = `
   @media(max-width:480px){.stat-chip{min-width:calc(50% - 5px);}}
 `;
 
+/* ─── Nav — activity-logs added ─────────────────────────────────────── */
 const NAV_ITEMS = [
-  { to: "/admin",           icon: "bi-speedometer2",         label: "Dashboard" },
-  { to: "/admin/users",     icon: "bi-people",               label: "Users"     },
-  { to: "/admin/courses",   icon: "bi-book",                 label: "Courses"   },
-  { to: "/admin/exams",     icon: "bi-file-earmark-text",    label: "Exams"     },
-  // { to: "/admin/anomalies", icon: "bi-exclamation-triangle", label: "Anomalies" },
-  { to: "/admin/support",   icon: "bi-headset",              label: "Support"   },
+  { to: "/admin",               icon: "bi-speedometer2",      label: "Dashboard" },
+  { to: "/admin/users",         icon: "bi-people",            label: "Users"     },
+  { to: "/admin/courses",       icon: "bi-book",              label: "Courses"   },
+  { to: "/admin/exams",         icon: "bi-file-earmark-text", label: "Exams"     },
+  { to: "/admin/activity-logs", icon: "bi-journal-text",      label: "Logs"      },
+  { to: "/admin/support",       icon: "bi-headset",           label: "Support"   },
 ];
 const BOTTOM_NAV = [
-  { to: "/admin",         icon: "bi-speedometer2",      label: "Home"    },
-  { to: "/admin/users",   icon: "bi-people",            label: "Users"   },
-  { to: "/admin/exams",   icon: "bi-file-earmark-text", label: "Exams"   },
-  { to: "/admin/support", icon: "bi-headset",           label: "Support" },
-  // { to: "/admin/anomalies", icon: "bi-exclamation-triangle", label: "Flags" },
+  { to: "/admin",               icon: "bi-speedometer2",      label: "Home"    },
+  { to: "/admin/users",         icon: "bi-people",            label: "Users"   },
+  { to: "/admin/courses",       icon: "bi-book",              label: "Courses" },
+  { to: "/admin/exams",         icon: "bi-file-earmark-text", label: "Exams"   },
+  { to: "/admin/activity-logs", icon: "bi-journal-text",      label: "Logs"    },
 ];
 
 const BASE = import.meta?.env?.VITE_API_URL ?? "/api";
 async function api(method, path, body) {
-  const opts = {
-    method,
-    headers: { "Content-Type": "application/json", "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" },
-    credentials: "include",
-  };
+  const opts = { method, headers: { "Content-Type": "application/json", "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" }, credentials: "include" };
   if (body !== undefined) opts.body = JSON.stringify(body);
-  const res = await fetch(BASE + path, opts);
+  const res  = await fetch(BASE + path, opts);
   if (res.status === 419) throw new Error("Session expired. Please refresh.");
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -115,21 +105,18 @@ const STATUS_CFG = {
   resolved:    { bg: "#f0fdf4", color: "#16a34a", dot: "#22c55e", label: "Resolved"    },
   closed:      { bg: "#f1f5f9", color: "#64748b", dot: "#94a3b8", label: "Closed"      },
 };
-
 const PRIORITY_CFG = {
   low:    { bg: "#f0fdf4", color: "#16a34a" },
   medium: { bg: "#fff8f0", color: "#fd7e14" },
   high:   { bg: "#fff0f0", color: "#dc3545" },
 };
-
 const CATEGORY_CFG = {
-  technical:  { icon: "bi-tools",              label: "Technical Issue" },
-  exam_issue: { icon: "bi-file-earmark-text",  label: "Exam Issue"      },
-  account:    { icon: "bi-person",             label: "Account"         },
-  grading:    { icon: "bi-pencil-square",      label: "Grading"         },
-  other:      { icon: "bi-chat-dots",          label: "Other"           },
+  technical:  { icon: "bi-tools",             label: "Technical Issue" },
+  exam_issue: { icon: "bi-file-earmark-text", label: "Exam Issue"      },
+  account:    { icon: "bi-person",            label: "Account"         },
+  grading:    { icon: "bi-pencil-square",     label: "Grading"         },
+  other:      { icon: "bi-chat-dots",         label: "Other"           },
 };
-
 const ROLE_CFG = {
   student:    { bg: "#e8f0fe", color: "#0056b3" },
   instructor: { bg: "#eff6ff", color: "#1a6ed8" },
@@ -144,22 +131,15 @@ function StatusPill({ status }) {
     </span>
   );
 }
-
 function PriorityPill({ priority }) {
   const s = PRIORITY_CFG[priority] ?? PRIORITY_CFG.low;
   return <span className="badge-pill" style={{ background: s.bg, color: s.color }}>{priority}</span>;
 }
-
 function MiniAvatar({ name = "", size = 32 }) {
   const initials = name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase() || "?";
   const hue = [...name].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
   return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%", flexShrink: 0,
-      background: `hsl(${hue},55%,88%)`, color: `hsl(${hue},45%,30%)`,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontWeight: 700, fontSize: size * 0.38,
-    }}>
+    <div style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0, background: `hsl(${hue},55%,88%)`, color: `hsl(${hue},45%,30%)`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: size * 0.38 }}>
       {initials}
     </div>
   );
@@ -169,19 +149,8 @@ function Toast({ msg, type, onDone }) {
   useEffect(() => { const t = setTimeout(onDone, 3800); return () => clearTimeout(t); }, [onDone]);
   const isErr = type === "error";
   return (
-    <div style={{
-      position: "fixed", bottom: 28, right: 28, zIndex: 9999,
-      background: isErr ? "#fff0f0" : "#f0fdf4",
-      color: isErr ? "#dc3545" : "#16a34a",
-      padding: "12px 20px", borderRadius: 12, fontSize: 13, fontWeight: 600,
-      display: "flex", alignItems: "center", gap: 10,
-      boxShadow: "0 8px 32px rgba(0,0,0,.14)",
-      border: `1px solid ${isErr ? "#fecaca" : "#bbf7d0"}`,
-      fontFamily: "'DM Sans', sans-serif",
-      animation: "fadeUp .25s ease",
-    }}>
-      <i className={`bi ${isErr ? "bi-x-circle-fill" : "bi-check-circle-fill"}`}></i>
-      {msg}
+    <div style={{ position: "fixed", bottom: 28, right: 28, zIndex: 9999, background: isErr ? "#fff0f0" : "#f0fdf4", color: isErr ? "#dc3545" : "#16a34a", padding: "12px 20px", borderRadius: 12, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 10, boxShadow: "0 8px 32px rgba(0,0,0,.14)", border: `1px solid ${isErr ? "#fecaca" : "#bbf7d0"}`, fontFamily: "'DM Sans',sans-serif", animation: "fadeUp .25s ease" }}>
+      <i className={`bi ${isErr ? "bi-x-circle-fill" : "bi-check-circle-fill"}`}></i>{msg}
     </div>
   );
 }
@@ -189,14 +158,11 @@ function Toast({ msg, type, onDone }) {
 function Pagination({ total, page, perPage, onChange }) {
   const totalPages = Math.ceil(total / perPage);
   if (totalPages <= 1) return null;
-  const pages = [];
-  for (let i = 1; i <= totalPages; i++) pages.push(i);
+  const pages   = Array.from({ length: totalPages }, (_, i) => i + 1);
   const visible = pages.filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center", padding: "12px 16px", borderTop: "1px solid #f1f5f9" }}>
-      <button className="page-btn" disabled={page === 1} onClick={() => onChange(page - 1)}>
-        <i className="bi bi-chevron-left" style={{ fontSize: 11 }}></i>
-      </button>
+      <button className="page-btn" disabled={page === 1} onClick={() => onChange(page - 1)}><i className="bi bi-chevron-left" style={{ fontSize: 11 }}></i></button>
       {visible.map((p, idx) => {
         const prev = visible[idx - 1];
         return (
@@ -206,21 +172,17 @@ function Pagination({ total, page, perPage, onChange }) {
           </React.Fragment>
         );
       })}
-      <button className="page-btn" disabled={page === totalPages} onClick={() => onChange(page + 1)}>
-        <i className="bi bi-chevron-right" style={{ fontSize: 11 }}></i>
-      </button>
-      <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: 4 }}>
-        {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
-      </span>
+      <button className="page-btn" disabled={page === totalPages} onClick={() => onChange(page + 1)}><i className="bi bi-chevron-right" style={{ fontSize: 11 }}></i></button>
+      <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: 4 }}>{(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}</span>
     </div>
   );
 }
 
 /* ─── Ticket Modal ───────────────────────────────────────────────────── */
 function TicketModal({ ticket, onClose, onUpdated, notify }) {
-  const [reply,   setReply]   = useState(ticket.admin_response ?? "");
-  const [status,  setStatus]  = useState(ticket.status);
-  const [saving,  setSaving]  = useState(false);
+  const [reply,  setReply]  = useState(ticket.admin_response ?? "");
+  const [status, setStatus] = useState(ticket.status);
+  const [saving, setSaving] = useState(false);
   const catCfg = CATEGORY_CFG[ticket.category] ?? { icon: "bi-chat-dots", label: ticket.category };
 
   const handleSave = async () => {
@@ -244,14 +206,13 @@ function TicketModal({ ticket, onClose, onUpdated, notify }) {
             </h5>
             <p style={{ margin: "2px 0 0", fontSize: 11, color: "#94a3b8" }}>#{ticket.id}</p>
           </div>
-          <button onClick={onClose} disabled={saving}
-            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#94a3b8", padding: 4, lineHeight: 1 }}>
+          <button onClick={onClose} disabled={saving} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#94a3b8", padding: 4, lineHeight: 1 }}>
             <i className="bi bi-x-lg"></i>
           </button>
         </div>
 
         <div className="modal-body">
-          {/* Reporter info */}
+          {/* Reporter */}
           <div style={{ background: "#f8faff", borderRadius: 12, padding: "12px 14px", marginBottom: 16, border: "1px solid rgba(0,86,179,.06)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <MiniAvatar name={ticket.user?.name ?? "?"} size={38} />
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -289,27 +250,20 @@ function TicketModal({ ticket, onClose, onUpdated, notify }) {
             </div>
           </div>
 
-          {/* Admin response */}
+          {/* Response */}
           <div style={{ marginBottom: 16 }}>
             <label className="form-lbl">Admin Response</label>
-            <textarea className="form-ctrl" rows={4}
-              value={reply} onChange={e => setReply(e.target.value)}
-              placeholder="Write a response to the user…"
-              style={{ resize: "vertical" }} />
+            <textarea className="form-ctrl" rows={4} value={reply} onChange={e => setReply(e.target.value)}
+              placeholder="Write a response to the user…" style={{ resize: "vertical" }} />
           </div>
 
-          {/* Status update */}
+          {/* Status */}
           <div>
             <label className="form-lbl">Update Status</label>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {Object.entries(STATUS_CFG).map(([key, s]) => (
-                <button key={key} className="status-toggle-btn"
-                  onClick={() => setStatus(key)}
-                  style={{
-                    background: status === key ? s.bg : "transparent",
-                    borderColor: status === key ? s.dot : "rgba(0,86,179,.15)",
-                    color: status === key ? s.color : "#64748b",
-                  }}>
+                <button key={key} className="status-toggle-btn" onClick={() => setStatus(key)}
+                  style={{ background: status === key ? s.bg : "transparent", borderColor: status === key ? s.dot : "rgba(0,86,179,.15)", color: status === key ? s.color : "#64748b" }}>
                   {s.label}
                 </button>
               ))}
@@ -320,9 +274,7 @@ function TicketModal({ ticket, onClose, onUpdated, notify }) {
         <div className="modal-ftr">
           <button className="dash-btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
           <button className="dash-btn-primary" onClick={handleSave} disabled={saving}>
-            {saving
-              ? <><span className="spinner-border spinner-border-sm me-2" style={{ width: "0.75rem", height: "0.75rem" }} />Saving…</>
-              : <><i className="bi bi-check-lg"></i> Save Response</>}
+            {saving ? <><span className="spinner-border spinner-border-sm me-2" style={{ width: "0.75rem", height: "0.75rem" }} />Saving…</> : <><i className="bi bi-check-lg"></i>Save Response</>}
           </button>
         </div>
       </div>
@@ -330,9 +282,9 @@ function TicketModal({ ticket, onClose, onUpdated, notify }) {
   );
 }
 
-/* ════════════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════════════════
    MAIN PAGE
-════════════════════════════════════════════════════════════════════ */
+════════════════════════════════════════════════════════════════════════ */
 export default function SupportTickets() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -352,10 +304,7 @@ export default function SupportTickets() {
   const notify   = (msg, type = "success") => setToast({ msg, type });
   const isActive = (to) => to === "/admin" ? location.pathname === to : location.pathname.startsWith(to);
 
-  const handleLogout = async () => {
-    try { await api("POST", "/logout"); } catch {}
-    navigate("/");
-  };
+  const handleLogout = async () => { try { await api("POST", "/logout"); } catch {} navigate("/"); };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -418,9 +367,7 @@ export default function SupportTickets() {
 
         {/* Topbar */}
         <div className="topbar">
-          <span style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 700, fontSize: 15, color: "#0056b3", letterSpacing: "-.3px", flexShrink: 0 }}>
-            SECT Admin
-          </span>
+          <span style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 700, fontSize: 15, color: "#0056b3", letterSpacing: "-.3px", flexShrink: 0 }}>SECT Admin</span>
           <div className="hide-mobile" style={{ flex: 1, maxWidth: 380, position: "relative" }}>
             <i className="bi bi-search" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13 }}></i>
             <input className="dash-search" placeholder="Search tickets…" value={search} onChange={e => setSearch(e.target.value)} />
@@ -428,17 +375,14 @@ export default function SupportTickets() {
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
             <NotificationBell />
             <div className="dropdown">
-              <button className="d-flex align-items-center gap-2 dropdown-toggle"
-                style={{ background: "transparent", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: 10 }}
-                data-bs-toggle="dropdown">
+              <button className="d-flex align-items-center gap-2 dropdown-toggle" style={{ background: "transparent", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: 10 }} data-bs-toggle="dropdown">
                 <div className="dash-avatar">{initial}</div>
                 <span className="d-none d-sm-inline" style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{firstName}</span>
               </button>
               <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0" style={{ borderRadius: 12, fontSize: 13 }}>
                 <li><Link className="dropdown-item" to="/admin/profile">My Profile</Link></li>
                 <li><hr className="dropdown-divider" /></li>
-                <li><button className="dropdown-item text-danger" onClick={handleLogout}
-                  style={{ border: "none", background: "none", width: "100%", textAlign: "left" }}>Logout</button></li>
+                <li><button className="dropdown-item text-danger" onClick={handleLogout} style={{ border: "none", background: "none", width: "100%", textAlign: "left" }}>Logout</button></li>
               </ul>
             </div>
           </div>
@@ -461,8 +405,7 @@ export default function SupportTickets() {
             {/* Mobile search */}
             <div className="d-lg-none mb-3" style={{ position: "relative" }}>
               <i className="bi bi-search" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13, zIndex: 1 }}></i>
-              <input className="dash-search" style={{ paddingLeft: 36 }} placeholder="Search tickets…"
-                value={search} onChange={e => setSearch(e.target.value)} />
+              <input className="dash-search" style={{ paddingLeft: 36 }} placeholder="Search tickets…" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
 
             {/* Page header */}
@@ -473,9 +416,7 @@ export default function SupportTickets() {
                 <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>Manage complaints and issues from students and instructors</p>
               </div>
               <button className="dash-btn-ghost" onClick={load} style={{ flexShrink: 0, fontSize: 12, padding: "7px 13px" }}>
-                {loading
-                  ? <span className="spinner-border spinner-border-sm" style={{ width: "0.75rem", height: "0.75rem" }} />
-                  : <><i className="bi bi-arrow-clockwise"></i><span className="d-none d-sm-inline"> Refresh</span></>}
+                {loading ? <span className="spinner-border spinner-border-sm" style={{ width: "0.75rem", height: "0.75rem" }} /> : <><i className="bi bi-arrow-clockwise"></i><span className="d-none d-sm-inline"> Refresh</span></>}
               </button>
             </div>
 
@@ -484,8 +425,7 @@ export default function SupportTickets() {
               {STAT_CHIPS.map(({ key, label, value, color, bg, icon, isPriority }) => {
                 const isSelected = isPriority ? priorityFilter === "high" : statusFilter === key;
                 return (
-                  <div key={key}
-                    className={`stat-chip ${isSelected ? "selected" : ""}`}
+                  <div key={key} className={`stat-chip ${isSelected ? "selected" : ""}`}
                     style={{ color, borderColor: isSelected ? color : "transparent" }}
                     onClick={() => {
                       if (isPriority) setPriorityFilter(priorityFilter === "high" ? "all" : "high");
@@ -508,17 +448,16 @@ export default function SupportTickets() {
             <div className="dash-card fade-up">
               {/* Toolbar */}
               <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9" }}>
-                {/* Status filter row */}
                 <div className="filters-wrap" style={{ marginBottom: 8 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".04em", flexShrink: 0 }}>Status:</span>
                   {[
-                    { key: "all", label: "All" },
-                    { key: "open", label: "Open" },
+                    { key: "all",         label: "All"         },
+                    { key: "open",        label: "Open"        },
                     { key: "in_progress", label: "In Progress" },
-                    { key: "resolved", label: "Resolved" },
-                    { key: "closed", label: "Closed" },
+                    { key: "resolved",    label: "Resolved"    },
+                    { key: "closed",      label: "Closed"      },
                   ].map(({ key, label }) => {
-                    const cfg = STATUS_CFG[key];
+                    const cfg    = STATUS_CFG[key];
                     const active = statusFilter === key;
                     return (
                       <button key={key} className="filter-btn" onClick={() => { setStatusFilter(key); setPage(1); }}
@@ -528,16 +467,13 @@ export default function SupportTickets() {
                     );
                   })}
                 </div>
-                {/* Extra filters row */}
                 <div className="filters-wrap">
-                  {/* Role */}
                   <select className="form-ctrl" value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }}
                     style={{ width: "auto", padding: "5px 10px", fontSize: 12, flex: "none", minWidth: 110 }}>
                     <option value="all">All Roles</option>
                     <option value="student">Students</option>
                     <option value="instructor">Instructors</option>
                   </select>
-                  {/* Priority */}
                   <select className="form-ctrl" value={priorityFilter} onChange={e => { setPriorityFilter(e.target.value); setPage(1); }}
                     style={{ width: "auto", padding: "5px 10px", fontSize: 12, flex: "none", minWidth: 120 }}>
                     <option value="all">All Priority</option>
@@ -545,7 +481,6 @@ export default function SupportTickets() {
                     <option value="medium">Medium</option>
                     <option value="low">Low</option>
                   </select>
-                  {/* Category */}
                   <select className="form-ctrl" value={categoryFilter} onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
                     style={{ width: "auto", padding: "5px 10px", fontSize: 12, flex: "none", minWidth: 140 }}>
                     <option value="all">All Categories</option>
@@ -553,9 +488,7 @@ export default function SupportTickets() {
                       <option key={key} value={key}>{label}</option>
                     ))}
                   </select>
-                  <span style={{ marginLeft: "auto", fontSize: 11, color: "#94a3b8", flexShrink: 0 }}>
-                    {filtered.length} ticket{filtered.length !== 1 ? "s" : ""}
-                  </span>
+                  <span style={{ marginLeft: "auto", fontSize: 11, color: "#94a3b8", flexShrink: 0 }}>{filtered.length} ticket{filtered.length !== 1 ? "s" : ""}</span>
                 </div>
               </div>
 
@@ -567,9 +500,7 @@ export default function SupportTickets() {
                 <div style={{ padding: "40px 16px", textAlign: "center", color: "#94a3b8" }}>
                   <i className="bi bi-headset" style={{ fontSize: 28, display: "block", marginBottom: 8, opacity: .3 }}></i>
                   <p style={{ margin: 0, fontSize: 13 }}>
-                    {search || statusFilter !== "all" || priorityFilter !== "all"
-                      ? "No tickets match your filters."
-                      : "No support tickets yet."}
+                    {search || statusFilter !== "all" || priorityFilter !== "all" ? "No tickets match your filters." : "No support tickets yet."}
                   </p>
                 </div>
               ) : (
@@ -578,14 +509,10 @@ export default function SupportTickets() {
                   <div className="hide-mobile" style={{ overflowX: "auto" }}>
                     <table className="dash-table">
                       <thead>
-                        <tr>
-                          {["Reporter", "Subject", "Category", "Priority", "Status", "Submitted", "Action"].map(h => (
-                            <th key={h}>{h}</th>
-                          ))}
-                        </tr>
+                        <tr>{["Reporter", "Subject", "Category", "Priority", "Status", "Submitted", "Action"].map(h => <th key={h}>{h}</th>)}</tr>
                       </thead>
                       <tbody>
-                        {pageData.map((ticket) => {
+                        {pageData.map(ticket => {
                           const catCfg  = CATEGORY_CFG[ticket.category] ?? { icon: "bi-chat-dots", label: ticket.category };
                           const roleCfg = ROLE_CFG[ticket.user?.role]   ?? { bg: "#f1f5f9", color: "#64748b" };
                           const isNew   = ticket.status === "open" && !ticket.admin_response;
@@ -597,43 +524,29 @@ export default function SupportTickets() {
                                   <div>
                                     <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#1e293b" }}>
                                       {ticket.user?.name ?? "—"}
-                                      {isNew && (
-                                        <span className="badge-pill" style={{ background: "#0056b3", color: "#fff", marginLeft: 5, fontSize: 9 }}>NEW</span>
-                                      )}
+                                      {isNew && <span className="badge-pill" style={{ background: "#0056b3", color: "#fff", marginLeft: 5, fontSize: 9 }}>NEW</span>}
                                     </p>
-                                    <span className="badge-pill" style={{ background: roleCfg.bg, color: roleCfg.color, fontSize: 9 }}>
-                                      {ticket.user?.role ?? "unknown"}
-                                    </span>
+                                    <span className="badge-pill" style={{ background: roleCfg.bg, color: roleCfg.color, fontSize: 9 }}>{ticket.user?.role ?? "unknown"}</span>
                                   </div>
                                 </div>
                               </td>
                               <td style={{ maxWidth: 200 }}>
                                 <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ticket.subject}</p>
-                                <p style={{ margin: "1px 0 0", fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                  {ticket.message?.slice(0, 55)}{ticket.message?.length > 55 ? "…" : ""}
-                                </p>
+                                <p style={{ margin: "1px 0 0", fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ticket.message?.slice(0, 55)}{ticket.message?.length > 55 ? "…" : ""}</p>
                               </td>
                               <td>
                                 <span style={{ fontSize: 12, color: "#64748b", display: "flex", alignItems: "center", gap: 5 }}>
-                                  <i className={`bi ${catCfg.icon}`}></i> {catCfg.label}
+                                  <i className={`bi ${catCfg.icon}`}></i>{catCfg.label}
                                 </span>
                               </td>
                               <td><PriorityPill priority={ticket.priority} /></td>
                               <td><StatusPill status={ticket.status} /></td>
                               <td style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap" }}>
-                                {ticket.created_at
-                                  ? new Date(ticket.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
-                                  : "—"}
+                                {ticket.created_at ? new Date(ticket.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}
                               </td>
                               <td>
-                                <button
-                                  onClick={() => setSelected(ticket)}
-                                  className="filter-btn"
-                                  style={{
-                                    background: isNew ? "#0056b3" : "#f1f5f9",
-                                    color: isNew ? "#fff" : "#64748b",
-                                    borderRadius: 8, padding: "5px 13px", fontSize: 12,
-                                  }}>
+                                <button onClick={() => setSelected(ticket)} className="filter-btn"
+                                  style={{ background: isNew ? "#0056b3" : "#f1f5f9", color: isNew ? "#fff" : "#64748b", borderRadius: 8, padding: "5px 13px", fontSize: 12 }}>
                                   {ticket.admin_response ? "View / Edit" : "Respond"}
                                 </button>
                               </td>

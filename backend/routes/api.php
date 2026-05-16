@@ -5,6 +5,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SupportTicketController;
+use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminProfileController;
@@ -64,14 +65,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::patch('/exams/{id}/status',    [AdminDashboardController::class, 'updateExamStatus']);
         Route::delete('/exams/{id}/sessions', [AdminDashboardController::class, 'resetSessions']);
 
-        // Anomaly Reports (admin-wide feed — merges all four anomaly log tables)
-        Route::get('/anomalies', [AdminDashboardController::class, 'anomalies']);
-
-        // System Logs
-        // Requires spatie/laravel-activitylog: composer require spatie/laravel-activitylog
-        // Then publish & migrate: php artisan vendor:publish --provider="Spatie\Activitylog\ActivitylogServiceProvider"
-        //                          php artisan migrate
-        Route::get('/logs', [AdminDashboardController::class, 'logs']);
+         // Activity Logs (replaces the old /admin/anomalies admin feed)
+        Route::get('/activity-logs', [ActivityLogController::class, 'index']);
 
         Route::get('/support',        [SupportTicketController::class, 'adminIndex']);
         Route::get('/support/{id}',   [SupportTicketController::class, 'adminShow']);
@@ -118,10 +113,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/student/dashboard/score-stats',    [StudentDashboardController::class, 'scoreStats']);
     Route::get('/student/search',                   [StudentSearchController::class, 'search']);
 
-    // ── Student: notifications ─────────────────────────────────────────────────
-    Route::get('/student/notifications',              [StudentNotificationController::class, 'index']);
-    Route::patch('/student/notifications/read-all',   [StudentNotificationController::class, 'markAllRead']);
-    Route::patch('/student/notifications/{id}/read',  [StudentNotificationController::class, 'markRead']);
+    // ── Student: notifications ────────────────────────────────────────────────
+    Route::get('/student/notifications',             [StudentNotificationController::class, 'index']);
+    Route::patch('/student/notifications/read-all',  [StudentNotificationController::class, 'markAllRead']);
+    Route::patch('/student/notifications/{id}/read', [StudentNotificationController::class, 'markRead']);
 
     // ── Student: anomaly event ingestion ──────────────────────────────────────
     // Called silently by AnomalyCollector during an active exam session.
@@ -190,7 +185,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/submissions/{submissionId}/student-pdf',
             [EssayGradingController::class, 'submissionPdf']);
 
-        // Anomaly review
+        // Anomaly review (instructor-facing — these stay, they're for exam detail pages)
         Route::get('/anomalies',                              [AnomalyController::class, 'index']);
         Route::get('/anomalies/summary',                      [AnomalyController::class, 'summary']);
         Route::get('/submissions/{submissionId}/anomalies',   [AnomalyController::class, 'show']);

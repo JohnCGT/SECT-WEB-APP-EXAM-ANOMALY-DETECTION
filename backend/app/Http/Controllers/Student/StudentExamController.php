@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Student;
 use App\Http\Controllers\Controller;
 
+use App\Models\ActivityLog;
 use App\Models\Exam;
 use App\Models\ExamSubmission;
 use Illuminate\Http\Request;
@@ -12,7 +13,6 @@ use Illuminate\Support\Facades\DB;
 
 class StudentExamController extends Controller
 {
-    // ── Private helper: resolve authenticated student ────────────────────────
     private function getStudent(Request $request)
     {
         $student = $request->user();
@@ -20,7 +20,6 @@ class StudentExamController extends Controller
         return $student;
     }
 
-    // ── Private helper: verify student is enrolled in course ─────────────────
     private function assertEnrolled($student, int $courseId): void
     {
         $enrolled = $student->enrolledCourses()
@@ -30,7 +29,6 @@ class StudentExamController extends Controller
         if (!$enrolled) abort(403, 'You are not enrolled in this course.');
     }
 
-    // ── Private helper: case-insensitive answer comparison ───────────────────
     private function answersMatch(?string $studentAnswer, ?string $correctAnswer): bool
     {
         if ($studentAnswer === null || $correctAnswer === null) return false;
@@ -48,7 +46,6 @@ class StudentExamController extends Controller
             ->with([
                 'instructor:id,name',
                 'exams' => function ($query) {
-                    // FIX: exclude drafts from grade calculations too
                     $query->whereNotIn('status', ['draft', 'cancelled'])
                         ->withCount('questions');
                 },
@@ -156,12 +153,6 @@ class StudentExamController extends Controller
 
     /**
      * GET /student/exams
-     *
-     * Returns all exams across every enrolled course WITH submission status.
-     *
-     * FIX #1: Only return non-draft exams. Students must never see draft exams —
-     * drafts are instructor work-in-progress and have not been published.
-     * Allowed statuses: scheduled, active, completed.
      */
     public function allExams(Request $request)
     {
@@ -169,7 +160,6 @@ class StudentExamController extends Controller
         $courseIds = $student->enrolledCourses()->pluck('courses.id');
 
         $exams = Exam::whereIn('course_id', $courseIds)
-            // FIX: exclude drafts — students only see published exams
             ->whereNotIn('status', ['draft', 'cancelled'])
             ->with([
                 'course:id,name,code',
@@ -216,9 +206,6 @@ class StudentExamController extends Controller
 
     /**
      * GET /student/courses/{courseId}/exams
-     *
-     * FIX #1: Same draft filter applied here — course exam page must not
-     * show draft exams to students either.
      */
     public function courseExams(Request $request, $courseId)
     {
@@ -226,7 +213,6 @@ class StudentExamController extends Controller
         $this->assertEnrolled($student, (int) $courseId);
 
         $exams = Exam::where('course_id', $courseId)
-            // FIX: exclude drafts
             ->whereNotIn('status', ['draft', 'cancelled'])
             ->withCount('questions')
             ->with(['submissions' => function ($query) use ($student) {
@@ -274,14 +260,10 @@ class StudentExamController extends Controller
 
         $this->assertEnrolled($student, (int) $exam->course_id);
 
-        // FIX: Also block starting a draft exam even if the student somehow
-        // has its ID (e.g. from a bookmark or direct URL)
         if ($exam->status === 'draft') {
             return response()->json(['message' => 'This exam is not available yet.'], 403);
         }
 
-        // FIX: Use Carbon::now('UTC') so the comparison is always UTC vs UTC,
-        // regardless of what APP_TIMEZONE is set to in config/app.php.
         $now = Carbon::now('UTC');
 
         if ($now->lt($exam->start_time)) {
@@ -315,6 +297,8 @@ class StudentExamController extends Controller
             return response()->json(['message' => 'You have already submitted this exam.'], 403);
         }
 
+        $isNew = !$existing;
+
         $submission = ExamSubmission::firstOrCreate(
             ['exam_id' => $examId, 'student_id' => $student->id],
             [
@@ -323,6 +307,24 @@ class StudentExamController extends Controller
                 'total_points' => $exam->total_points,
             ]
         );
+
+        // ── Activity Log — only on first start, not on resume ─────────────
+        if ($isNew) {
+            ActivityLog::record(
+                $student,
+                'exam.started',
+                "{$student->name} started exam \"{$exam->title}\".",
+                [
+                    'exam_id'       => $exam->id,
+                    'exam_title'    => $exam->title,
+                    'submission_id' => $submission->id,
+                ],
+                $request,
+                $exam->id,
+                'Exam'
+            );
+        }
+        // ─────────────────────────────────────────────────────────────────
 
         $questions = $exam->questions->map(function ($question) {
             return [
@@ -368,10 +370,6 @@ class StudentExamController extends Controller
 
     /**
      * POST /student/exams/{examId}/submit
-     *
-     * FIX: Essays stored with points_earned = NULL (not yet graded).
-     * FIX: Removed hardcoded 'Asia/Manila' timezone — use UTC throughout
-     * so the ML job receives correct timestamps regardless of server config.
      */
     public function submit(Request $request, $examId)
     {
@@ -423,13 +421,28 @@ class StudentExamController extends Controller
             'answers'      => $gradedAnswers,
         ]);
 
-        // FIX: Use UTC ISO strings directly — no hardcoded Asia/Manila conversion.
-        // Carbon casts on the model already store as UTC; toIso8601String() on a
-        // UTC Carbon instance is always correct.
         $examStart = Carbon::parse($submission->started_at)->utc()->toIso8601String();
         $examEnd   = $now->toIso8601String();
 
         ProcessExamML::dispatch($submission->id, $examStart, $examEnd);
+
+        // ── Activity Log ──────────────────────────────────────────────────
+        ActivityLog::record(
+            $student,
+            'exam.submitted',
+            "{$student->name} submitted exam \"{$exam->title}\".",
+            [
+                'exam_id'       => $exam->id,
+                'exam_title'    => $exam->title,
+                'submission_id' => $submission->id,
+                'score'         => $score,
+                'total_points'  => $submission->total_points,
+            ],
+            $request,
+            $exam->id,
+            'Exam'
+        );
+        // ─────────────────────────────────────────────────────────────────
 
         return response()->json([
             'message'    => 'Exam submitted successfully.',

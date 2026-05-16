@@ -5,6 +5,7 @@
 namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 
+use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -14,8 +15,6 @@ class AdminUserController extends Controller
 {
     /**
      * GET /api/admin/users
-     * List all users, newest first.
-     * Admin-only.
      */
     public function index()
     {
@@ -28,7 +27,6 @@ class AdminUserController extends Controller
 
     /**
      * POST /api/admin/users
-     * Register a new user from the admin panel.
      */
     public function store(Request $request)
     {
@@ -39,10 +37,10 @@ class AdminUserController extends Controller
             'email'    => 'required|email|unique:users,email',
             'password' => [
                 'required', 'string', 'min:8',
-                'regex:/[a-z]/',       // lowercase
-                'regex:/[A-Z]/',       // uppercase
-                'regex:/[0-9]/',       // digit
-                'regex:/[@$!%*#?&]/', // special char
+                'regex:/[a-z]/',
+                'regex:/[A-Z]/',
+                'regex:/[0-9]/',
+                'regex:/[@$!%*#?&]/',
             ],
             'role'     => 'required|in:admin,instructor,student',
         ], [
@@ -68,6 +66,23 @@ class AdminUserController extends Controller
             ]);
         }
 
+        // ── Activity Log ──────────────────────────────────────────────────
+        ActivityLog::record(
+            $request->user(),
+            'admin.user_created',
+            "Admin {$request->user()->name} registered \"{$user->name}\" as {$user->role}.",
+            [
+                'target_user_id'    => $user->id,
+                'target_user_name'  => $user->name,
+                'target_user_email' => $user->email,
+                'role'              => $user->role,
+            ],
+            $request,
+            $user->id,
+            'User'
+        );
+        // ─────────────────────────────────────────────────────────────────
+
         return response()->json([
             'message' => 'User registered successfully.',
             'user'    => $this->format($user),
@@ -76,7 +91,6 @@ class AdminUserController extends Controller
 
     /**
      * PUT /api/admin/users/{id}
-     * Update name, email, role, and optionally password.
      */
     public function update(Request $request, int $id)
     {
@@ -90,7 +104,6 @@ class AdminUserController extends Controller
             'role'  => 'required|in:admin,instructor,student',
         ];
 
-        // Password is optional on edit — only validate if provided
         if ($request->filled('password')) {
             $rules['password'] = [
                 'string', 'min:8',
@@ -115,6 +128,23 @@ class AdminUserController extends Controller
 
         $user->save();
 
+        // ── Activity Log ──────────────────────────────────────────────────
+        ActivityLog::record(
+            $request->user(),
+            'admin.user_updated',
+            "Admin {$request->user()->name} updated user \"{$user->name}\".",
+            [
+                'target_user_id'    => $user->id,
+                'target_user_name'  => $user->name,
+                'target_user_email' => $user->email,
+                'role'              => $user->role,
+            ],
+            $request,
+            $user->id,
+            'User'
+        );
+        // ─────────────────────────────────────────────────────────────────
+
         return response()->json([
             'message' => 'User updated successfully.',
             'user'    => $this->format($user),
@@ -123,8 +153,6 @@ class AdminUserController extends Controller
 
     /**
      * PATCH /api/admin/users/{id}/status
-     * Suspend or reactivate a user.
-     * Body: { "status": "active" | "suspended" }
      */
     public function updateStatus(Request $request, int $id)
     {
@@ -132,7 +160,6 @@ class AdminUserController extends Controller
 
         $user = User::findOrFail($id);
 
-        // Prevent suspending other admins
         if ($user->role === 'admin') {
             return response()->json(['message' => 'Cannot change status of an admin account.'], 403);
         }
@@ -144,6 +171,23 @@ class AdminUserController extends Controller
         $user->status = $validated['status'];
         $user->save();
 
+        // ── Activity Log ──────────────────────────────────────────────────
+        $action = $validated['status'] === 'suspended' ? 'suspended' : 'reactivated';
+        ActivityLog::record(
+            $request->user(),
+            'admin.user_status_changed',
+            "Admin {$request->user()->name} {$action} user \"{$user->name}\".",
+            [
+                'target_user_id'   => $user->id,
+                'target_user_name' => $user->name,
+                'new_status'       => $validated['status'],
+            ],
+            $request,
+            $user->id,
+            'User'
+        );
+        // ─────────────────────────────────────────────────────────────────
+
         return response()->json([
             'message' => 'User status updated.',
             'user'    => $this->format($user),
@@ -152,18 +196,33 @@ class AdminUserController extends Controller
 
     /**
      * DELETE /api/admin/users/{id}
-     * Permanently delete a user.
      */
-    public function destroy(int $id)
+    public function destroy(Request $request, int $id)
     {
         $this->authorizeAdmin();
 
         $user = User::findOrFail($id);
 
-        // Prevent self-deletion or deleting other admins
         if ($user->role === 'admin') {
             return response()->json(['message' => 'Admin accounts cannot be deleted via this panel.'], 403);
         }
+
+        // ── Activity Log — BEFORE delete so we still have user data ───────
+        ActivityLog::record(
+            $request->user(),
+            'admin.user_deleted',
+            "Admin {$request->user()->name} deleted user \"{$user->name}\" ({$user->email}).",
+            [
+                'target_user_id'    => $user->id,
+                'target_user_name'  => $user->name,
+                'target_user_email' => $user->email,
+                'role'              => $user->role,
+            ],
+            $request,
+            $user->id,
+            'User'
+        );
+        // ─────────────────────────────────────────────────────────────────
 
         $user->delete();
 
@@ -172,7 +231,6 @@ class AdminUserController extends Controller
 
     /* ─── Private helpers ─────────────────────────────────────────────── */
 
-    /** Throw 403 if the authenticated user is not an admin. */
     private function authorizeAdmin(): void
     {
         if (!auth()->check() || !auth()->user()->isAdmin()) {
@@ -180,7 +238,6 @@ class AdminUserController extends Controller
         }
     }
 
-    /** Return a consistent array shape for every user. */
     private function format(User $u): array
     {
         return [

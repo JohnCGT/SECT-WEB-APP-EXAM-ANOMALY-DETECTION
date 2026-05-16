@@ -40,7 +40,7 @@ import AdminProfile from "./pages/admin/AdminProfile";
 import UserManagement from "./pages/admin/UserManagement";
 import AdminCourseManagement from "./pages/admin/AdminCourseManagement";
 import ExamManagement from "./pages/admin/ExamManagement";
-import AnomalyReports from "./pages/admin/AnomalyReports";
+import ActivityLogs from "./pages/admin/ActivityLogs";
 import SupportTickets from "./pages/admin/SupportTickets";
 
 // Bootstrap
@@ -182,9 +182,10 @@ createRoot(document.getElementById("root")).render(
           path="/admin/exams"
           element={<ProtectedRoute role="admin"><ExamManagement /></ProtectedRoute>}
         />
+        {/* Activity Logs — replaces /admin/anomalies */}
         <Route
-          path="/admin/anomalies"
-          element={<ProtectedRoute role="admin"><AnomalyReports /></ProtectedRoute>}
+          path="/admin/activity-logs"
+          element={<ProtectedRoute role="admin"><ActivityLogs /></ProtectedRoute>}
         />
         <Route
           path="/admin/support"

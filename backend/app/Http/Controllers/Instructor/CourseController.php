@@ -3,14 +3,12 @@
 namespace App\Http\Controllers\Instructor;
 use App\Http\Controllers\Controller;
 
+use App\Models\ActivityLog;
 use App\Models\Course;
 use Illuminate\Http\Request;
 
 class CourseController extends Controller
 {
-    /**
-     * Get all courses for authenticated instructor
-     */
     public function index(Request $request)
     {
         $courses = Course::where('instructor_id', $request->user()->id)
@@ -21,9 +19,6 @@ class CourseController extends Controller
         return response()->json(['courses' => $courses], 200);
     }
 
-    /**
-     * Create a new course
-     */
     public function store(Request $request)
     {
         $request->validate([
@@ -45,15 +40,29 @@ class CourseController extends Controller
             'credits'       => $request->credits ?? 3,
         ]);
 
+        // ── Activity Log ──────────────────────────────────────────────────
+        ActivityLog::record(
+            $request->user(),
+            'course.created',
+            "{$request->user()->name} created course \"{$course->name}\" ({$course->code}).",
+            [
+                'course_id'   => $course->id,
+                'course_code' => $course->code,
+                'course_name' => $course->name,
+                'semester'    => $course->semester,
+            ],
+            $request,
+            $course->id,
+            'Course'
+        );
+        // ─────────────────────────────────────────────────────────────────
+
         return response()->json([
             'message' => 'Course created successfully',
             'course'  => $course,
         ], 201);
     }
 
-    /**
-     * Get single course with exams
-     */
     public function show(Request $request, $id)
     {
         $course = Course::where('id', $id)
@@ -66,9 +75,6 @@ class CourseController extends Controller
         return response()->json(['course' => $course], 200);
     }
 
-    /**
-     * Update course
-     */
     public function update(Request $request, $id)
     {
         $course = Course::where('id', $id)
@@ -85,13 +91,24 @@ class CourseController extends Controller
         ]);
 
         $course->update($request->only([
-            'code',
-            'name',
-            'description',
-            'semester',
-            'academic_year',
-            'credits',
+            'code', 'name', 'description', 'semester', 'academic_year', 'credits',
         ]));
+
+        // ── Activity Log ──────────────────────────────────────────────────
+        ActivityLog::record(
+            $request->user(),
+            'course.updated',
+            "{$request->user()->name} updated course \"{$course->name}\" ({$course->code}).",
+            [
+                'course_id'   => $course->id,
+                'course_code' => $course->code,
+                'course_name' => $course->name,
+            ],
+            $request,
+            $course->id,
+            'Course'
+        );
+        // ─────────────────────────────────────────────────────────────────
 
         return response()->json([
             'message' => 'Course updated successfully',
@@ -99,19 +116,30 @@ class CourseController extends Controller
         ], 200);
     }
 
-    /**
-     * Delete course
-     */
     public function destroy(Request $request, $id)
     {
         $course = Course::where('id', $id)
             ->where('instructor_id', $request->user()->id)
             ->firstOrFail();
 
+        // ── Activity Log — BEFORE delete so we still have the name ────────
+        ActivityLog::record(
+            $request->user(),
+            'course.deleted',
+            "{$request->user()->name} deleted course \"{$course->name}\" ({$course->code}).",
+            [
+                'course_id'   => $course->id,
+                'course_code' => $course->code,
+                'course_name' => $course->name,
+            ],
+            $request,
+            $course->id,
+            'Course'
+        );
+        // ─────────────────────────────────────────────────────────────────
+
         $course->delete();
 
-        return response()->json([
-            'message' => 'Course deleted successfully',
-        ], 200);
+        return response()->json(['message' => 'Course deleted successfully'], 200);
     }
 }

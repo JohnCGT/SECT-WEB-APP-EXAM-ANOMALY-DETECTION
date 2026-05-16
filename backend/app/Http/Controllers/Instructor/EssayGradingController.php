@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Instructor;
 use App\Http\Controllers\Controller;
 
+use App\Models\ActivityLog;
 use App\Models\Exam;
 use App\Models\ExamResult;
 use App\Models\ExamSubmission;
@@ -10,19 +11,8 @@ use App\Models\Question;
 use App\Models\StudentNotification;
 use Illuminate\Http\Request;
 
-/**
- * EssayGradingController
- *
- * Instructor endpoints:
- *   GET   /exams/{examId}/essays/pending                         — all ungraded essay answers
- *   GET   /exams/{examId}/essays/stats                           — quick pending count (badge)
- *   PATCH /exams/{examId}/essays/{submissionId}                  — grade essay answers
- *   GET   /exams/{examId}/submissions/{submissionId}/student-pdf — full data for per-student PDF
- */
 class EssayGradingController extends Controller
 {
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
     private function verifyOwnership(int $examId, int $instructorId): Exam
     {
         return Exam::where('id', $examId)
@@ -98,7 +88,6 @@ class EssayGradingController extends Controller
     // ── PATCH /exams/{examId}/essays/{submissionId} ───────────────────────────
     public function grade(Request $request, int $examId, int $submissionId)
     {
-        // Verify exam ownership and fetch submission first — both are needed below
         $exam = $this->verifyOwnership($examId, $request->user()->id);
 
         $submission = ExamSubmission::where('id', $submissionId)
@@ -143,18 +132,36 @@ class EssayGradingController extends Controller
             return $answer;
         }, $answers);
 
-        $newScore = collect($newAnswers)->sum(fn ($a) => (float) ($a['points_earned'] ?? 0));
+        $newScore = collect($newAnswers)->sum(fn($a) => (float) ($a['points_earned'] ?? 0));
         $submission->update(['answers' => $newAnswers, 'score' => $newScore]);
 
-        // ── Notify student when all essays are graded ──
-        // $submission is now defined, so we can safely reference it here
+        // ── Activity Log ──────────────────────────────────────────────────
+        ActivityLog::record(
+            $request->user(),
+            'essay.graded',
+            "{$request->user()->name} graded essays for a submission in exam \"{$exam->title}\".",
+            [
+                'exam_id'         => $exam->id,
+                'exam_title'      => $exam->title,
+                'submission_id'   => $submissionId,
+                'student_id'      => $submission->student_id,
+                'questions_graded'=> count($request->grades),
+                'new_score'       => $newScore,
+                'total_points'    => $submission->total_points,
+            ],
+            $request,
+            $submissionId,
+            'ExamSubmission'
+        );
+        // ─────────────────────────────────────────────────────────────────
+
+        // ── Notify student when all essays are graded ─────────────────────
         $pendingEssays = \App\Models\ExamAnswer::where('submission_id', $submissionId)
             ->whereHas('question', fn($q) => $q->where('type', 'essay'))
             ->whereNull('points_earned')
             ->count();
 
         if ($pendingEssays === 0) {
-            // All essays graded — notify the student
             $examWithCourse = \App\Models\Exam::with('course')->find($examId);
 
             StudentNotification::create([
@@ -214,17 +221,6 @@ class EssayGradingController extends Controller
     }
 
     // ── GET /exams/{examId}/submissions/{submissionId}/student-pdf ────────────
-    /**
-     * Returns the complete data payload the client needs to build a per-student PDF.
-     * No server-side PDF library is needed — jsPDF handles rendering in the browser.
-     *
-     * Includes:
-     *  - Exam metadata
-     *  - Student info
-     *  - Submission stats (score, %, timing)
-     *  - Full CPI integrity breakdown from exam_results
-     *  - All questions with the student's answer, correctness, points, and feedback
-     */
     public function submissionPdf(Request $request, int $examId, int $submissionId)
     {
         $exam = $this->verifyOwnership($examId, $request->user()->id);
@@ -250,7 +246,6 @@ class EssayGradingController extends Controller
             $isCorrect     = $answerData['is_correct']     ?? null;
             $feedback      = $answerData['feedback']       ?? null;
 
-            // Re-derive MC/TF correctness so old buggy submissions are self-healed
             if (in_array($question->type, ['multiple_choice', 'true_false']) && $studentAnswer !== null) {
                 $isCorrect    = strtolower(trim((string) $studentAnswer))
                              === strtolower(trim((string) $question->correct_answer));

@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import NotificationBell from "./NotificationBell";
 
-/* ─── Shared CSS ─────────────────────────────────────────────────────── */
 const SHARED_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
   *,*::before,*::after{box-sizing:border-box;}
@@ -47,10 +46,8 @@ const SHARED_CSS = `
   .stat-chips-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
   .stat-chip{flex:1;min-width:130px;border-radius:14px;padding:12px;display:flex;align-items:center;gap:8px;border:1px solid rgba(0,86,179,.06);background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.04);}
   .stat-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-  /* Course card */
   .course-row{background:#fff;border-radius:14px;border:1px solid rgba(0,86,179,.06);box-shadow:0 1px 3px rgba(0,0,0,.04);transition:box-shadow .2s,transform .2s;overflow:hidden;}
   .course-row:hover{box-shadow:0 2px 8px rgba(0,86,179,.10);transform:translateY(-1px);}
-  /* Pagination */
   .page-btn{display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,86,179,.15);background:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;color:#64748b;padding:0 6px;}
   .page-btn:hover{background:var(--blue-lite);border-color:var(--blue);color:var(--blue);}
   .page-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
@@ -61,26 +58,24 @@ const SHARED_CSS = `
     .dash-table td,.dash-table th{padding:8px 10px;font-size:12px;}
     .stat-chip{min-width:calc(50% - 5px);}
   }
-  @media(max-width:480px){
-    .stat-chip{min-width:100%;}
-  }
+  @media(max-width:480px){.stat-chip{min-width:100%;}}
 `;
 
+/* ─── Nav — activity-logs added ─────────────────────────────────────── */
 const NAV_ITEMS = [
-  { to: "/admin",           icon: "bi-speedometer2",         label: "Dashboard" },
-  { to: "/admin/users",     icon: "bi-people",               label: "Users"     },
-  { to: "/admin/courses",   icon: "bi-book",                 label: "Courses"   },
-  { to: "/admin/exams",     icon: "bi-file-earmark-text",    label: "Exams"     },
-  // { to: "/admin/anomalies", icon: "bi-exclamation-triangle", label: "Anomalies" },
-  { to: "/admin/support",   icon: "bi-headset",              label: "Support"   },
+  { to: "/admin",               icon: "bi-speedometer2",      label: "Dashboard" },
+  { to: "/admin/users",         icon: "bi-people",            label: "Users"     },
+  { to: "/admin/courses",       icon: "bi-book",              label: "Courses"   },
+  { to: "/admin/exams",         icon: "bi-file-earmark-text", label: "Exams"     },
+  { to: "/admin/activity-logs", icon: "bi-journal-text",      label: "Logs"      },
+  { to: "/admin/support",       icon: "bi-headset",           label: "Support"   },
 ];
-
 const BOTTOM_NAV = [
-  { to: "/admin",           icon: "bi-speedometer2",      label: "Home"     },
-  { to: "/admin/users",     icon: "bi-people",            label: "Users"    },
-  { to: "/admin/courses",   icon: "bi-book",              label: "Courses"  },
-  { to: "/admin/exams",     icon: "bi-file-earmark-text", label: "Exams"    },
-  { to: "/admin/support",   icon: "bi-headset",           label: "Support"  },
+  { to: "/admin",               icon: "bi-speedometer2",      label: "Home"    },
+  { to: "/admin/users",         icon: "bi-people",            label: "Users"   },
+  { to: "/admin/courses",       icon: "bi-book",              label: "Courses" },
+  { to: "/admin/exams",         icon: "bi-file-earmark-text", label: "Exams"   },
+  { to: "/admin/activity-logs", icon: "bi-journal-text",      label: "Logs"    },
 ];
 
 const BASE = import.meta?.env?.VITE_API_URL ?? "/api";
@@ -184,7 +179,6 @@ export default function AdminCourseManagement() {
       || c.semester?.toLowerCase().includes(q);
   });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const pageData = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   const instructorSet = new Set(courses.map(c => c.instructor?.id).filter(Boolean));
@@ -195,10 +189,10 @@ export default function AdminCourseManagement() {
   const firstName = user?.name?.split(" ")[0] ?? "Admin";
 
   const STATS = [
-    { label: "Total Courses",    value: courses.length,    color: "#0056b3", bg: "#e8f0fe", icon: "bi-book"    },
-    { label: "Instructors",      value: instructorSet.size, color: "#1a6ed8", bg: "#dbeafe", icon: "bi-person-badge" },
-    { label: "Total Enrollments",value: totalStudents,     color: "#16a34a", bg: "#f0fdf4", icon: "bi-people"  },
-    { label: "Total Exams",      value: totalExams,        color: "#fd7e14", bg: "#fff8f0", icon: "bi-file-earmark-text" },
+    { label: "Total Courses",    value: courses.length,     color: "#0056b3", bg: "#e8f0fe", icon: "bi-book"               },
+    { label: "Instructors",      value: instructorSet.size, color: "#1a6ed8", bg: "#dbeafe", icon: "bi-person-badge"        },
+    { label: "Total Enrollments",value: totalStudents,      color: "#16a34a", bg: "#f0fdf4", icon: "bi-people"              },
+    { label: "Total Exams",      value: totalExams,         color: "#fd7e14", bg: "#fff8f0", icon: "bi-file-earmark-text"  },
   ];
 
   return (
@@ -263,8 +257,9 @@ export default function AdminCourseManagement() {
                 <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>All courses across all instructors — read-only view</p>
               </div>
               <button className="dash-btn-ghost" onClick={load} style={{ flexShrink: 0, fontSize: 12, padding: "7px 13px" }}>
-                <i className="bi bi-arrow-clockwise"></i>
-                <span className="d-none d-sm-inline"> Refresh</span>
+                {loading
+                  ? <span className="spinner-border spinner-border-sm" style={{ width: "0.75rem", height: "0.75rem" }} />
+                  : <><i className="bi bi-arrow-clockwise"></i><span className="d-none d-sm-inline"> Refresh</span></>}
               </button>
             </div>
 
@@ -318,12 +313,7 @@ export default function AdminCourseManagement() {
                           <tr key={course.id}>
                             <td>
                               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <div style={{
-                                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                                  background: "#e8f0fe", display: "flex", alignItems: "center",
-                                  justifyContent: "center", fontSize: 10, fontWeight: 800,
-                                  color: "#0056b3", textAlign: "center", lineHeight: 1.2, wordBreak: "break-all",
-                                }}>
+                                <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, background: "#e8f0fe", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#0056b3", textAlign: "center", lineHeight: 1.2, wordBreak: "break-all" }}>
                                   {course.code}
                                 </div>
                                 <div>
@@ -345,16 +335,12 @@ export default function AdminCourseManagement() {
                             </td>
                             <td style={{ fontSize: 12, color: "#64748b" }}>{course.semester ?? "—"}</td>
                             <td>
-                              <span className="badge-pill" style={{ background: "#e8f0fe", color: "#0056b3" }}>
-                                {course.credits ?? "—"} cr
-                              </span>
+                              <span className="badge-pill" style={{ background: "#e8f0fe", color: "#0056b3" }}>{course.credits ?? "—"} cr</span>
                             </td>
                             <td style={{ fontSize: 14, fontWeight: 700, color: "#16a34a" }}>{course.students_count ?? 0}</td>
                             <td style={{ fontSize: 14, fontWeight: 700, color: "#1a6ed8" }}>{course.exams_count ?? 0}</td>
                             <td style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap" }}>
-                              {course.created_at
-                                ? new Date(course.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
-                                : "—"}
+                              {course.created_at ? new Date(course.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}
                             </td>
                           </tr>
                         ))}
@@ -367,11 +353,7 @@ export default function AdminCourseManagement() {
                     {pageData.map(course => (
                       <div key={course.id} className="course-row">
                         <div style={{ padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 12 }}>
-                          <div style={{
-                            width: 44, height: 44, borderRadius: 10, background: "#e8f0fe",
-                            color: "#0056b3", display: "flex", alignItems: "center", justifyContent: "center",
-                            fontWeight: 800, fontSize: 10, flexShrink: 0, textAlign: "center", lineHeight: 1.2, wordBreak: "break-all",
-                          }}>
+                          <div style={{ width: 44, height: 44, borderRadius: 10, background: "#e8f0fe", color: "#0056b3", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 10, flexShrink: 0, textAlign: "center", lineHeight: 1.2, wordBreak: "break-all" }}>
                             {course.code}
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>

@@ -1,9 +1,8 @@
 // src/pages/admin/AdminPage.jsx
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import NotificationBell from "./NotificationBell";
 
-/* ─── Shared CSS (instructor design system) ──────────────────────────── */
 const SHARED_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
   *,*::before,*::after{box-sizing:border-box;}
@@ -16,124 +15,56 @@ const SHARED_CSS = `
     --danger:#dc3545;--warn:#fd7e14;--green:#16a34a;
   }
   .dash-card{background:var(--card-bg);border-radius:var(--card-br);box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);overflow:hidden;}
-  .glass-sidebar{
-    background:rgba(255,255,255,0.60);
-    backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
-    border-right:1px solid rgba(255,255,255,0.80);box-shadow:4px 0 24px rgba(0,86,179,.07);
-  }
-  .nav-pill{
-    display:flex;flex-direction:column;align-items:center;
-    padding:10px 8px;border-radius:12px;gap:4px;
-    font-size:11px;font-weight:600;text-decoration:none;
-    color:var(--slate);transition:background .15s,color .15s,transform .15s;width:100%;
-  }
+  .glass-sidebar{background:rgba(255,255,255,0.60);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-right:1px solid rgba(255,255,255,0.80);box-shadow:4px 0 24px rgba(0,86,179,.07);}
+  .nav-pill{display:flex;flex-direction:column;align-items:center;padding:10px 8px;border-radius:12px;gap:4px;font-size:11px;font-weight:600;text-decoration:none;color:var(--slate);transition:background .15s,color .15s,transform .15s;width:100%;}
   .nav-pill:hover{background:var(--blue-lite);color:var(--blue);transform:translateY(-1px);}
   .nav-pill.active{background:var(--blue);color:#fff;box-shadow:0 4px 14px rgba(0,86,179,.35);}
   .nav-pill i{font-size:18px;}
-  .topbar{
-    background:rgba(255,255,255,0.80);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-    border-bottom:1px solid rgba(0,86,179,.08);position:sticky;top:0;z-index:200;height:56px;
-    display:flex;align-items:center;padding:0 20px;gap:12px;
-  }
+  .topbar{background:rgba(255,255,255,0.80);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(0,86,179,.08);position:sticky;top:0;z-index:200;height:56px;display:flex;align-items:center;padding:0 20px;gap:12px;}
   .dash-avatar{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
   .skeleton{background:linear-gradient(90deg,#f1f5f9 25%,#e8f0fe 50%,#f1f5f9 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px;}
   @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   .fade-up{animation:fadeUp .4s ease both;}
-  .dash-btn-primary{
-    background:var(--blue);color:#fff;border:none;border-radius:10px;
-    padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;
-    font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
-    transition:opacity .15s,transform .15s;text-decoration:none;
-  }
+  .dash-btn-primary{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s,transform .15s;text-decoration:none;}
   .dash-btn-primary:hover{opacity:.87;transform:translateY(-1px);color:#fff;}
   .dash-btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;}
-  .dash-btn-ghost{
-    background:#fff;border:1px solid rgba(0,86,179,.15);color:#64748b;
-    border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;
-    cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;
-    transition:all .15s;text-decoration:none;
-  }
+  .dash-btn-ghost{background:#fff;border:1px solid rgba(0,86,179,.15);color:#64748b;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;transition:all .15s;text-decoration:none;}
   .dash-btn-ghost:hover{background:#f1f5f9;color:#1e293b;}
-  .action-btn{
-    width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,86,179,.12);
-    background:#fff;display:inline-flex;align-items:center;justify-content:center;
-    cursor:pointer;transition:all .15s;font-size:13px;text-decoration:none;color:#64748b;flex-shrink:0;
-  }
-  .action-btn:hover{background:var(--blue-lite);border-color:var(--blue);color:var(--blue);}
-  .action-btn.del:hover{background:#fef2f2;border-color:#ef4444;color:#ef4444;}
-  .action-btn.warn:hover{background:#fff7ed;border-color:#f59e0b;color:#f59e0b;}
-  .action-btn.suc:hover{background:#f0fdf4;border-color:#22c55e;color:#22c55e;}
-  .badge-pill{
-    display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;
-    font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;
-  }
+  .badge-pill{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;}
   .dash-table{width:100%;border-collapse:collapse;font-family:'DM Sans',sans-serif;}
   .dash-table th{padding:10px 14px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.06em;white-space:nowrap;border-bottom:1px solid #f1f5f9;text-align:left;background:#f8faff;}
   .dash-table td{padding:12px 14px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
   .dash-table tbody tr{transition:background .15s;}
   .dash-table tbody tr:hover{background:#f8faff;}
   .dash-table tbody tr:last-child td{border-bottom:none;}
-  .form-ctrl{
-    width:100%;border:1px solid rgba(0,86,179,.15);border-radius:10px;
-    padding:9px 13px;font-size:13px;color:#1e293b;outline:none;
-    font-family:'DM Sans',sans-serif;background:#f8faff;
-    transition:border-color .2s,box-shadow .2s;
-  }
-  .form-ctrl:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,86,179,.10);background:#fff;}
-  .form-ctrl:disabled{opacity:.6;cursor:not-allowed;}
-  .form-lbl{font-size:11px;font-weight:700;color:#64748b;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;display:block;}
-  .dash-modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(4px);z-index:1055;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;}
-  .dash-modal{background:#fff;border-radius:20px;width:100%;max-width:520px;box-shadow:0 24px 64px rgba(0,0,0,.18);overflow:hidden;display:flex;flex-direction:column;max-height:calc(100vh - 32px);animation:fadeUp .25s ease;}
-  .dash-modal-hdr{padding:22px 24px 16px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;}
-  .dash-modal-body{overflow-y:auto;padding:20px 24px;flex:1;}
-  .dash-modal-ftr{padding:14px 24px;border-top:1px solid #f1f5f9;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;}
-  .admin-bottom-nav{
-    position:fixed;bottom:0;left:0;right:0;height:64px;
-    background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);
-    border-top:1px solid rgba(0,86,179,0.10);
-    display:flex;align-items:stretch;z-index:1030;
-    box-shadow:0 -4px 24px rgba(0,86,179,0.08);
-  }
+  .admin-bottom-nav{position:fixed;bottom:0;left:0;right:0;height:64px;background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);border-top:1px solid rgba(0,86,179,0.10);display:flex;align-items:stretch;z-index:1030;box-shadow:0 -4px 24px rgba(0,86,179,0.08);}
   .bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:600;gap:3px;text-decoration:none;transition:color .2s;}
   .bnav-item i{font-size:19px;}
-  .stat-chip{
-    flex:1;min-width:0;border-radius:14px;padding:12px;
-    display:flex;align-items:center;gap:8px;
-    border:1px solid rgba(0,86,179,.06);background:#fff;
-    box-shadow:0 1px 3px rgba(0,0,0,.04);cursor:pointer;
-    transition:border-color .15s,box-shadow .15s,transform .15s;
-  }
-  .stat-chip:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,86,179,.10);}
-  .stat-chip.selected{border-color:currentColor;box-shadow:0 4px 16px rgba(0,86,179,.12);}
+  .act-card{background:#fff;border-radius:14px;border:1px solid rgba(0,86,179,.06);box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;margin-bottom:8px;}
   @media(max-width:767px){
     .hide-mobile{display:none!important;}
     .dash-table td,.dash-table th{padding:10px 10px;font-size:12px;}
   }
-  @media(max-width:575px){
-    .dash-table td,.dash-table th{padding:8px;}
-  }
 `;
 
-/* ─── Nav items ──────────────────────────────────────────────────────── */
 const NAV_ITEMS = [
-  { to: "/admin",           icon: "bi-speedometer2",         label: "Dashboard" },
-  { to: "/admin/users",     icon: "bi-people",               label: "Users"     },
-  { to: "/admin/courses",   icon: "bi-book",                 label: "Courses"   },
-  { to: "/admin/exams",     icon: "bi-file-earmark-text",    label: "Exams"     },
-  // { to: "/admin/anomalies", icon: "bi-exclamation-triangle", label: "Anomalies" },
-  { to: "/admin/support",   icon: "bi-headset",              label: "Support"   },
+  { to: "/admin",               icon: "bi-speedometer2",      label: "Dashboard" },
+  { to: "/admin/users",         icon: "bi-people",            label: "Users"     },
+  { to: "/admin/courses",       icon: "bi-book",              label: "Courses"   },
+  { to: "/admin/exams",         icon: "bi-file-earmark-text", label: "Exams"     },
+  { to: "/admin/activity-logs", icon: "bi-journal-text",      label: "Logs"      },
+  { to: "/admin/support",       icon: "bi-headset",           label: "Support"   },
 ];
 
 const BOTTOM_NAV = [
-  { to: "/admin",           icon: "bi-speedometer2",      label: "Home"      },
-  { to: "/admin/users",     icon: "bi-people",            label: "Users"     },
-  { to: "/admin/exams",     icon: "bi-file-earmark-text", label: "Exams"     },
-  // { to: "/admin/anomalies", icon: "bi-exclamation-triangle", label: "Flags"  },
-  { to: "/admin/support",   icon: "bi-headset",           label: "Support"   },
+  { to: "/admin",               icon: "bi-speedometer2",      label: "Home"    },
+  { to: "/admin/users",         icon: "bi-people",            label: "Users"   },
+  { to: "/admin/courses",       icon: "bi-book",              label: "Courses" },
+  { to: "/admin/exams",         icon: "bi-file-earmark-text", label: "Exams"   },
+  { to: "/admin/activity-logs", icon: "bi-journal-text",      label: "Logs"    },
 ];
 
-/* ─── API helper ─────────────────────────────────────────────────────── */
 const BASE = import.meta?.env?.VITE_API_URL ?? "/api";
 async function api(method, path, body) {
   const opts = {
@@ -148,7 +79,84 @@ async function api(method, path, body) {
   return json;
 }
 
-/* ─── Shared Layout Components ───────────────────────────────────────── */
+const EVENT_CONFIG = {
+  "register":                 { label: "Registered",       icon: "bi-person-plus",        color: "#16a34a", bg: "#f0fdf4" },
+  "login":                    { label: "Login",            icon: "bi-box-arrow-in-right", color: "#0056b3", bg: "#e8f0fe" },
+  "logout":                   { label: "Logout",           icon: "bi-box-arrow-right",    color: "#64748b", bg: "#f1f5f9" },
+  "course.created":           { label: "Course Created",   icon: "bi-book-half",          color: "#0056b3", bg: "#e8f0fe" },
+  "course.updated":           { label: "Course Updated",   icon: "bi-pencil-square",      color: "#1a6ed8", bg: "#eff6ff" },
+  "course.deleted":           { label: "Course Deleted",   icon: "bi-book",               color: "#dc3545", bg: "#fff0f0" },
+  "exam.created":             { label: "Exam Created",     icon: "bi-file-earmark-plus",  color: "#0056b3", bg: "#e8f0fe" },
+  "exam.updated":             { label: "Exam Updated",     icon: "bi-file-earmark-text",  color: "#1a6ed8", bg: "#eff6ff" },
+  "exam.deleted":             { label: "Exam Deleted",     icon: "bi-file-earmark-x",     color: "#dc3545", bg: "#fff0f0" },
+  "exam.started":             { label: "Exam Started",     icon: "bi-play-circle",        color: "#16a34a", bg: "#f0fdf4" },
+  "exam.submitted":           { label: "Exam Submitted",   icon: "bi-check-circle",       color: "#16a34a", bg: "#f0fdf4" },
+  "question.created":         { label: "Question Added",   icon: "bi-patch-plus",         color: "#9333ea", bg: "#fdf4ff" },
+  "question.updated":         { label: "Question Edited",  icon: "bi-pencil",             color: "#9333ea", bg: "#fdf4ff" },
+  "question.deleted":         { label: "Question Deleted", icon: "bi-trash",              color: "#dc3545", bg: "#fff0f0" },
+  "essay.graded":             { label: "Essay Graded",     icon: "bi-award",              color: "#fd7e14", bg: "#fff8f0" },
+  "admin.user_created":       { label: "User Added",       icon: "bi-person-check",       color: "#0056b3", bg: "#e8f0fe" },
+  "admin.user_updated":       { label: "User Updated",     icon: "bi-person-gear",        color: "#1a6ed8", bg: "#eff6ff" },
+  "admin.user_status_changed":{ label: "User Status",      icon: "bi-person-gear",        color: "#fd7e14", bg: "#fff8f0" },
+  "admin.user_deleted":       { label: "User Deleted",     icon: "bi-person-x",           color: "#dc3545", bg: "#fff0f0" },
+};
+
+const ROLE_CONFIG = {
+  admin:      { bg: "#fff0f0", color: "#dc3545" },
+  instructor: { bg: "#eff6ff", color: "#1a6ed8" },
+  student:    { bg: "#e8f0fe", color: "#0056b3" },
+};
+
+function getEventCfg(event = "") {
+  if (EVENT_CONFIG[event]) return EVENT_CONFIG[event];
+  const prefix = event.split(".")[0];
+  const fallbacks = {
+    exam:     { icon: "bi-file-earmark-text", color: "#1a6ed8", bg: "#eff6ff" },
+    course:   { icon: "bi-book",              color: "#0056b3", bg: "#e8f0fe" },
+    question: { icon: "bi-patch-question",    color: "#9333ea", bg: "#fdf4ff" },
+    admin:    { icon: "bi-shield",            color: "#dc3545", bg: "#fff0f0" },
+    essay:    { icon: "bi-award",             color: "#fd7e14", bg: "#fff8f0" },
+  };
+  return fallbacks[prefix] ?? { icon: "bi-activity", color: "#64748b", bg: "#f1f5f9" };
+}
+
+function EventBadge({ event = "" }) {
+  const cfg = getEventCfg(event);
+  const label = EVENT_CONFIG[event]?.label ?? event;
+  return (
+    <span className="badge-pill" style={{ background: cfg.bg, color: cfg.color }}>
+      <i className={`bi ${cfg.icon}`}></i> {label}
+    </span>
+  );
+}
+
+function RolePill({ role = "" }) {
+  const s = ROLE_CONFIG[role?.toLowerCase()] ?? { bg: "#f1f5f9", color: "#64748b" };
+  return <span className="badge-pill" style={{ background: s.bg, color: s.color }}>{role || "—"}</span>;
+}
+
+function MiniAvatar({ name = "", size = 28 }) {
+  const initials = name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase() || "?";
+  const hue = [...name].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: `hsl(${hue},55%,88%)`, color: `hsl(${hue},45%,30%)`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontWeight: 700, fontSize: size * 0.38,
+    }}>
+      {initials}
+    </div>
+  );
+}
+
+function formatDate(dt) {
+  if (!dt) return "—";
+  return new Date(dt).toLocaleString(undefined, {
+    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+}
+
 function AdminSidebar({ navItems }) {
   const location = useLocation();
   const isActive = (to) => to === "/admin" ? location.pathname === to : location.pathname.startsWith(to);
@@ -178,7 +186,7 @@ function AdminBottomNav({ navItems, active }) {
 }
 
 function AdminTopbar({ user, onLogout }) {
-  const initial = user?.name?.charAt(0)?.toUpperCase() ?? "A";
+  const initial   = user?.name?.charAt(0)?.toUpperCase() ?? "A";
   const firstName = user?.name?.split(" ")[0] ?? "Admin";
   return (
     <div className="topbar">
@@ -197,8 +205,12 @@ function AdminTopbar({ user, onLogout }) {
           <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0" style={{ borderRadius: 12, fontSize: 13 }}>
             <li><Link className="dropdown-item" to="/admin/profile">My Profile</Link></li>
             <li><hr className="dropdown-divider" /></li>
-            <li><button className="dropdown-item text-danger" onClick={onLogout}
-              style={{ border: "none", background: "none", width: "100%", textAlign: "left" }}>Logout</button></li>
+            <li>
+              <button className="dropdown-item text-danger" onClick={onLogout}
+                style={{ border: "none", background: "none", width: "100%", textAlign: "left" }}>
+                Logout
+              </button>
+            </li>
           </ul>
         </div>
       </div>
@@ -206,21 +218,6 @@ function AdminTopbar({ user, onLogout }) {
   );
 }
 
-/* ─── CPI label chip ─────────────────────────────────────────────────── */
-function CpiChip({ label }) {
-  const MAP = {
-    High:     { bg: "#fff0f0", color: "#dc3545" },
-    Medium:   { bg: "#fff8f0", color: "#fd7e14" },
-    Low:      { bg: "#f0fdf4", color: "#16a34a" },
-    Unlikely: { bg: "#e8f0fe", color: "#0056b3" },
-  };
-  const s = MAP[label] ?? MAP.Unlikely;
-  return (
-    <span className="badge-pill" style={{ background: s.bg, color: s.color }}>{label}</span>
-  );
-}
-
-/* ─── Stat card ──────────────────────────────────────────────────────── */
 function StatCard({ label, value, color, bg, icon }) {
   return (
     <div style={{
@@ -231,7 +228,7 @@ function StatCard({ label, value, color, bg, icon }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em" }}>{label}</p>
-          <p style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 700, color: value === "—" ? "#94a3b8" : color, fontFamily: "'DM Sans', sans-serif" }}>{value}</p>
+          <p style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 700, color: value === "—" ? "#94a3b8" : color }}>{value}</p>
         </div>
         <div style={{ width: 38, height: 38, borderRadius: 10, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <i className={`bi ${icon}`} style={{ color, fontSize: 16 }}></i>
@@ -241,15 +238,12 @@ function StatCard({ label, value, color, bg, icon }) {
   );
 }
 
-/* ════════════════════════════════════════════════════════════════════════
-   MAIN DASHBOARD PAGE
-════════════════════════════════════════════════════════════════════════ */
 export default function AdminPage() {
   const navigate = useNavigate();
-  const [stats,   setStats]   = useState(null);
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [user,    setUser]    = useState(null);
+  const [stats,          setStats]          = useState(null);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [user,           setUser]           = useState(null);
 
   const handleLogout = async () => {
     try { await api("POST", "/logout"); } catch {}
@@ -271,7 +265,7 @@ export default function AdminPage() {
         high_cpi_risk:    dashData.high_cpi_risk    ?? 0,
         open_tickets:     dashData.open_tickets     ?? 0,
       });
-      setResults(dashData.recent_results ?? []);
+      setRecentActivity(dashData.recent_activity ?? []);
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, []);
@@ -279,11 +273,11 @@ export default function AdminPage() {
   useEffect(() => { load(); }, [load]);
 
   const STAT_CARDS = [
-    { label: "Total Users",      value: stats?.total_users      ?? "—", color: "#0056b3", bg: "#e8f0fe", icon: "bi-people"              },
-    { label: "Active Exams",     value: stats?.active_exams     ?? "—", color: "#1a6ed8", bg: "#dbeafe", icon: "bi-file-earmark-text"   },
-    { label: "Flagged Sessions", value: stats?.flagged_sessions ?? "—", color: "#dc3545", bg: "#fff0f0", icon: "bi-flag"                },
-    { label: "High CPI Risk",    value: stats?.high_cpi_risk    ?? "—", color: "#fd7e14", bg: "#fff8f0", icon: "bi-exclamation-triangle" },
-    { label: "Open Tickets",     value: stats?.open_tickets     ?? "—", color: "#0056b3", bg: "#e8f0fe", icon: "bi-headset"             },
+    { label: "Total Users",      value: stats?.total_users      ?? "—", color: "#0056b3", bg: "#e8f0fe", icon: "bi-people"            },
+    { label: "Active Exams",     value: stats?.active_exams     ?? "—", color: "#1a6ed8", bg: "#dbeafe", icon: "bi-file-earmark-text" },
+    { label: "Flagged Sessions", value: stats?.flagged_sessions ?? "—", color: "#dc3545", bg: "#fff0f0", icon: "bi-flag"              },
+    { label: "High CPI Risk",    value: stats?.high_cpi_risk    ?? "—", color: "#fd7e14", bg: "#fff8f0", icon: "bi-graph-up-arrow"    },
+    { label: "Open Tickets",     value: stats?.open_tickets     ?? "—", color: "#0056b3", bg: "#e8f0fe", icon: "bi-headset"           },
   ];
 
   return (
@@ -298,7 +292,6 @@ export default function AdminPage() {
 
           <main style={{ flex: 1, padding: "20px 16px", paddingBottom: 90, minWidth: 0 }}>
 
-            {/* Page header */}
             <div style={{ marginBottom: 20 }}>
               <p style={{ margin: 0, fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Overview</p>
               <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: "-.5px" }}>Dashboard</h1>
@@ -318,14 +311,16 @@ export default function AdminPage() {
 
             {/* Quick links */}
             <div className="dash-card fade-up" style={{ padding: "14px 16px", marginBottom: 14 }}>
-              <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".05em" }}>Quick Links</p>
+              <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".05em" }}>
+                Quick Links
+              </p>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {[
-                  { to: "/admin/users",     label: "Manage Users",   icon: "bi-people"              },
-                  { to: "/admin/courses",   label: "View Courses",   icon: "bi-book"                },
-                  { to: "/admin/exams",     label: "Manage Exams",   icon: "bi-file-earmark-text"   },
-                  { to: "/admin/anomalies", label: "View Anomalies", icon: "bi-exclamation-triangle" },
-                  { to: "/admin/support",   label: "Support Center", icon: "bi-headset"             },
+                  { to: "/admin/users",        label: "Manage Users",  icon: "bi-people"            },
+                  { to: "/admin/courses",       label: "View Courses",  icon: "bi-book"              },
+                  { to: "/admin/exams",         label: "Manage Exams",  icon: "bi-file-earmark-text" },
+                  { to: "/admin/activity-logs", label: "Activity Logs", icon: "bi-journal-text"      },
+                  { to: "/admin/support",       label: "Support",       icon: "bi-headset"           },
                 ].map(({ to, label, icon }) => (
                   <Link key={to} to={to} className="dash-btn-ghost" style={{ fontSize: 12, padding: "7px 13px" }}>
                     <i className={`bi ${icon}`}></i> {label}
@@ -334,78 +329,117 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* CPI Report Table */}
+            {/* ── Recent Activity Preview ── */}
             <div className="dash-card fade-up">
-              <div style={{ padding: "14px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ padding: "14px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                 <div>
                   <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
-                    <i className="bi bi-graph-up-arrow me-2" style={{ color: "#0056b3" }}></i>Recent CPI Reports
+                    <i className="bi bi-journal-text me-2" style={{ color: "#0056b3" }}></i>Recent Activity
                   </h2>
-                  <p style={{ margin: "2px 0 0", fontSize: 11, color: "#94a3b8" }}>Cheating Probability Index — latest submissions</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 11, color: "#94a3b8" }}>Latest 5 actions across the platform</p>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button className="dash-btn-ghost" onClick={load} style={{ fontSize: 12, padding: "6px 12px" }}>
-                    {loading ? <span className="spinner-border spinner-border-sm" style={{ width: "0.75rem", height: "0.75rem" }} /> : "↻ Refresh"}
+                    {loading
+                      ? <span className="spinner-border spinner-border-sm" style={{ width: "0.75rem", height: "0.75rem" }} />
+                      : "↻ Refresh"}
                   </button>
-                  <Link to="/admin/anomalies" className="dash-btn-primary" style={{ fontSize: 12, padding: "6px 12px" }}>
-                    View All
+                  <Link to="/admin/activity-logs" className="dash-btn-primary" style={{ fontSize: 12, padding: "6px 12px" }}>
+                    <i className="bi bi-journal-text"></i> View All
                   </Link>
                 </div>
               </div>
 
               {loading ? (
-                <div style={{ padding: "40px 16px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
-                  <span className="spinner-border spinner-border-sm me-2" style={{ color: "#0056b3" }} />Loading dashboard data…
+                <div style={{ padding: "20px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 52, borderRadius: 10 }} />)}
                 </div>
-              ) : results.length === 0 ? (
+              ) : recentActivity.length === 0 ? (
                 <div style={{ padding: "40px 16px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
-                  <i className="bi bi-graph-up" style={{ fontSize: 28, display: "block", marginBottom: 8, opacity: .3 }}></i>
-                  No CPI reports yet.
+                  <i className="bi bi-journal-text" style={{ fontSize: 28, display: "block", marginBottom: 8, opacity: .3 }}></i>
+                  No activity recorded yet.
                 </div>
               ) : (
-                <div style={{ overflowX: "auto" }}>
-                  <table className="dash-table">
-                    <thead>
-                      <tr>
-                        {["Student", "Exam", "CPI Score", "Risk Level", "Flagged Signals", "Processed"].map(h => (
-                          <th key={h}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {results.map((r, i) => (
-                        <tr key={r.id ?? i}>
-                          <td style={{ fontWeight: 600, color: "#1e293b", fontSize: 13 }}>{r.student?.name ?? "—"}</td>
-                          <td style={{ fontSize: 12, color: "#64748b" }}>{r.exam?.title ?? "—"}</td>
-                          <td>
-                            <span style={{
-                              fontSize: 14, fontWeight: 700,
-                              color: r.cpi_score >= 0.7 ? "#dc3545" : r.cpi_score >= 0.4 ? "#fd7e14" : "#16a34a",
-                            }}>
-                              {typeof r.cpi_score === "number" ? r.cpi_score.toFixed(2) : "—"}
-                            </span>
-                          </td>
-                          <td><CpiChip label={r.cpi_label ?? "Unlikely"} /></td>
-                          <td>
-                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                              {r.iso_tab_flagged && <span className="badge-pill" style={{ background: "#fff0f0", color: "#dc3545" }}>Tab</span>}
-                              {r.svm_flagged     && <span className="badge-pill" style={{ background: "#fff8f0", color: "#fd7e14" }}>Keys</span>}
-                              {r.rt_flagged      && <span className="badge-pill" style={{ background: "#eff6ff", color: "#1a6ed8" }}>Time</span>}
-                              {r.hmm_flagged     && <span className="badge-pill" style={{ background: "#fdf4ff", color: "#9333ea" }}>HMM</span>}
-                              {!r.iso_tab_flagged && !r.svm_flagged && !r.rt_flagged && !r.hmm_flagged &&
-                                <span style={{ fontSize: 11, color: "#94a3b8" }}>None</span>}
-                            </div>
-                          </td>
-                          <td style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap" }}>
-                            {r.processed_at
-                              ? new Date(r.processed_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
-                              : "Pending"}
-                          </td>
+                <>
+                  {/* Desktop table */}
+                  <div className="hide-mobile" style={{ overflowX: "auto" }}>
+                    <table className="dash-table">
+                      <thead>
+                        <tr>
+                          {["User", "Role", "Event", "Description", "When"].map(h => (
+                            <th key={h}>{h}</th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {recentActivity.map((log, i) => (
+                          <tr key={log.id ?? i}>
+                            <td>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <MiniAvatar name={log.user_name ?? "?"} size={28} />
+                                <div style={{ minWidth: 0 }}>
+                                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap" }}>
+                                    {log.user_name ?? "Unknown"}
+                                  </p>
+                                  <p style={{ margin: 0, fontSize: 10, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }}>
+                                    {log.user_email ?? "—"}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+                            <td><RolePill role={log.user_role} /></td>
+                            <td><EventBadge event={log.event} /></td>
+                            <td style={{ fontSize: 12, color: "#64748b", maxWidth: 260 }}>
+                              <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                                {log.description ?? "—"}
+                              </span>
+                            </td>
+                            <td style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap" }}>
+                              {formatDate(log.occurred_at)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile cards */}
+                  <div className="d-lg-none" style={{ padding: "12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                    {recentActivity.map((log, i) => {
+                      const cfg = getEventCfg(log.event);
+                      return (
+                        <div key={log.id ?? i} className="act-card">
+                          <div style={{ padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: 10 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: 9, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                              <i className={`bi ${cfg.icon}`} style={{ color: cfg.color, fontSize: 15 }}></i>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", gap: 6, flexWrap: "wrap", marginBottom: 2 }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: "#1e293b" }}>{log.user_name ?? "Unknown"}</span>
+                                <RolePill role={log.user_role} />
+                              </div>
+                              <div style={{ marginBottom: 3 }}>
+                                <EventBadge event={log.event} />
+                              </div>
+                              {log.description && (
+                                <p style={{ margin: "2px 0 0", fontSize: 11, color: "#64748b", lineHeight: 1.5 }}>{log.description}</p>
+                              )}
+                              <p style={{ margin: "4px 0 0", fontSize: 10, color: "#94a3b8" }}>
+                                <i className="bi bi-clock me-1"></i>{formatDate(log.occurred_at)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ padding: "10px 16px", borderTop: "1px solid #f1f5f9", textAlign: "center" }}>
+                    <Link to="/admin/activity-logs" style={{ fontSize: 12, color: "#0056b3", fontWeight: 600, textDecoration: "none" }}>
+                      View all activity logs <i className="bi bi-arrow-right"></i>
+                    </Link>
+                  </div>
+                </>
               )}
             </div>
           </main>
