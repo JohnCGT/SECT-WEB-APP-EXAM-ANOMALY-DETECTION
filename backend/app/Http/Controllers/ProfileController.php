@@ -17,13 +17,19 @@ class ProfileController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'name'  => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $user->id,
+            'name'       => 'required|string|max:255',
+            'email'      => 'required|email|unique:users,email,' . $user->id,
+            'phone'      => 'nullable|string|max:20',
+            'course'     => 'nullable|string|max:255',
+            'year_level' => 'nullable|string|max:50',
         ]);
 
         $user->update([
-            'name'  => trim($validated['name']),
-            'email' => strtolower($validated['email']),
+            'name'       => trim($validated['name']),
+            'email'      => strtolower($validated['email']),
+            'phone'      => $validated['phone']      ?? $user->phone,
+            'course'     => $validated['course']     ?? $user->course,
+            'year_level' => $validated['year_level'] ?? $user->year_level,
         ]);
 
         return response()->json([
@@ -65,10 +71,15 @@ class ProfileController extends Controller
     private function formatUser($user): array
     {
         return [
-            'id'    => $user->id,
-            'name'  => $user->name,
-            'email' => $user->email,
-            'role'  => $user->role,
+            'id'                => $user->id,
+            'name'              => $user->name,
+            'email'             => $user->email,
+            'role'              => $user->role,
+            'phone'             => $user->phone,
+            'course'            => $user->course,
+            'year_level'        => $user->year_level,
+            'student_id'        => $user->student_id ?? null,
+            'profile_photo_url' => $user->profile_photo_url ?? null,
         ];
     }
 }

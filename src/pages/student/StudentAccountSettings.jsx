@@ -1,6 +1,20 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API, { fetchCsrfToken } from "../../lib/api";
+
+let _sweetalertReady = false;
+const loadSwal = () =>
+  new Promise((resolve) => {
+    if (window.Swal) { resolve(window.Swal); return; }
+    if (_sweetalertReady) { const wait = () => window.Swal ? resolve(window.Swal) : setTimeout(wait, 50); wait(); return; }
+    _sweetalertReady = true;
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js";
+    s.onload = () => resolve(window.Swal);
+    document.head.appendChild(s);
+  });
+
+const showAlert = async (opts) => { const Swal = await loadSwal(); return Swal.fire(opts); };
 
 const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
@@ -12,7 +26,7 @@ const GLOBAL_CSS = `
     --card-bg:#ffffff;--card-br:14px;
     --card-sh:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,86,179,.06);
   }
-  .topbar{background:rgba(255,255,255,0.80);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(0,86,179,.08);position:sticky;top:0;z-index:100;height:56px;}
+  .topbar{background:rgba(255,255,255,0.80);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(0,86,179,.08);position:sticky;top:0;z-index:200;height:56px;}
   .glass-sidebar{background:rgba(255,255,255,0.60);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-right:1px solid rgba(255,255,255,0.80);box-shadow:4px 0 24px rgba(0,86,179,.07);}
   .nav-pill{display:flex;flex-direction:column;align-items:center;padding:10px 8px;border-radius:12px;gap:4px;font-size:11px;font-weight:600;text-decoration:none;color:var(--slate);transition:background .15s,color .15s,transform .15s;width:100%;}
   .nav-pill:hover{background:var(--blue-lite);color:var(--blue);transform:translateY(-1px);}
@@ -52,7 +66,7 @@ const GLOBAL_CSS = `
   .req-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#1d4ed8;line-height:1.65;}
   @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
   .fade-up{animation:fadeUp .28s ease both;}
-  .bottom-nav{position:fixed;bottom:0;left:0;right:0;height:64px;background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);border-top:1px solid rgba(0,86,179,0.10);display:flex;align-items:stretch;z-index:1030;box-shadow:0 -4px 24px rgba(0,86,179,0.08);}
+  .bottom-nav{position:fixed;bottom:0;left:0;right:0;height:64px;background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);border-top:1px solid rgba(0,86,179,0.10);display:flex;align-items:stretch;z-index:150;box-shadow:0 -4px 24px rgba(0,86,179,0.08);}
   .bottom-nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:600;gap:3px;text-decoration:none;color:#94a3b8;transition:color .2s;border-top:2px solid transparent;}
   .bottom-nav a.active{color:#0056b3;border-top-color:#0056b3;}
   .bottom-nav a i{font-size:19px;}
@@ -67,6 +81,92 @@ const GLOBAL_CSS = `
   .page-wrap{max-width:660px;margin:0 auto;}
   .identity-strip{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
   @media(max-width:420px){.change-photo-btn span{display:none;}}
+
+  /* ── Notification dropdown ── */
+  @keyframes notifSlideDown {
+    from { opacity: 0; transform: translateY(-8px) scale(.97); }
+    to   { opacity: 1; transform: translateY(0)   scale(1);    }
+  }
+  .notif-dropdown {
+    position: fixed;
+    top: 66px;
+    right: 12px;
+    left: auto;
+    width: 360px;
+    max-width: calc(100vw - 24px);
+    max-height: 480px;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 12px 48px rgba(0,86,179,.16), 0 3px 12px rgba(0,0,0,.07);
+    border: 1px solid rgba(0,86,179,.09);
+    z-index: 2000;
+    animation: notifSlideDown .22s cubic-bezier(.32,1,.45,1) both;
+  }
+  .notif-header {
+    padding: 14px 18px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; background: #fff; z-index: 1;
+    border-radius: 18px 18px 0 0;
+  }
+  .notif-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background .12s;
+    border-bottom: 1px solid #f8faff;
+  }
+  .notif-item:last-child { border-bottom: none; }
+  .notif-item:hover { background: #f8fbff; }
+  .notif-item.unread { background: linear-gradient(90deg, #f0f6ff 0%, #fff 100%); }
+  .notif-item.unread:hover { background: #e8f2ff; }
+  .notif-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #0056b3; flex-shrink: 0; margin-top: 6px;
+    box-shadow: 0 0 0 2px rgba(0,86,179,.2);
+  }
+  .notif-icon-wrap {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  .shimmer-block {
+    border-radius: 10px;
+    background: linear-gradient(90deg,#f1f5f9 25%,#e8f0fe 50%,#f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+  }
+
+  /* ── SweetAlert2 custom theme ── */
+  .swal2-popup.sect-alert {
+    border-radius: 20px !important;
+    font-family: 'DM Sans', sans-serif !important;
+    padding: 28px 24px !important;
+  }
+  .swal2-popup.sect-alert .swal2-title {
+    font-size: 17px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+  }
+  .swal2-popup.sect-alert .swal2-html-container {
+    font-size: 13px !important;
+    color: #64748b !important;
+  }
+  .swal2-popup.sect-alert .swal2-confirm {
+    background: #0056b3 !important;
+    border-radius: 9px !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    font-family: 'DM Sans', sans-serif !important;
+    padding: 9px 24px !important;
+    box-shadow: none !important;
+  }
+  .swal2-popup.sect-alert .swal2-icon {
+    border-width: 2px !important;
+    margin-bottom: 10px !important;
+  }
 `;
 
 const NAV_ITEMS = [
@@ -85,6 +185,27 @@ const COURSE_LIST = [
   "BS Business Administration","BS Nursing","BS Psychology",
 ];
 
+/* ─── Notification type config ─── */
+const NOTIF_TYPE_META = {
+  new_exam:        { icon:"bi-pencil-square",  bg:"#e8f0fe", color:"#0056b3", label:"New Exam"      },
+  new_subject:     { icon:"bi-journal-plus",   bg:"#fff7ed", color:"#f59e0b", label:"Enrolled"       },
+  results_updated: { icon:"bi-bar-chart-fill", bg:"#f0fdf4", color:"#15803d", label:"Results"        },
+  score_updated:   { icon:"bi-stars",          bg:"#fdf4ff", color:"#9333ea", label:"Score Updated"  },
+  default:         { icon:"bi-megaphone-fill", bg:"#e8f0fe", color:"#0056b3", label:"Notice"         },
+};
+const getNotifMeta = (type) => NOTIF_TYPE_META[type] ?? NOTIF_TYPE_META.default;
+
+const timeAgo = (iso) => {
+  if (!iso) return "";
+  const ms = Date.now() - new Date(iso);
+  const m  = Math.floor(ms / 60000);
+  if (m < 1)  return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+};
+
 function pwStrength(pw) {
   if (!pw) return { score:0, label:"", color:"" };
   let s = 0;
@@ -97,6 +218,83 @@ function pwStrength(pw) {
   return { score:s, ...m[s] };
 }
 
+/* ── Helper: build full name from user object ── */
+const buildFullName = (u) => {
+  if (!u) return "";
+  if (u.name) return u.name;
+  const parts = [u.first_name, u.last_name].filter(Boolean);
+  return parts.join(" ");
+};
+
+/* ─────────────────────────────────────────────
+   NOTIFICATION DROPDOWN
+───────────────────────────────────────────── */
+const NotificationDropdown = ({ notifications, unreadCount, onClose, onMarkAllRead, onNotifClick }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  return (
+    <div ref={ref} className="notif-dropdown">
+      <div className="notif-header">
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:14, fontWeight:700, color:"#0f172a" }}>Notifications</span>
+          {unreadCount > 0 && (
+            <span style={{ fontSize:10, fontWeight:700, background:"#ef4444", color:"#fff", padding:"2px 7px", borderRadius:99, lineHeight:1.4 }}>
+              {unreadCount}
+            </span>
+          )}
+        </div>
+        {unreadCount > 0 && (
+          <button onClick={onMarkAllRead} style={{ background:"none", border:"1px solid rgba(0,86,179,.18)", cursor:"pointer", fontSize:11, fontWeight:600, color:"#0056b3", padding:"3px 10px", borderRadius:99, transition:"background .15s" }}>
+            Mark all read
+          </button>
+        )}
+      </div>
+      {notifications === null ? (
+        <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
+          {[1,2,3].map(i => <div key={i} className="shimmer-block" style={{ height:64 }}/>)}
+        </div>
+      ) : notifications.length === 0 ? (
+        <div style={{ padding:"40px 18px", textAlign:"center", color:"#94a3b8" }}>
+          <div style={{ width:52, height:52, borderRadius:"50%", background:"#f1f5f9", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 12px" }}>
+            <i className="bi bi-bell-slash" style={{ fontSize:22, color:"#cbd5e1" }}></i>
+          </div>
+          <p style={{ margin:0, fontSize:13, fontWeight:600, color:"#64748b" }}>All caught up!</p>
+          <p style={{ margin:"4px 0 0", fontSize:12, color:"#94a3b8" }}>No notifications yet.</p>
+        </div>
+      ) : (
+        <div>
+          {notifications.map((n) => {
+            const meta = getNotifMeta(n.type);
+            return (
+              <div key={n.id} className={`notif-item${n.is_read ? "" : " unread"}`} onClick={() => onNotifClick(n)} style={{ cursor: n.url ? "pointer" : "default" }}>
+                <div style={{ width:10, flexShrink:0, display:"flex", justifyContent:"center", paddingTop:5 }}>
+                  {!n.is_read && <div className="notif-dot"/>}
+                </div>
+                <div className="notif-icon-wrap" style={{ background:meta.bg }}>
+                  <i className={`bi ${meta.icon}`} style={{ color:meta.color, fontSize:15 }}></i>
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:2 }}>
+                    <span style={{ fontSize:10, fontWeight:700, color:meta.color, background:meta.bg, borderRadius:99, padding:"1px 7px" }}>{meta.label}</span>
+                    <span style={{ fontSize:10, color:"#94a3b8", marginLeft:"auto" }}>{timeAgo(n.created_at)}</span>
+                  </div>
+                  <p style={{ margin:"0 0 2px", fontSize:13, fontWeight:n.is_read ? 500 : 700, color:"#1e293b", lineHeight:1.35 }}>{n.title}</p>
+                  {n.body && <p style={{ margin:0, fontSize:12, color:"#64748b", lineHeight:1.45 }}>{n.body}</p>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const BottomNav = ({ active }) => (
@@ -107,21 +305,28 @@ const BottomNav = ({ active }) => (
   </nav>
 );
 
-const Topbar = ({ user, onLogout }) => {
+const Topbar = ({ user, onLogout, notifOpen, setNotifOpen, notifications, unreadCount, onMarkAllRead, onNotifClick, notifBtnRef }) => {
   const initial   = user?.name?.charAt(0)?.toUpperCase() ?? "S";
   const firstName = user?.name?.split(" ")[0] ?? "Student";
   return (
     <div className="topbar d-flex align-items-center px-3 px-lg-4 gap-3">
       <span style={{ fontFamily:"'DM Sans',sans-serif", fontWeight:700, fontSize:15, color:"#0056b3", letterSpacing:"-.3px", flexShrink:0 }}>SECT Portal</span>
       <div className="ms-auto d-flex align-items-center gap-2">
-        <button style={{ background:"transparent", border:"none", position:"relative", padding:"4px 8px", cursor:"pointer" }}>
-          <i className="bi bi-bell" style={{ fontSize:18, color:"#64748b" }}></i>
-          <span style={{ position:"absolute", top:2, right:6, width:7, height:7, background:"#ef4444", borderRadius:"50%", border:"1.5px solid #f0f4fb" }}></span>
-        </button>
+        <div style={{ position:"relative" }} ref={notifBtnRef}>
+          <button onClick={() => setNotifOpen(v => !v)} style={{ background:notifOpen?"#e8f0fe":"transparent", border:"none", position:"relative", padding:"6px 8px", cursor:"pointer", borderRadius:10, transition:"background .15s" }}>
+            <i className="bi bi-bell" style={{ fontSize:18, color:notifOpen?"#0056b3":"#64748b" }}></i>
+            {unreadCount > 0 && (
+              <span style={{ position:"absolute", top:2, right:4, minWidth:16, height:16, padding:"0 4px", background:"#ef4444", borderRadius:99, border:"1.5px solid #f0f4fb", fontSize:9, fontWeight:700, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", lineHeight:1 }}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+          {notifOpen && (
+            <NotificationDropdown notifications={notifications} unreadCount={unreadCount} onClose={() => setNotifOpen(false)} onMarkAllRead={onMarkAllRead} onNotifClick={onNotifClick}/>
+          )}
+        </div>
         <div className="dropdown">
-          <button className="d-flex align-items-center gap-2 dropdown-toggle"
-            style={{ background:"transparent", border:"none", cursor:"pointer", padding:"4px 6px", borderRadius:10 }}
-            data-bs-toggle="dropdown">
+          <button className="d-flex align-items-center gap-2 dropdown-toggle" style={{ background:"transparent", border:"none", cursor:"pointer", padding:"4px 6px", borderRadius:10 }} data-bs-toggle="dropdown">
             <div className="avatar">{user?.profile_photo_url ? <img src={user.profile_photo_url} alt="avatar"/> : initial}</div>
             <span className="d-none d-sm-inline" style={{ fontSize:13, fontWeight:600, color:"#1e293b" }}>{firstName}</span>
           </button>
@@ -168,8 +373,7 @@ const PwInput = ({ value, onChange, placeholder, className }) => {
   const [show, setShow] = useState(false);
   return (
     <div className="pw-wrap">
-      <input className={`field-input ${className ?? ""}`} type={show ? "text" : "password"}
-        placeholder={placeholder} value={value} onChange={onChange}/>
+      <input className={`field-input ${className ?? ""}`} type={show ? "text" : "password"} placeholder={placeholder} value={value} onChange={onChange}/>
       <button type="button" className="pw-eye" onClick={() => setShow(s => !s)} tabIndex={-1}>
         <i className={`bi ${show ? "bi-eye-slash" : "bi-eye"}`} style={{ fontSize:14 }}></i>
       </button>
@@ -178,10 +382,10 @@ const PwInput = ({ value, onChange, placeholder, className }) => {
 };
 
 const CourseInput = ({ value, onChange }) => {
-  const [query, setQuery]           = useState(value ?? "");
+  const [query, setQuery]             = useState(value ?? "");
   const [suggestions, setSuggestions] = useState([]);
-  const [open, setOpen]             = useState(false);
-  const [hi, setHi]                 = useState(-1);
+  const [open, setOpen]               = useState(false);
+  const [hi, setHi]                   = useState(-1);
   const ref = useRef(null);
 
   useEffect(() => { setQuery(value ?? ""); }, [value]);
@@ -224,8 +428,9 @@ const CourseInput = ({ value, onChange }) => {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 const StudentAccountSettings = () => {
-  const navigate   = useNavigate();
-  const photoInput = useRef(null);
+  const navigate    = useNavigate();
+  const photoInput  = useRef(null);
+  const notifBtnRef = useRef(null);
 
   const [user,      setUser]      = useState(null);
   const [activeTab, setActiveTab] = useState("general");
@@ -240,61 +445,188 @@ const StudentAccountSettings = () => {
   const [savingPw, setSavingPw] = useState(false);
   const strength = pwStrength(pw.next);
 
+  /* ── Notification state ── */
+  const [notifOpen,     setNotifOpen]     = useState(false);
+  const [notifications, setNotifications] = useState(null);
+  const [unreadCount,   setUnreadCount]   = useState(0);
+
   const addToast = (msg, type="success") => {
     const id = Date.now();
     setToasts(t => [...t, { id, message:msg, type }]);
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3500);
   };
 
+  /* ── Fetch user ── */
   useEffect(() => {
     API.get("/me").then(r => {
       const u = r.data.user;
       setUser(u);
-      setForm({ fullName:u?.name??"", email:u?.email??"", phone:u?.phone??"", course:u?.course??"", year_level:u?.year_level??"" });
+      setForm({
+        fullName:   buildFullName(u),
+        email:      u?.email      ?? "",
+        phone:      u?.phone      ?? "",
+        course:     u?.course     ?? "",
+        year_level: u?.year_level ?? "",
+      });
       if (u?.profile_photo_url) setPhotoPreview(u.profile_photo_url);
     }).catch(() => {});
   }, []);
 
+  /* ── Notifications: fetch + 60s poll ── */
+  const fetchNotifications = useCallback(() => {
+    API.get("/student/notifications")
+      .then(res => {
+        setNotifications(res.data.notifications ?? []);
+        setUnreadCount(res.data.unread_count ?? 0);
+      })
+      .catch(() => { setNotifications([]); setUnreadCount(0); });
+  }, []);
+
+  useEffect(() => {
+    fetchNotifications();
+    const t = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(t);
+  }, [fetchNotifications]);
+
+  const handleMarkAllRead = () => {
+    API.patch("/student/notifications/read-all")
+      .then(() => {
+        setNotifications(prev => prev?.map(n => ({ ...n, is_read:true })) ?? []);
+        setUnreadCount(0);
+      })
+      .catch(() => {});
+  };
+
+  const handleNotifClick = (notif) => {
+    if (!notif.is_read) {
+      API.patch(`/student/notifications/${notif.id}/read`)
+        .then(() => {
+          setNotifications(prev => prev?.map(n => n.id === notif.id ? { ...n, is_read:true } : n) ?? []);
+          setUnreadCount(prev => Math.max(0, prev - 1));
+        })
+        .catch(() => {});
+    }
+    if (notif.url || notif.type) {
+      setNotifOpen(false);
+      if (notif.type === "new_subject") { navigate("/student/subjects"); return; }
+      if (notif.type === "new_exam")    { navigate(`${notif.url}/take`); return; }
+      if (notif.url)                    { navigate(notif.url); }
+    }
+  };
+
   const handleLogout = async () => { try { await API.post("/logout"); } catch {} navigate("/"); };
   const initial = user?.name?.charAt(0)?.toUpperCase() ?? "S";
 
+  /* ── Sync form back from user state ── */
+  const syncFormFromUser = (u) => {
+    setForm({
+      fullName:   buildFullName(u),
+      email:      u?.email      ?? "",
+      phone:      u?.phone      ?? "",
+      course:     u?.course     ?? "",
+      year_level: u?.year_level ?? "",
+    });
+    if (u?.profile_photo_url) setPhotoPreview(u.profile_photo_url);
+  };
+
   const validateInfo = () => {
     const e = {};
-    if (!form.fullName.trim())                                   e.fullName = "Full name is required.";
-    if (!form.email.trim())                                      e.email    = "Email is required.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))   e.email    = "Enter a valid email address.";
-    if (form.phone && !/^[+\d\s\-()]{7,20}$/.test(form.phone)) e.phone    = "Enter a valid phone number.";
+    if (!form.fullName.trim())                                  e.fullName = "Full name is required.";
+    if (!form.email.trim())                                     e.email    = "Email is required.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))  e.email    = "Enter a valid email address.";
+    if (form.phone && !/^[+\d\s\-()]{7,20}$/.test(form.phone)) e.phone   = "Enter a valid phone number.";
     return e;
   };
 
+  /* ── SAVE PROFILE INFO ── */
   const handleSaveInfo = async () => {
-    const e = validateInfo(); if (Object.keys(e).length) { setFormErrors(e); return; }
-    setFormErrors({}); setSavingInfo(true);
+    const e = validateInfo();
+    if (Object.keys(e).length) { setFormErrors(e); return; }
+    setFormErrors({});
+    setSavingInfo(true);
     try {
       await fetchCsrfToken();
       const parts = form.fullName.trim().split(" ");
-      const res = await API.put("/profile", { first_name:parts[0], last_name:parts.slice(1).join(" "), email:form.email, phone:form.phone, course:form.course, year_level:form.year_level });
-      setUser(res.data.user); addToast("Profile updated successfully!");
+      const firstName = parts[0];
+      const lastName  = parts.slice(1).join(" ");
+
+      const res = await API.put("/profile", {
+        name:       form.fullName.trim(),   // what Laravel validates as "name"
+        first_name: firstName,              // kept for backends that split it
+        last_name:  lastName,
+        email:      form.email,
+        phone:      form.phone,
+        course:     form.course,
+        year_level: form.year_level,
+      });
+
+      /* Update user state — handle both response shapes:
+         { user: {...} }  OR  the user object directly */
+      const updatedUser = res.data.user ?? res.data;
+
+      /* Merge manually in case backend doesn't return everything */
+      const merged = {
+        ...user,
+        ...updatedUser,
+        /* Ensure name is always present for display */
+        name: updatedUser.name
+          ?? buildFullName(updatedUser)
+          ?? `${firstName} ${lastName}`.trim(),
+      };
+      setUser(merged);
+      syncFormFromUser(merged);
+
+      /* ── SweetAlert2 success ── */
+      await showAlert({
+        icon: "success",
+        title: "Changes Saved!",
+        html: `<span style="color:#64748b">Your profile information has been updated successfully.</span>`,
+        confirmButtonText: "Got it",
+        customClass: { popup:"sect-alert" },
+        timer: 3000,
+        timerProgressBar: true,
+      });
     } catch (err) {
       const se = err.response?.data?.errors ?? {};
       const mapped = {};
-      if (se.first_name || se.last_name) mapped.fullName = (se.first_name ?? se.last_name)?.[0];
-      if (se.email) mapped.email = se.email[0]; if (se.phone) mapped.phone = se.phone[0];
-      setFormErrors(mapped); addToast(err.response?.data?.message ?? "Failed to save.", "error");
-    } finally { setSavingInfo(false); }
+      if (se.name || se.first_name || se.last_name) mapped.fullName = (se.name ?? se.first_name ?? se.last_name)?.[0];
+      if (se.email) mapped.email = se.email[0];
+      if (se.phone) mapped.phone = se.phone[0];
+      setFormErrors(mapped);
+
+      await showAlert({
+        icon: "error",
+        title: "Couldn't Save",
+        html: `<span style="color:#64748b">${err.response?.data?.message ?? "Something went wrong. Please try again."}</span>`,
+        confirmButtonText: "OK",
+        customClass: { popup:"sect-alert" },
+      });
+    } finally {
+      setSavingInfo(false);
+    }
   };
 
   const handlePhotoChange = async e => {
     const file = e.target.files?.[0]; if (!file) return;
     if (file.size > 2*1024*1024) { addToast("Photo must be under 2 MB.", "error"); return; }
-    const reader = new FileReader(); reader.onload = ev => setPhotoPreview(ev.target.result); reader.readAsDataURL(file);
+    const reader = new FileReader();
+    reader.onload = ev => setPhotoPreview(ev.target.result);
+    reader.readAsDataURL(file);
     setUploadingPhoto(true);
     try {
-      await fetchCsrfToken(); const fd = new FormData(); fd.append("photo", file);
+      await fetchCsrfToken();
+      const fd = new FormData(); fd.append("photo", file);
       const res = await API.post("/profile/photo", fd, { headers:{ "Content-Type":"multipart/form-data" } });
-      setPhotoPreview(res.data.profile_photo_url); setUser(u => ({ ...u, profile_photo_url:res.data.profile_photo_url })); addToast("Photo updated!");
-    } catch { addToast("Photo upload failed.", "error"); setPhotoPreview(user?.profile_photo_url ?? null); }
-    finally { setUploadingPhoto(false); e.target.value=""; }
+      setPhotoPreview(res.data.profile_photo_url);
+      setUser(u => ({ ...u, profile_photo_url:res.data.profile_photo_url }));
+      addToast("Photo updated!");
+    } catch {
+      addToast("Photo upload failed.", "error");
+      setPhotoPreview(user?.profile_photo_url ?? null);
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = "";
+    }
   };
 
   const validatePassword = () => {
@@ -311,20 +643,48 @@ const StudentAccountSettings = () => {
     return e;
   };
 
+  /* ── CHANGE PASSWORD ── */
   const handleChangePassword = async () => {
-    const e = validatePassword(); if (Object.keys(e).length) { setPwErrors(e); return; }
-    setPwErrors({}); setSavingPw(true);
+    const e = validatePassword();
+    if (Object.keys(e).length) { setPwErrors(e); return; }
+    setPwErrors({});
+    setSavingPw(true);
     try {
       await fetchCsrfToken();
-      await API.put("/profile/password", { current_password:pw.current, password:pw.next, password_confirmation:pw.confirm });
-      setPw({ current:"", next:"", confirm:"" }); addToast("Password changed successfully!");
+      await API.put("/profile/password", {
+        current_password:     pw.current,
+        password:             pw.next,
+        password_confirmation: pw.confirm,
+      });
+      setPw({ current:"", next:"", confirm:"" });
+
+      /* ── SweetAlert2 success ── */
+      await showAlert({
+        icon: "success",
+        title: "Password Changed!",
+        html: `<span style="color:#64748b">Your password has been updated.</span>`,
+        confirmButtonText: "Done",
+        customClass: { popup:"sect-alert" },
+        timer: 3500,
+        timerProgressBar: true,
+      });
     } catch (err) {
       const se = err.response?.data?.errors ?? {};
       const mapped = {};
       if (se.current_password) mapped.current = se.current_password[0];
       if (se.password)         mapped.next    = se.password[0];
-      setPwErrors(mapped); addToast(err.response?.data?.message ?? "Failed to change password.", "error");
-    } finally { setSavingPw(false); }
+      setPwErrors(mapped);
+
+      await showAlert({
+        icon: "error",
+        title: "Password Update Failed",
+        html: `<span style="color:#64748b">${err.response?.data?.message ?? "Please check your current password and try again."}</span>`,
+        confirmButtonText: "OK",
+        customClass: { popup:"sect-alert" },
+      });
+    } finally {
+      setSavingPw(false);
+    }
   };
 
   return (
@@ -332,7 +692,17 @@ const StudentAccountSettings = () => {
       <style>{GLOBAL_CSS}</style>
       <ToastList toasts={toasts}/>
       <div style={{ background:"#f0f4fb", minHeight:"100vh" }}>
-        <Topbar user={user} onLogout={handleLogout}/>
+        <Topbar
+          user={user}
+          onLogout={handleLogout}
+          notifOpen={notifOpen}
+          setNotifOpen={setNotifOpen}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onMarkAllRead={handleMarkAllRead}
+          onNotifClick={handleNotifClick}
+          notifBtnRef={notifBtnRef}
+        />
         <div className="d-flex align-items-stretch">
           <Sidebar active="Settings"/>
           <main style={{ flex:1, padding:"28px 20px", paddingBottom:100, minWidth:0 }}>
@@ -360,7 +730,7 @@ const StudentAccountSettings = () => {
                   </div>
                   <input ref={photoInput} type="file" accept="image/jpeg,image/png,image/webp" style={{ display:"none" }} onChange={handlePhotoChange}/>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <p style={{ margin:0, fontSize:14, fontWeight:700, color:"#0f172a", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{user?.name ?? "—"}</p>
+                    <p style={{ margin:0, fontSize:14, fontWeight:700, color:"#0f172a", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{user?.name ?? buildFullName(user) ?? "—"}</p>
                     <p style={{ margin:"1px 0 0", fontSize:12, color:"#64748b", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{user?.email ?? "—"}</p>
                     <div style={{ display:"flex", gap:5, marginTop:5, flexWrap:"wrap" }}>
                       {[user?.course, user?.year_level, user?.student_id].filter(Boolean).map(b => (
@@ -387,23 +757,36 @@ const StudentAccountSettings = () => {
 
                   <div className="two-col">
                     <Field label="Full Name" error={formErrors.fullName}>
-                      <input className={`field-input${formErrors.fullName?" error":form.fullName?" success":""}`}
-                        placeholder="e.g. Juan dela Cruz" value={form.fullName}
-                        onChange={e => { setForm(f => ({ ...f, fullName:e.target.value })); setFormErrors(x => ({ ...x, fullName:null })); }}/>
+                      <input
+                        className={`field-input${formErrors.fullName ? " error" : form.fullName ? " success" : ""}`}
+                        placeholder="e.g. Juan dela Cruz"
+                        value={form.fullName}
+                        onChange={e => { setForm(f => ({ ...f, fullName:e.target.value })); setFormErrors(x => ({ ...x, fullName:null })); }}
+                      />
                     </Field>
                     <Field label="Email Address" error={formErrors.email}>
-                      <input className={`field-input${formErrors.email?" error":form.email?" success":""}`}
-                        type="email" value={form.email}
-                        onChange={e => { setForm(f => ({ ...f, email:e.target.value })); setFormErrors(x => ({ ...x, email:null })); }}/>
+                      <input
+                        className={`field-input${formErrors.email ? " error" : form.email ? " success" : ""}`}
+                        type="email"
+                        value={form.email}
+                        onChange={e => { setForm(f => ({ ...f, email:e.target.value })); setFormErrors(x => ({ ...x, email:null })); }}
+                      />
                     </Field>
                     <Field label="Phone Number" error={formErrors.phone}>
-                      <input className={`field-input${formErrors.phone?" error":""}`}
-                        type="tel" placeholder="+63 912 345 6789" value={form.phone}
-                        onChange={e => { setForm(f => ({ ...f, phone:e.target.value })); setFormErrors(x => ({ ...x, phone:null })); }}/>
+                      <input
+                        className={`field-input${formErrors.phone ? " error" : ""}`}
+                        type="tel"
+                        placeholder="+63 912 345 6789"
+                        value={form.phone}
+                        onChange={e => { setForm(f => ({ ...f, phone:e.target.value })); setFormErrors(x => ({ ...x, phone:null })); }}
+                      />
                     </Field>
                     <Field label="Year Level">
-                      <select className="field-select" value={form.year_level}
-                        onChange={e => setForm(f => ({ ...f, year_level:e.target.value }))}>
+                      <select
+                        className="field-select"
+                        value={form.year_level}
+                        onChange={e => setForm(f => ({ ...f, year_level:e.target.value }))}
+                      >
                         <option value="">— Select —</option>
                         {["1st Year","2nd Year","3rd Year","4th Year","5th Year"].map(o => <option key={o}>{o}</option>)}
                       </select>
@@ -415,7 +798,9 @@ const StudentAccountSettings = () => {
                   </Field>
 
                   <button className="save-btn" onClick={handleSaveInfo} disabled={savingInfo}>
-                    {savingInfo ? <><span className="spinner-border spinner-border-sm me-1" role="status"/>Saving…</> : <><i className="bi bi-check2"></i>Save Changes</>}
+                    {savingInfo
+                      ? <><span className="spinner-border spinner-border-sm me-1" role="status"/>Saving…</>
+                      : <><i className="bi bi-check2"></i>Save Changes</>}
                   </button>
                 </div>
               )}
@@ -463,7 +848,9 @@ const StudentAccountSettings = () => {
                     </div>
 
                     <button className="save-btn" onClick={handleChangePassword} disabled={savingPw}>
-                      {savingPw ? <><span className="spinner-border spinner-border-sm me-1" role="status"/>Updating…</> : <><i className="bi bi-shield-lock"></i>Update Password</>}
+                      {savingPw
+                        ? <><span className="spinner-border spinner-border-sm me-1" role="status"/>Updating…</>
+                        : <><i className="bi bi-shield-lock"></i>Update Password</>}
                     </button>
                   </div>
                 </div>
