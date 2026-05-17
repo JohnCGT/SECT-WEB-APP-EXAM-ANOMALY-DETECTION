@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import API, { fetchCsrfToken } from "../api";
+import API, { fetchCsrfToken } from "../lib/api";
 import Swal from "sweetalert2";
 
 // ─── Constants ────────────────────────────────────────────────────────────────

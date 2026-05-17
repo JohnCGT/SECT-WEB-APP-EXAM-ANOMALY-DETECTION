@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import API from "../../api";
+import API from "../../lib/api";
 
 /* ─── Design tokens ─── */
 const GLOBAL_CSS = `

@@ -1,7 +1,7 @@
 // src/components/InstructorAlertBell.jsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import API from "../api";
+import API from "../lib/api";
 
 const FLAGGED_THRESHOLD  = 50;
 const POSSIBLE_THRESHOLD = 25;

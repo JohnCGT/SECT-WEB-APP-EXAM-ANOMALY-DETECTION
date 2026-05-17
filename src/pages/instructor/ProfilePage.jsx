@@ -1,7 +1,7 @@
 // src/pages/instructor/ProfilePage.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import API from "../../api";
+import API from "../../lib/api";
 import InstructorAlertBell from "../../components/InstructorAlertBell";
 
 const STYLES = `

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import API from "../../api";
+import API from "../../lib/api";
 
 /* ─────────────────────────────────────────────
    STYLES

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
-import API from "../../api";
+import API from "../../lib/api";
 import Swal from "sweetalert2";
 
 /* ─── Constants ─────────────────────────────────────────────────────────── */

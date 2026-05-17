@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import API from "../../api";
+import API from "../../lib/api";
 import Swal from "sweetalert2";
 import TypingTest from "./TypingTest";
 

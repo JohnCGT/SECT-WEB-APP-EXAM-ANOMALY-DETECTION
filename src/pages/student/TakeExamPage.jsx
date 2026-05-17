@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import API from "../../api";
+import API from "../../lib/api";
 import Swal from "sweetalert2";
-import { AnomalyCollector } from "../../anomalyCollector";
+import { AnomalyCollector } from "../../services/anomalyCollector";
 import TypingTest from "./TypingTest";
 
 const GLOBAL_CSS = `

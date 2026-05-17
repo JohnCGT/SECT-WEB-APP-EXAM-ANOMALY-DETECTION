@@ -1,7 +1,7 @@
 // src/pages/student/StudentSupport.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import API from "../../api";
+import API from "../../lib/api";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Student Support Center
