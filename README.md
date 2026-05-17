@@ -1,399 +1,530 @@
 # SECT — Web Exam Anomaly Detection
 
-**SECT** is a full-stack web application built for conducting online exams with built-in academic integrity monitoring. It tracks suspicious behavior during exams in real time and runs it through a machine learning pipeline to generate a **Cheating Probability Index (CPI)** score for each student submission.
+SECT is a web-based online examination platform built for academic integrity. It handles exam creation, student proctoring, and real-time behavioral anomaly detection using machine learning. The system quietly monitors student activity during an active exam and flags suspicious behavior without interrupting the student's session.
 
-This project was developed as a thesis system combining web development with applied machine learning for academic integrity detection.
-
----
-
-## What it does
-
-When a student takes an exam, SECT silently monitors behavioral signals in the background — things like tab switching, unusual keyboard shortcuts, response timing patterns, and typing rhythm. After the exam is submitted, those signals are sent to a Python/Flask ML service that processes them through three anomaly detection algorithms and produces a CPI score. Instructors can then review flagged submissions through a dashboard with detailed anomaly breakdowns.
+This was built as a thesis project, combining full-stack web development with machine learning-based academic integrity detection.
 
 ---
 
 ## Table of Contents
 
+- [Overview](#overview)
 - [Tech Stack](#tech-stack)
-- [System Architecture](#system-architecture)
-- [Anomaly Detection & CPI](#anomaly-detection--cpi)
-- [User Roles](#user-roles)
 - [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Running the App](#running-the-app)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [Database Schema](#database-schema)
+- [How Anomaly Detection Works](#how-anomaly-detection-works)
+- [Cheating Probability Index](#cheating-probability-index)
+- [Exam Monitoring Settings](#exam-monitoring-settings)
+- [User Roles](#user-roles)
 - [API Overview](#api-overview)
-- [What Gets Tracked](#what-gets-tracked)
-- [Database Tables](#database-tables)
-- [For Developers](#for-developers)
-- [Known Issues / TODOs](#known-issues--todos)
+- [Developers](#developers)
+
+---
+
+## Overview
+
+When a student starts an exam, the `AnomalyCollector` class runs silently in the browser. It listens for behavioral signals — tab switching, keyboard shortcuts, how long a student spends on a question, and how they type — and sends each event to the Laravel backend via XHR. The backend logs every event into dedicated tables, one per signal type. After an exam is submitted, a Python Flask service reads those logs and runs the appropriate machine learning algorithm on each signal type. Results are written back into the `exam_results` table as a final CPI score and per-algorithm flags. Instructors can then open the anomaly review dashboard to see the full log per student and decide whether to act on it.
+
+The system is intentionally non-blocking. If a signal fails to post, it is logged silently and the exam continues unaffected.
 
 ---
 
 ## Tech Stack
 
 **Frontend**
-- React 19 + Vite
+- React 19 with Vite
 - React Router v7
-- Bootstrap 5 + Bootstrap Icons
-- Axios
-- SweetAlert2
+- Axios for HTTP requests
+- Bootstrap 5 and Bootstrap Icons
+- SweetAlert2 for confirmation dialogs
 
 **Backend**
-- Laravel 12 (PHP 8.2+)
-- Laravel Sanctum (API authentication)
-- MySQL 8.0+
+- PHP 8.2
+- Laravel 12
+- Laravel Sanctum for session-based authentication
+- MySQL
 
-**ML Service**
-- Python / Flask (runs on port `5001`)
-- Isolation Forest (x2 variants)
-- One-Class SVM
-- Hidden Markov Model (HMM)
-
-**Dev Tools**
-- XAMPP (Apache + MySQL + PHP)
-- Node.js 18+
-- Composer
-
----
-
-## System Architecture
-
-```
-[ React Frontend ]
-       ↕  REST API (Axios)
-[ Laravel Backend ]  ←→  [ MySQL Database ]
-       ↕  HTTP (cURL, port 5001)
-[ Python / Flask ML Service ]
-```
-
-During an exam, the React frontend collects behavioral data via `anomalyCollector.js` and sends it to Laravel API endpoints in real time. When the exam ends, Laravel dispatches a background job (`ProcessExamML`) that POSTs the session data to the Flask service at `http://127.0.0.1:5001/process-exam`. The Flask service runs the ML models and returns the CPI score, which is saved back into the database.
-
----
-
-## Anomaly Detection & CPI
-
-The CPI (Cheating Probability Index) is a 0–100 score that summarizes how suspicious a student's exam session was. It's computed by the Flask ML service using a weighted combination of three models:
-
-| Model | Role |
-|---|---|
-| **Isolation Forest (v1)** | Detects general outliers in behavioral features |
-| **Isolation Forest (v2)** | Secondary variant with different feature weighting |
-| **One-Class SVM** | Trained on baseline "normal" behavior; flags deviations |
-| **Hidden Markov Model** | Analyzes keystroke timing sequences for behavioral drift |
-
-### CPI Score Labels
-
-| Score Range | Label |
-|---|---|
-| 0 – 19 | Unlikely |
-| 20 – 49 | Warning |
-| 50 – 79 | Suspicious |
-| 80 – 100 | Highly Suspicious |
-
-The system tracks four main behavioral signals:
-
-- **Tab switches** — how many times and how long the student left the exam window
-- **Keyboard shortcuts** — blocked combos like Ctrl+C, Ctrl+V, F12, Ctrl+Shift+I, etc.
-- **Response time anomalies** — unusually fast answers that may suggest external help
-- **Keystroke dynamics** — dwell times, flight times, WPM compared to a typed baseline
-
----
-
-## User Roles
-
-There are three roles in the system, each with their own set of pages and permissions.
-
-**Admin**
-- Manage all users (create, activate, deactivate accounts)
-- Manage courses and exam content across the platform
-- View anomaly reports for all exams
-- Handle support tickets submitted by instructors and students
-
-**Instructor**
-- Create and manage their own courses and exams
-- Add/remove students from courses
-- View real-time anomaly alerts during active exams
-- Access detailed CPI reports and behavioral breakdowns per student
-- Grade essay-type questions
-- Submit support tickets
-
-**Student**
-- Enroll in courses
-- Take exams (with behavior monitored in the background)
-- Complete a typing baseline test before their first exam
-- View their own exam results and grades
-- Submit support tickets
+**Anomaly Detection Service**
+- Python 3.10+
+- Flask
+- Isolation Forest (tab switching)
+- One-Class SVM (keyboard shortcuts)
+- Hidden Markov Model (keystroke dynamics)
+- Z-Score Method (response time)
 
 ---
 
 ## Project Structure
 
 ```
-/
-├── src/                        # React frontend
-│   ├── components/             # Shared components (Login, Register, ProtectedRoute, etc.)
+SECT-WEB-APP-EXAM-ANOMALY-DETECTION/
+│
+├── src/                              # React frontend
+│   ├── lib/
+│   │   └── api.js                    # Axios instance, CSRF handling, interceptors
+│   ├── services/
+│   │   └── anomalyCollector.js       # Behavioral event collector (runs during exam)
+│   ├── components/
+│   │   ├── LoginPage.jsx
+│   │   ├── RegisterPage.jsx
+│   │   ├── ProtectedRoute.jsx
+│   │   └── InstructorAlertBell.jsx
 │   ├── pages/
-│   │   ├── admin/              # Admin dashboard pages
-│   │   ├── instructor/         # Instructor pages (courses, exams, alerts, reports)
-│   │   └── student/            # Student pages (dashboard, exams, grades, profile)
-│   ├── anomalyCollector.js     # Collects and sends behavioral signals during exams
-│   ├── api.js                  # Axios instance with base URL and auth headers
-│   └── main.jsx                # App entry point and route definitions
+│   │   ├── admin/
+│   │   │   ├── AdminPage.jsx
+│   │   │   ├── UserManagement.jsx
+│   │   │   ├── ExamManagement.jsx
+│   │   │   ├── AdminCourseManagement.jsx
+│   │   │   ├── AnomalyReports.jsx
+│   │   │   ├── SupportTickets.jsx
+│   │   │   ├── ActivityLogs.jsx
+│   │   │   ├── AdminProfile.jsx
+│   │   │   └── NotificationBell.jsx
+│   │   ├── instructor/
+│   │   │   ├── Homepage.jsx
+│   │   │   ├── CoursesPage.jsx
+│   │   │   ├── CourseDetail.jsx
+│   │   │   ├── ExamPage.jsx
+│   │   │   ├── ExamDetail.jsx
+│   │   │   ├── ExamEdit.jsx
+│   │   │   ├── Students.jsx
+│   │   │   ├── Reports.jsx
+│   │   │   ├── Alerts.jsx
+│   │   │   ├── ProfilePage.jsx
+│   │   │   ├── AccountSettings.jsx
+│   │   │   └── InstructorSupport.jsx
+│   │   └── student/
+│   │       ├── Dashboard.jsx
+│   │       ├── SubjectPage.jsx
+│   │       ├── ExamsPage.jsx
+│   │       ├── CourseExamPage.jsx
+│   │       ├── TakeExamPage.jsx
+│   │       ├── ExamResultsPage.jsx
+│   │       ├── GradesPage.jsx
+│   │       ├── TypingTestPage.jsx
+│   │       ├── StudentProfile.jsx
+│   │       ├── StudentAccountSettings.jsx
+│   │       └── StudentSupport.jsx
+│   └── styles/
 │
-├── backend/                    # Laravel backend
-│   ├── app/
-│   │   ├── Http/Controllers/
-│   │   │   ├── Admin/          # Admin-specific controllers
-│   │   │   ├── Instructor/     # Instructor controllers (Exam, Anomaly, Course, etc.)
-│   │   │   └── Student/        # Student controllers (Exam, Dashboard, Course, etc.)
-│   │   ├── Jobs/
-│   │   │   ├── ProcessExamML.php       # Dispatches submission to Flask for scoring
-│   │   │   └── TrainHMMBaseline.php    # Trains HMM on a student's typing baseline
-│   │   ├── Models/             # Eloquent models for all database tables
-│   │   └── Services/
-│   │       └── AnomalyDetectionService.php  # Handles real-time anomaly logging
-│   ├── database/migrations/    # All database migrations
-│   └── routes/api.php          # All API route definitions
-│
-└── ml_service/                 # Python/Flask ML service (see note below)
-    └── app.py                  # Flask app exposing /process-exam endpoint
+└── backend/                          # Laravel API
+    ├── app/
+    │   ├── Http/
+    │   │   └── Controllers/
+    │   │       ├── Admin/
+    │   │       │   ├── AdminDashboardController.php
+    │   │       │   ├── AdminProfileController.php
+    │   │       │   └── AdminUserController.php
+    │   │       ├── Instructor/
+    │   │       │   ├── AnomalyController.php
+    │   │       │   ├── CourseController.php
+    │   │       │   ├── CourseStudentController.php
+    │   │       │   ├── EssayGradingController.php
+    │   │       │   ├── ExamController.php
+    │   │       │   └── QuestionController.php
+    │   │       ├── Student/
+    │   │       │   ├── StudentCourseController.php
+    │   │       │   ├── StudentDashboardController.php
+    │   │       │   ├── StudentExamController.php
+    │   │       │   ├── StudentNotificationController.php
+    │   │       │   ├── StudentSearchController.php
+    │   │       │   └── TypingBaselineController.php
+    │   │       ├── AuthController.php
+    │   │       ├── ProfileController.php
+    │   │       └── SupportTicketController.php
+    │   └── Models/
+    │       ├── User.php
+    │       ├── Course.php
+    │       ├── Exam.php
+    │       ├── Question.php
+    │       ├── ExamSubmission.php
+    │       ├── ExamAnswer.php
+    │       ├── ExamResult.php
+    │       ├── TabSwitchLog.php
+    │       ├── KeyboardShortcutLog.php
+    │       ├── ResponseTimeLog.php
+    │       ├── KeystrokeDynamicsLog.php
+    │       ├── KeystrokeBaseline.php
+    │       ├── StudentNotification.php
+    │       ├── SupportTicket.php
+    │       └── ActivityLog.php
+    ├── routes/
+    │   └── api.php
+    └── database/
+        └── migrations/
 ```
 
-> **Note:** The ML service (`ml_service/`) may need to be set up separately. See [For Developers](#for-developers) for details.
-
 ---
 
-## Prerequisites
+## Getting Started
 
-Make sure you have all of these installed before starting:
+### Prerequisites
 
-| Tool | Version | Link |
-|---|---|---|
-| XAMPP | Latest | https://www.apachefriends.org/ |
-| Node.js | v18+ | https://nodejs.org/ |
-| Composer | Latest | https://getcomposer.org/ |
-| Python | 3.9+ | https://www.python.org/ |
-| Git | Latest | https://git-scm.com/ |
+- Node.js 18+
+- PHP 8.2+
+- Composer
+- MySQL
+- Python 3.10+ with Flask (for the anomaly detection service)
 
-**System requirements:** Windows 10/11, macOS, or Linux — minimum 4GB RAM, 2GB free disk space.
-
----
-
-## Installation
-
-### 1. Clone the Repository
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/SECT-WEB-APP-EXAM-ANOMALY-DETECTION.git
-cd SECT-WEB-APP-EXAM-ANOMALY-DETECTION
+git clone https://github.com/your-org/sect-web-app.git
+cd sect-web-app
 ```
 
-### 2. Backend Setup (Laravel)
+### 2. Frontend setup
+
+```bash
+# Install dependencies
+npm install
+
+# Copy and configure the frontend environment file
+cp .env.example .env
+
+# Start the development server
+npm run dev
+```
+
+### 3. Backend setup
 
 ```bash
 cd backend
+
+# Install PHP dependencies
 composer install
+
+# Copy and configure the backend environment file
+cp .env.example .env
+
+# Generate the application key
+php artisan key:generate
+
+# Run all database migrations
+php artisan migrate
+
+# Start the Laravel development server
+php artisan serve
 ```
 
-Copy the environment file and configure it:
+### 4. Rebuild the autoloader
+
+Only needed after moving or adding controllers. Run this if you see class-not-found errors:
 
 ```bash
-# Windows
-copy .env.example .env
-
-# Mac/Linux
-cp .env.example .env
+cd backend
+composer dump-autoload
+php artisan route:clear
+php artisan config:clear
+php artisan cache:clear
 ```
 
-Open `.env` and update your database credentials:
+---
+
+## Environment Variables
+
+### Backend — `backend/.env`
 
 ```env
-DB_DATABASE=sect_db
+APP_NAME=SECT
+APP_ENV=local
+APP_KEY=                        # generated by php artisan key:generate
+APP_DEBUG=true
+APP_URL=http://localhost:8000
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=sect_app
 DB_USERNAME=root
 DB_PASSWORD=
+
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_DOMAIN=localhost
+
+SANCTUM_STATEFUL_DOMAINS=localhost:5173
 ```
 
-Then generate the app key and run migrations:
+### Frontend — `.env` (project root)
 
-```bash
-php artisan key:generate
-php artisan migrate
+```env
+VITE_API_URL=http://localhost:8000
 ```
 
-### 3. Frontend Setup (React)
-
-```bash
-# From the project root
-npm install
-```
-
-### 4. ML Service Setup (Python/Flask)
-
-```bash
-cd ml_service
-pip install flask scikit-learn hmmlearn numpy pandas
-```
-
-> The Flask service must be running on port `5001` for CPI scoring to work after exam submission.
+> Do not commit either `.env` file to version control. Both are listed in `.gitignore` by default.
 
 ---
 
-## Running the App
+## Database Schema
 
-You need three things running simultaneously: XAMPP (for MySQL), the Laravel server, and the Vite dev server. Optionally, also run the Flask ML service.
+SECT uses a purpose-built schema where each anomaly signal type has its own dedicated table. This makes it straightforward for the Flask service to query exactly the data it needs per algorithm without filtering across a single bloated log table.
 
-**Start XAMPP** — make sure Apache and MySQL are running.
+### Core tables
 
-**Start the backend (Laravel):**
+| Table | Description |
+|---|---|
+| `users` | All users — students, instructors, and admins share this table with a `role` column |
+| `courses` | Courses created by instructors, with code, name, semester, and credits |
+| `course_students` | Enrollment — links students to courses |
+| `exams` | Exam records tied to a course and instructor, includes monitoring toggle settings |
+| `questions` | Questions per exam; supports `multiple_choice`, `true_false`, and `essay` types |
+| `exam_submissions` | One row per student per exam; tracks start time, submit time, score, and status |
+| `exam_answers` | One row per question per submission; stores the student's answer and points earned |
+| `keystroke_baselines` | One baseline per student, recorded via the typing test before any exam |
 
-```bash
-cd backend
-php artisan serve
-# Runs at http://127.0.0.1:8000
-```
+### Anomaly log tables
 
-**Start the frontend (React + Vite):**
+Each table maps to one machine learning algorithm and stores the raw features that algorithm needs.
 
-```bash
-# From project root
-npm run dev
-# Runs at http://localhost:5173
-```
+| Table | Algorithm | Key features stored |
+|---|---|---|
+| `tab_switch_logs` | Isolation Forest | `cumulative_switches`, `hidden_duration_ms`, `is_return_event` |
+| `keyboard_shortcut_logs` | One-Class SVM | `keys`, `cumulative_count`, `is_paste`, `pasted_char_count` |
+| `response_time_logs` | Z-Score Method | `response_time_ms`, `question_position`, `previous_times_ms`, `z_score`, `direction` |
+| `keystroke_dynamics_logs` | Hidden Markov Model | `dwell_times_ms`, `flight_times_ms`, `avg_dwell_ms`, `wpm`, `keystroke_count` |
 
-**Start the ML service (Flask):**
+### Results table
 
-```bash
-cd ml_service
-python app.py
-# Runs at http://127.0.0.1:5001
-```
+| Table | Description |
+|---|---|
+| `exam_results` | One row per submission; written by Flask after scoring. Stores the CPI score, CPI label, and per-algorithm flags (`iso_tab_flagged`, `svm_flagged`, `rt_flagged`, `hmm_flagged`) and raw scores |
 
-Once everything is running, open your browser and go to `http://localhost:5173`.
+### Supporting tables
+
+| Table | Description |
+|---|---|
+| `student_notifications` | In-app notifications for students |
+| `support_tickets` | Student and instructor support requests |
+| `activity_logs` | System-wide event log for admin review |
+
+---
+
+## How Anomaly Detection Works
+
+### Step 1 — Signal collection (frontend)
+
+`anomalyCollector.js` attaches event listeners when an exam starts. It runs entirely in the browser and collects four types of behavioral signals:
+
+**Tab switching** — fires on the browser's `visibilitychange` event. When the tab is hidden, a ping is sent immediately with `hidden_duration_ms: 0`. When the student returns, a second event is sent with the actual time elapsed. Only the return event counts toward the summary counter. This prevents a single leave from inflating the count.
+
+**Keyboard shortcuts** — fires on `keydown` at the document level using capture mode. A predefined blocklist of combos (`Ctrl+C`, `Ctrl+V`, `Ctrl+T`, `F12`, `PrintScreen`, and others) triggers an immediate post. Paste events on essay fields are also captured separately with character count and paste index so the algorithm can weigh them differently.
+
+**Response time** — tracked per question. The collector records when a question becomes active and sends the elapsed time when the student moves to the next question or submits. All previous response times for the session are included in the payload so Flask can compute z-scores on the fly without querying the database again.
+
+**Keystroke dynamics** — attached to each essay textarea. Records how long each key is held down (`dwell_times_ms`) and the gap between key releases (`flight_times_ms`). The buffer flushes automatically after 2 seconds of typing inactivity or when the field loses focus. Mobile virtual keyboards, which suppress key events on iOS and Android, are handled via an `input` event fallback that synthesizes a realistic 80ms dwell time.
+
+### Step 2 — Storage (Laravel backend)
+
+Each signal type is received by `AnomalyController` and written to its dedicated log table. The controller validates the payload, writes the raw feature data, and returns a current flag status to the frontend. No machine learning computation happens here — that is intentionally deferred to the Flask service so the exam experience is never delayed by scoring overhead.
+
+### Step 3 — Scoring (Python Flask)
+
+After a submission is completed, Flask reads the raw logs for that submission and runs each algorithm independently:
+
+| Signal | Algorithm | How it works |
+|---|---|---|
+| Tab switching | Isolation Forest | Trains on session-level features (`cumulative_switches`, `hidden_duration_ms`). Flags sessions that are statistical outliers relative to the normal distribution of behavior. |
+| Keyboard shortcuts | One-Class SVM | Learns the boundary of normal shortcut behavior (ideally none). Sessions that exceed the boundary in frequency, paste count, or pasted character volume are flagged. |
+| Response time | Z-Score | For each question, computes how many standard deviations the response time is from the student's session mean. Questions where `|z| > threshold` are flagged as either `too_fast` or `too_slow`. |
+| Keystroke dynamics | Hidden Markov Model | Models the sequence of `(dwell, flight)` pairs as observations against the student's pre-recorded baseline. Flags sessions whose emission probability falls below a trained threshold. |
+
+Flask writes the scores and per-algorithm flags back into `exam_results` and backfills the `severity` column on each individual log row.
+
+### Step 4 — Review (instructor dashboard)
+
+Instructors open the anomaly review panel for any exam. They can see the CPI score and label per student, a full chronological log of every event grouped by signal type, per-algorithm flags and raw scores, and they can mark individual log entries as reviewed with personal notes.
+
+---
+
+## Cheating Probability Index
+
+The CPI is a single score from 0 to 100 that summarizes anomaly signals from all four algorithms into one number per submission. Flask computes it after scoring and writes it to `exam_results.cpi_score`. The four per-algorithm scores are weighted and combined into the final CPI.
+
+| CPI Score | Label |
+|---|---|
+| 0 – 25 | Unlikely |
+| 26 – 50 | Possible |
+| 51 – 75 | Probable |
+| 76 – 100 | Highly Probable |
+
+`is_flagged` is set to `true` when the score crosses a configured threshold. Instructors see the label and score side by side on the student results table, making it easy to prioritize who to review first.
+
+---
+
+## Exam Monitoring Settings
+
+Each exam has per-toggle monitoring settings that instructors configure when creating or editing an exam. The collector checks these flags before attaching any listeners, so students are never monitored for signals the instructor did not enable.
+
+| Setting | What it controls |
+|---|---|
+| `tab_switching_monitor` | Whether tab-switch events are collected and scored |
+| `keyboard_analysis` | Whether keyboard shortcut events are collected and scored |
+| `isolation_forest` | Whether Isolation Forest scoring runs for this exam |
+| `face_detection` | Reserved for future camera-based proctoring |
+| `mouse_tracking` | Reserved for future mouse movement analysis |
+| `screen_recording` | Reserved — disabled by default |
+
+---
+
+## User Roles
+
+### Admin
+
+- Create, update, and deactivate user accounts for students and instructors
+- View all courses and exams across the entire platform
+- Monitor anomaly reports system-wide
+- Manage and respond to support tickets
+- Review system-wide activity logs
+
+### Instructor
+
+- Create and manage courses and enroll students by search
+- Build exams with multiple question types: multiple choice, true/false, and essay
+- Configure per-exam monitoring settings and toggle individual algorithms
+- View all student submissions and grade essay questions against a rubric
+- Review the full anomaly log and CPI score for each student per exam
+- Mark anomaly log entries as reviewed with personal notes
+
+### Student
+
+- View enrolled courses and browse upcoming and active exams
+- Take exams in a monitored environment with the collector running in the background
+- View grades and detailed results after submission
+- Complete a typing baseline test before taking exams, which the HMM uses for comparison
+- Submit and track support tickets
 
 ---
 
 ## API Overview
 
-All API routes are prefixed with `/api`. Here's a summary of the main groups:
+All routes are prefixed with `/api`. Protected routes require a valid Sanctum session cookie.
 
-| Prefix | Who uses it | What it covers |
-|---|---|---|
-| `/api/auth/*` | Everyone | Login, register, logout |
-| `/api/instructor/*` | Instructors | Courses, exams, questions, student lists, reports, alerts |
-| `/api/student/*` | Students | Dashboard, enrolled courses, exam taking, results, grades |
-| `/api/admin/*` | Admins | User management, platform-wide exam/course management |
-| `/api/anomaly/*` | System (during exams) | Tab switch events, keyboard shortcuts, response times, keystrokes |
-
-Real-time anomaly events are sent to endpoints like:
-- `POST /api/anomaly/tab-switch`
-- `POST /api/anomaly/keyboard-shortcut`
-- `POST /api/anomaly/response-time`
-- `POST /api/anomaly/keystroke-dynamics`
-
----
-
-## What Gets Tracked
-
-The `anomalyCollector.js` file on the frontend is the heart of the monitoring system. Here's what it watches during an active exam session:
-
-- **Tab visibility** — triggers when `document.visibilityState` changes (tab switch or window minimize)
-- **Keyboard shortcuts** — intercepts and logs blocked key combos (Ctrl+C, Ctrl+V, F12, Ctrl+Shift+I, etc.)
-- **Response time** — measures how long a student spends on each question before submitting
-- **Keystroke dynamics** — records dwell time (how long a key is held) and flight time (gap between keystrokes) to build a typing fingerprint
-
-All of this data is flushed to the backend in batches during the exam and compiled when the student submits.
-
----
-
-## Database Tables
-
-Key tables you should know about:
-
-| Table | Description |
-|---|---|
-| `users` | All users (admin, instructor, student) — role is a column |
-| `courses` | Courses created by instructors |
-| `course_students` | Enrollment pivot table |
-| `exams` | Exam definitions (title, duration, question shuffling, etc.) |
-| `questions` | Questions belonging to an exam |
-| `exam_submissions` | One row per student per exam attempt |
-| `exam_results` | CPI score, flag status, and event counters per submission |
-| `tab_switch_logs` | Every tab switch event during an exam |
-| `keyboard_shortcut_logs` | Every blocked shortcut attempt |
-| `response_time_logs` | Time spent per question |
-| `keystroke_dynamics_logs` | Dwell/flight times per question |
-| `keystroke_baselines` | A student's baseline typing profile (from the typing test) |
-| `student_notifications` | In-app notifications for students |
-| `support_tickets` | Support requests from students and instructors |
-
----
-
-## For Developers
-
-### Adding a new anomaly signal
-
-1. Add a new log model in `backend/app/Models/`
-2. Create a migration for its table
-3. Add a `process*()` method in `AnomalyDetectionService.php`
-4. Add a route in `routes/api.php` pointing to the relevant controller
-5. Update `anomalyCollector.js` to capture and send the new signal
-6. Update the Flask ML service to factor the new signal into CPI scoring
-
-### Updating the CPI formula
-
-The CPI scoring logic lives in the Flask service (`ml_service/app.py`). The weights for each algorithm and each behavioral signal can be adjusted there. The Laravel side just receives and stores whatever score Flask returns.
-
-> The placeholder scoring formula (used when Flask is unavailable) is defined in `ExamAnomalySummary.php` as:  
-> `tab_switches × 5 + keyboard_shortcuts × 8 + response_time_anomalies × 6 + keystroke_anomalies × 7`, clamped to 100.
-
-### Session & CORS
-
-Cross-origin requests are handled by Laravel Sanctum. If you run into CORS issues during development, check `config/cors.php`. Cookie-based sessions require the frontend and backend to be on the same domain or properly configured subdomain in production. See `config/session.php` for session driver settings.
-
-### Queue Workers
-
-The ML scoring job (`ProcessExamML`) runs through Laravel's queue. In development, run:
-
-```bash
-php artisan queue:listen --tries=1
+### Auth (public)
+```
+POST   /api/register
+POST   /api/login
 ```
 
-Without this, CPI scores won't be generated after exam submission.
+### Auth (protected)
+```
+POST   /api/logout
+GET    /api/me
+PUT    /api/profile
+PUT    /api/profile/password
+POST   /api/profile/photo
+```
 
-### Typing Baseline
+### Admin
+```
+GET    /api/admin/dashboard
+GET    /api/admin/users
+POST   /api/admin/users
+PUT    /api/admin/users/{id}
+PATCH  /api/admin/users/{id}/status
+DELETE /api/admin/users/{id}
+GET    /api/admin/courses
+GET    /api/admin/exams
+PATCH  /api/admin/exams/{id}/status
+GET    /api/admin/anomalies
+GET    /api/admin/logs
+GET    /api/admin/support
+PATCH  /api/admin/support/{id}
+```
 
-Before a student can take their first exam, the system requires them to complete a typing test. This baseline is stored in `keystroke_baselines` and used by the HMM model to detect behavioral drift during actual exams.
+### Instructor — Courses & Students
+```
+GET    /api/courses
+POST   /api/courses
+GET    /api/courses/{id}
+PUT    /api/courses/{id}
+DELETE /api/courses/{id}
+GET    /api/courses/{courseId}/students
+POST   /api/courses/{courseId}/students
+DELETE /api/courses/{courseId}/students/{studentId}
+GET    /api/students/search
+```
+
+### Instructor — Exams & Questions
+```
+GET    /api/exams
+POST   /api/exams
+GET    /api/exams/{id}
+PUT    /api/exams/{id}
+DELETE /api/exams/{id}
+GET    /api/exams/{id}/submissions
+GET    /api/exams/{examId}/questions
+POST   /api/exams/{examId}/questions
+PUT    /api/exams/{examId}/questions/{id}
+DELETE /api/exams/{examId}/questions/{id}
+```
+
+### Instructor — Anomaly Review
+```
+GET    /api/exams/{examId}/anomalies
+GET    /api/exams/{examId}/anomalies/summary
+GET    /api/exams/{examId}/submissions/{submissionId}/anomalies
+PATCH  /api/exams/{examId}/anomalies/{logId}/review
+```
+
+### Instructor — Essay Grading
+```
+GET    /api/exams/{examId}/essays/pending
+GET    /api/exams/{examId}/essays/stats
+PATCH  /api/exams/{examId}/essays/{submissionId}
+GET    /api/exams/{examId}/submissions/{submissionId}/student-pdf
+```
+
+### Student — Exams
+```
+GET    /api/student/exams
+GET    /api/student/courses/{courseId}/exams
+POST   /api/student/exams/{examId}/start
+POST   /api/student/exams/{examId}/submit
+GET    /api/student/exams/{examId}/results
+GET    /api/student/grades
+```
+
+### Student — Anomaly Ingestion
+```
+# Rate limited to 60 requests per minute per student
+POST   /api/student/exams/{examId}/anomalies/tab-switch
+POST   /api/student/exams/{examId}/anomalies/keyboard-shortcut
+POST   /api/student/exams/{examId}/anomalies/response-time
+POST   /api/student/exams/{examId}/anomalies/keystroke-dynamics
+```
+
+### Student — Dashboard & Misc
+```
+GET    /api/student/dashboard/exams/upcoming
+GET    /api/student/dashboard/exams/active
+GET    /api/student/dashboard/exams/results
+GET    /api/student/dashboard/integrity
+GET    /api/student/dashboard/score-stats
+GET    /api/student/dashboard/typing-stats
+GET    /api/student/courses
+GET    /api/student/courses/{courseId}
+GET    /api/student/search
+GET    /api/student/typing-baseline/status
+POST   /api/student/typing-baseline
+GET    /api/student/notifications
+PATCH  /api/student/notifications/read-all
+PATCH  /api/student/notifications/{id}/read
+```
 
 ---
 
-## Known Issues / TODOs
+## Developers
 
-- [ ] The Flask ML service setup is not yet included in this repository — it needs to be configured separately
-- [ ] `.env.example` needs to be added if not already present (don't commit your actual `.env`)
-- [ ] Essay grading is partially implemented — auto-scoring for open-ended questions is a planned feature
-- [ ] Real-time CPI updates during an active exam (currently computed only after submission)
-- [ ] Add unit tests for `AnomalyDetectionService`
-
----
-
-## Contributing
-
-Pull requests are welcome. If you're making changes to the ML pipeline or CPI formula, please document what you changed and why in your PR description — it makes review a lot easier.
-
-For major changes, open an issue first to discuss what you'd like to change.
+| Name | Role |
+|---|---|
+| [John Carlo Tulin](https://github.com/) | placeholder |
+| [Eumy Simoun Castillo](https://github.com/) | placeholder |
+| [Jacinto Jose Guban](https://github.com/) | placeholder |
+| [Sam Esita](https://github.com/) | placeholder |
 
 ---
 
-## Authors
-John Carlo Tulin
-Eumy Simoun Castillo
-Jacinto Jose Guban
-Sam Esita
-
-
----
-
-## License
-
-This project is for academic and educational use.
+*SECT is an academic thesis project. It is not intended for production use without further security review.*
