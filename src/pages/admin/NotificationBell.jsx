@@ -44,17 +44,19 @@ async function fetchNotifs() {
     });
     if (!res.ok) return [];
     const json = await res.json().catch(() => ({}));
-    return json.data ?? [];
+    // Only keep support-ticket related notifications — filter out any CPI/anomaly entries
+    const all = json.data ?? [];
+    return all.filter(n => n.type === "new_ticket" || n.type === "ticket_updated" || n.type === "exam_completed");
   } catch {
     return [];
   }
 }
 
+/* ─── Only support-ticket and exam notifications ─────────────────────── */
 const NOTIF_CFG = {
-  new_ticket:     { icon: "🎫", color: "#0056b3", bg: "#e8f0fe", link: "/admin/support"   },
-  high_cpi:       { icon: "🚨", color: "#dc3545", bg: "#fff0f0", link: "/admin/anomalies" },
-  exam_flagged:   { icon: "🚩", color: "#fd7e14", bg: "#fff8f0", link: "/admin/anomalies" },
-  exam_completed: { icon: "✅", color: "#16a34a", bg: "#f0fdf4", link: "/admin/exams"     },
+  new_ticket:     { icon: "🎫", color: "#0056b3", bg: "#e8f0fe", link: "/admin/support" },
+  ticket_updated: { icon: "💬", color: "#1a6ed8", bg: "#eff6ff", link: "/admin/support" },
+  exam_completed: { icon: "✅", color: "#16a34a", bg: "#f0fdf4", link: "/admin/exams"   },
 };
 
 export default function NotificationBell() {
@@ -63,7 +65,7 @@ export default function NotificationBell() {
     try { return new Set(JSON.parse(localStorage.getItem("al_read_notifs") || "[]")); }
     catch { return new Set(); }
   });
-  const [open, setOpen] = useState(false);
+  const [open,    setOpen]    = useState(false);
   const [loading, setLoading] = useState(false);
   const ref = useRef(null);
 
@@ -103,7 +105,7 @@ export default function NotificationBell() {
     });
   };
 
-  const recent = notifications.slice(0, 8);
+  const recent   = notifications.slice(0, 8);
   const hasBadge = unread > 0;
 
   return (
@@ -148,10 +150,7 @@ export default function NotificationBell() {
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a2e" }}>Notifications</span>
               {unread > 0 && (
-                <span style={{
-                  background: "#0056b3", color: "#fff", padding: "1px 7px",
-                  borderRadius: 10, fontSize: 10, fontWeight: 600,
-                }}>
+                <span style={{ background: "#0056b3", color: "#fff", padding: "1px 7px", borderRadius: 10, fontSize: 10, fontWeight: 600 }}>
                   {unread} new
                 </span>
               )}
@@ -167,11 +166,7 @@ export default function NotificationBell() {
                   : "↻"}
               </button>
               {unread > 0 && (
-                <button onClick={markAll} style={{
-                  border: "none", background: "none", fontSize: 11,
-                  color: "#888", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
-                  fontFamily: "'DM Sans', system-ui, sans-serif",
-                }}>
+                <button onClick={markAll} style={{ border: "none", background: "none", fontSize: 11, color: "#888", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "'DM Sans',system-ui,sans-serif" }}>
                   Mark all read
                 </button>
               )}
@@ -190,7 +185,7 @@ export default function NotificationBell() {
               </div>
             ) : (
               recent.map((n) => {
-                const cfg = NOTIF_CFG[n.type] ?? { icon: "📌", color: "#64748b", bg: "#f1f5f9", link: "/admin" };
+                const cfg     = NOTIF_CFG[n.type] ?? { icon: "📌", color: "#64748b", bg: "#f1f5f9", link: "/admin/support" };
                 const isUnread = !readIds.has(n.id);
                 return (
                   <Link
@@ -205,41 +200,24 @@ export default function NotificationBell() {
                       alignItems: "flex-start",
                     }}
                   >
-                    <div style={{
-                      width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-                      background: cfg.bg,
-                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15,
-                    }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
                       {cfg.icon}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{
-                        margin: 0, fontSize: 12, color: "#1e293b", lineHeight: 1.4,
-                        fontWeight: isUnread ? 700 : 500,
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}>
+                      <p style={{ margin: 0, fontSize: 12, color: "#1e293b", lineHeight: 1.4, fontWeight: isUnread ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {n.title}
                       </p>
-                      <p style={{
-                        margin: "2px 0 0", fontSize: 11, color: "#64748b",
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}>
+                      <p style={{ margin: "2px 0 0", fontSize: 11, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {n.body}
                       </p>
                       <p style={{ margin: "3px 0 0", fontSize: 10, color: "#94a3b8" }}>
                         {n.created_at
-                          ? new Date(n.created_at).toLocaleString(undefined, {
-                              month: "short", day: "numeric",
-                              hour: "2-digit", minute: "2-digit",
-                            })
+                          ? new Date(n.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
                           : ""}
                       </p>
                     </div>
                     {isUnread && (
-                      <div style={{
-                        width: 7, height: 7, borderRadius: "50%",
-                        background: "#0056b3", flexShrink: 0, marginTop: 4,
-                      }} />
+                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#0056b3", flexShrink: 0, marginTop: 4 }} />
                     )}
                   </Link>
                 );
