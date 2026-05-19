@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { Link, useNavigate } from "react-router-dom";
 import API from "../../lib/api";
 
-/* ─── Design tokens ─── */
 const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');
 
@@ -161,7 +160,7 @@ const GLOBAL_CSS = `
   .bottom-nav a.active { color: #0056b3; border-top-color: #0056b3; }
   .bottom-nav a i { font-size: 19px; }
 
-  /* ── Notification dropdown (improved) ── */
+  /* ── Notification dropdown ── */
   @keyframes notifSlideDown {
     from { opacity: 0; transform: translateY(-8px) scale(.97); }
     to   { opacity: 1; transform: translateY(0)   scale(1);    }
@@ -261,13 +260,6 @@ const SORT_OPTIONS = [
 ];
 
 /* ─── Notification type config ─── */
-/*
-  Supported types:
-    new_exam        → new exam posted by instructor
-    new_subject     → student enrolled in a new subject/course
-    results_updated → exam results are now visible
-    score_updated   → instructor finished grading essays; score updated
-*/
 const NOTIF_TYPE_META = {
   new_exam: {
     icon: "bi-pencil-square",
@@ -349,7 +341,7 @@ const Sidebar = ({ active }) => (
 );
 
 /* ─────────────────────────────────────────────
-   NOTIFICATION DROPDOWN (improved design)
+   NOTIFICATION DROPDOWN
 ───────────────────────────────────────────── */
 const NotificationDropdown = ({ notifications, unreadCount, onClose, onMarkAllRead, onNotifClick }) => {
   const ref = useRef(null);
@@ -381,7 +373,7 @@ const NotificationDropdown = ({ notifications, unreadCount, onClose, onMarkAllRe
           <button onClick={onMarkAllRead} style={{
             background: "none", border: "1px solid rgba(0,86,179,.18)", cursor: "pointer",
             fontSize: 11, fontWeight: 600, color: "#0056b3", padding: "3px 10px",
-            borderRadius: 99, transition: "background .15s",
+            borderRadius: 99, transition: "background .15s", fontFamily: "inherit",
           }}>
             Mark all read
           </button>
@@ -409,14 +401,14 @@ const NotificationDropdown = ({ notifications, unreadCount, onClose, onMarkAllRe
         </div>
       ) : (
         <div>
-          {notifications.map((n, idx) => {
+          {notifications.map((n) => {
             const meta = getNotifMeta(n.type);
             return (
               <div
                 key={n.id}
                 className={`notif-item${n.is_read ? "" : " unread"}`}
                 onClick={() => onNotifClick(n)}
-                style={{ cursor: n.url ? "pointer" : "default" }}
+                style={{ cursor: n.url || n.type ? "pointer" : "default" }}
               >
                 {/* Unread dot */}
                 <div style={{ width: 10, flexShrink: 0, display: "flex", justifyContent: "center", paddingTop: 5 }}>
@@ -719,7 +711,7 @@ const SubjectDetail = ({ course, accentIdx, onClose }) => {
           </div>
         )}
 
-        {/* Stats — exams count only */}
+        {/* Stats */}
         <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
           <div style={{
             display: "flex", alignItems: "center", gap: 10,
@@ -872,18 +864,22 @@ const SubjectPage = () => {
         })
         .catch(() => {});
     }
-    if (notif.url) {
+
+    if (notif.url || notif.type) {
       setNotifOpen(false);
-      let finalUrl = notif.url;
-      if (notif.type === "new_exam")         finalUrl = `${notif.url}/take`;
-      // else if (notif.type === "results_updated") finalUrl = `${notif.url}/results`;
-      // else if (notif.type === "score_updated")   finalUrl = `${notif.url}/results`;
-      else if (notif.type === "new_subject")     finalUrl = "/student/subjects";
-      navigate(finalUrl);
+
+      if (notif.type === "new_subject") {
+        navigate("/student/subjects");
+        return;
+      }
+      if (notif.type === "new_exam") {
+        navigate(notif.url ? `${notif.url}/take` : "/student/exams");
+        return;
+      }
+      if (notif.url) navigate(notif.url);
     }
   };
 
-  /* ── Close sort dropdown on outside click ── */
   useEffect(() => {
     const handler = (e) => { if (sortRef.current && !sortRef.current.contains(e.target)) setShowSortMenu(false); };
     document.addEventListener("mousedown", handler);

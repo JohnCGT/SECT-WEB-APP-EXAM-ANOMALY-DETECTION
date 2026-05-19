@@ -155,7 +155,7 @@ const GLOBAL_CSS = `
   .bottom-nav a.active { color: #0056b3; border-top-color: #0056b3; }
   .bottom-nav a i { font-size: 19px; }
 
-  /* ── Notification dropdown (improved) ── */
+  /* ── Notification dropdown ── */
   @keyframes notifSlideDown {
     from { opacity: 0; transform: translateY(-8px) scale(.97); }
     to   { opacity: 1; transform: translateY(0)   scale(1);    }
@@ -236,13 +236,6 @@ const NAV_ITEMS = [
 ];
 
 /* ─── Notification type config ─── */
-/*
-  Supported types:
-    new_exam        → new exam posted by instructor
-    new_subject     → student enrolled in a new subject/course
-    results_updated → exam results are now visible
-    score_updated   → instructor finished grading essays; score updated
-*/
 const NOTIF_TYPE_META = {
   new_exam: {
     icon: "bi-pencil-square",
@@ -318,11 +311,11 @@ const timeAgo = (iso) => {
 };
 
 const TABS = [
-  { key: "all",       label: "All",       icon: "bi-grid-3x2-gap" },
-  { key: "open",      label: "Open",      icon: "bi-pencil-square" },
-  { key: "upcoming",  label: "Soon",      icon: "bi-clock"         },
-  { key: "submitted", label: "Done",      icon: "bi-check-circle"  },
-  { key: "ended",     label: "Ended",     icon: "bi-lock"          },
+  { key: "all",       label: "All",   icon: "bi-grid-3x2-gap" },
+  { key: "open",      label: "Open",  icon: "bi-pencil-square" },
+  { key: "upcoming",  label: "Soon",  icon: "bi-clock"         },
+  { key: "submitted", label: "Done",  icon: "bi-check-circle"  },
+  { key: "ended",     label: "Ended", icon: "bi-lock"          },
 ];
 
 /* ─── Sub-components ─── */
@@ -356,7 +349,7 @@ const EmptyState = ({ icon, title, subtitle }) => (
 );
 
 /* ─────────────────────────────────────────────
-   NOTIFICATION DROPDOWN (improved design)
+   NOTIFICATION DROPDOWN
 ───────────────────────────────────────────── */
 const NotificationDropdown = ({ notifications, unreadCount, onClose, onMarkAllRead, onNotifClick }) => {
   const ref = useRef(null);
@@ -388,7 +381,7 @@ const NotificationDropdown = ({ notifications, unreadCount, onClose, onMarkAllRe
           <button onClick={onMarkAllRead} style={{
             background: "none", border: "1px solid rgba(0,86,179,.18)", cursor: "pointer",
             fontSize: 11, fontWeight: 600, color: "#0056b3", padding: "3px 10px",
-            borderRadius: 99, transition: "background .15s",
+            borderRadius: 99, transition: "background .15s", fontFamily: "inherit",
           }}>
             Mark all read
           </button>
@@ -423,7 +416,7 @@ const NotificationDropdown = ({ notifications, unreadCount, onClose, onMarkAllRe
                 key={n.id}
                 className={`notif-item${n.is_read ? "" : " unread"}`}
                 onClick={() => onNotifClick(n)}
-                style={{ cursor: n.url ? "pointer" : "default" }}
+                style={{ cursor: n.url || n.type ? "pointer" : "default" }}
               >
                 {/* Unread dot */}
                 <div style={{ width: 10, flexShrink: 0, display: "flex", justifyContent: "center", paddingTop: 5 }}>
@@ -472,7 +465,6 @@ const NotificationDropdown = ({ notifications, unreadCount, onClose, onMarkAllRe
 
 /* ─────────────────────────────────────────────
    EXAM SEARCH OVERLAY
-   Searches only within the student's exams.
 ───────────────────────────────────────────── */
 const ExamSearchOverlay = ({ exams, onClose, onSelectExam }) => {
   const [query, setQuery] = useState("");
@@ -556,7 +548,6 @@ const ExamSearchOverlay = ({ exams, onClose, onSelectExam }) => {
                 onMouseEnter={e => e.currentTarget.style.background = "#f8faff"}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
               >
-                {/* Status icon */}
                 <div style={{ width: 38, height: 38, borderRadius: 10, background: st.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <i className={`bi ${st.icon}`} style={{ color: st.color, fontSize: 16 }}></i>
                 </div>
@@ -582,7 +573,7 @@ const ExamSearchOverlay = ({ exams, onClose, onSelectExam }) => {
 };
 
 /* ─────────────────────────────────────────────
-   TOPBAR — now with notifications + exam search
+   TOPBAR
 ───────────────────────────────────────────── */
 const Topbar = ({
   user, onLogout,
@@ -601,7 +592,6 @@ const Topbar = ({
         SECT Portal
       </span>
 
-      {/* Desktop: clickable search bar that opens exam overlay */}
       <div
         className="d-none d-md-flex align-items-center ms-4 position-relative"
         style={{ maxWidth: 300 }}
@@ -669,14 +659,14 @@ const Topbar = ({
   );
 };
 
-/* ─── Exam Row Card (horizontal, list-style) ─── */
+/* ─── Exam Row Card ─── */
 const ExamCard = ({ exam, idx }) => {
   const status    = getStatus(exam);
   const st        = STATUS_META[status];
   const isOpen    = status === "open";
   const isDone    = status === "submitted";
   const remaining = isOpen ? timeLeft(exam.end_time) : null;
-  const pct        = isDone && exam.submission?.total_points > 0
+  const pct       = isDone && exam.submission?.total_points > 0
     ? Math.round((exam.submission.score / exam.submission.total_points) * 100) : null;
 
   return (
@@ -737,7 +727,7 @@ const ExamCard = ({ exam, idx }) => {
           </span>
         </div>
 
-        {/* Score bar if submitted — neutral colors, no pass/fail indication */}
+        {/* Score bar if submitted */}
         {isDone && pct !== null && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -807,8 +797,8 @@ const ExamsPage = () => {
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
   const [activeTab, setActiveTab]   = useState("all");
-  const [searchTerm, setSearchTerm] = useState("");   // kept for filter logic
-  const [searchOpen, setSearchOpen] = useState(false); // overlay open/close
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const notifBtnRef                 = useRef(null);
 
   /* ── Notification state ── */
@@ -868,14 +858,19 @@ const ExamsPage = () => {
         })
         .catch(() => {});
     }
-    if (notif.url) {
+
+    if (notif.url || notif.type) {
       setNotifOpen(false);
-      let finalUrl = notif.url;
-      if (notif.type === "new_exam")             finalUrl = `${notif.url}/take`;
-      // else if (notif.type === "results_updated") finalUrl = `${notif.url}/results`;
-      // else if (notif.type === "score_updated")   finalUrl = `${notif.url}/results`;
-      else if (notif.type === "new_subject")     finalUrl = "/student/subjects";
-      navigate(finalUrl);
+
+      if (notif.type === "new_subject") {
+        navigate("/student/subjects");
+        return;
+      }
+      if (notif.type === "new_exam") {
+        navigate(notif.url ? `${notif.url}/take` : "/student/exams");
+        return;
+      }
+      if (notif.url) navigate(notif.url);
     }
   };
 
@@ -888,10 +883,9 @@ const ExamsPage = () => {
   const handleSearchSelect = (exam) => {
     setSearchOpen(false);
     const status = getStatus(exam);
-    if (status === "open")      navigate(`/student/exams/${exam.id}/take`);
+    if (status === "open")           navigate(`/student/exams/${exam.id}/take`);
     else if (status === "submitted") navigate(`/student/exams/${exam.id}/results`);
     else {
-      // Highlight on the list by switching to appropriate tab
       setActiveTab(status);
       setSearchTerm(exam.title);
     }
@@ -947,7 +941,6 @@ const ExamsPage = () => {
     <>
       <style>{GLOBAL_CSS}</style>
 
-      {/* Exam search overlay */}
       {searchOpen && (
         <ExamSearchOverlay
           exams={exams}
@@ -975,7 +968,7 @@ const ExamsPage = () => {
 
           <main style={{ flex: 1, padding: "20px 16px", paddingBottom: 88, minWidth: 0 }}>
 
-            {/* Mobile search bar — opens overlay */}
+            {/* Mobile search bar */}
             <div className="d-md-none mb-3 position-relative" onClick={() => setSearchOpen(true)}>
               <i className="bi bi-search" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13, zIndex: 1, pointerEvents: "none" }}></i>
               <input className="search-input" placeholder="Search exams…" readOnly style={{ cursor: "pointer" }} />
@@ -1008,7 +1001,7 @@ const ExamsPage = () => {
               <>
                 {/* Stats strip */}
                 {counts.all > 0 && (
-                  <div style={{ display: "flex", marginBottom: 18, overflowX: "auto", paddingBottom: 2 }}>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 18, overflowX: "auto", paddingBottom: 2 }}>
                     {[
                       { label: "Open",      val: counts.open,      color: "#0056b3", bg: "#e8f0fe" },
                       { label: "Upcoming",  val: counts.upcoming,  color: "#f59e0b", bg: "#fff7ed" },
@@ -1058,10 +1051,10 @@ const ExamsPage = () => {
                   </div>
                 )}
 
-                {/* Filter segmented control — mobile-optimised, all 5 options always visible */}
+                {/* Filter segmented control */}
                 <div className="filter-bar" style={{ marginBottom: 18 }}>
                   {TABS.map(tab => {
-                    const count = tab.key === "all" ? counts.all : counts[tab.key];
+                    const count    = tab.key === "all" ? counts.all : counts[tab.key];
                     const isActive = activeTab === tab.key;
                     return (
                       <button
@@ -1069,7 +1062,7 @@ const ExamsPage = () => {
                         className={`filter-seg${isActive ? " active" : ""}`}
                         onClick={() => { setActiveTab(tab.key); setSearchTerm(""); }}
                         title={
-                          tab.key === "upcoming"  ? "Upcoming" :
+                          tab.key === "upcoming"  ? "Upcoming"  :
                           tab.key === "submitted" ? "Submitted" : undefined
                         }
                       >

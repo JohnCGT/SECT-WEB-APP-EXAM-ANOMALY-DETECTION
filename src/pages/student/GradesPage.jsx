@@ -242,7 +242,7 @@ const NAV_ITEMS = [
   { to: "/student/account-settings", icon: "bi-gear",             label: "Settings" },
 ];
 
-/* ─── Notification type config (mirrored from ExamsPage) ─── */
+/* ─── Notification type config ─── */
 const NOTIF_TYPE_META = {
   new_exam: {
     icon: "bi-pencil-square",
@@ -289,7 +289,6 @@ const timeAgo = (iso) => {
   return `${Math.floor(h / 24)}d ago`;
 };
 
-/* ─── Philippine Grading Helpers ─── */
 const pctToGradePoint = (pct) => {
   if (pct === null || pct === undefined) return null;
   if (pct >= 97) return 1.00;
@@ -302,7 +301,6 @@ const pctToGradePoint = (pct) => {
   return 5.00;
 };
 
-// 1.00 fills bar fully, 5.00 = empty
 const gpaToBarPct = (gpa) => {
   if (!gpa) return 0;
   return Math.round(((5.00 - Math.min(5, Math.max(1, gpa))) / 4) * 100);
@@ -341,7 +339,7 @@ const classifySemester = (semStr) => {
 };
 
 /* ─────────────────────────────────────────────
-   NOTIFICATION DROPDOWN (same as ExamsPage)
+   NOTIFICATION DROPDOWN
 ───────────────────────────────────────────── */
 const NotificationDropdown = ({ notifications, unreadCount, onClose, onMarkAllRead, onNotifClick }) => {
   const ref = useRef(null);
@@ -373,7 +371,7 @@ const NotificationDropdown = ({ notifications, unreadCount, onClose, onMarkAllRe
           <button onClick={onMarkAllRead} style={{
             background: "none", border: "1px solid rgba(0,86,179,.18)", cursor: "pointer",
             fontSize: 11, fontWeight: 600, color: "#0056b3", padding: "3px 10px",
-            borderRadius: 99, transition: "background .15s",
+            borderRadius: 99, transition: "background .15s", fontFamily: "inherit",
           }}>
             Mark all read
           </button>
@@ -408,7 +406,7 @@ const NotificationDropdown = ({ notifications, unreadCount, onClose, onMarkAllRe
                 key={n.id}
                 className={`notif-item${n.is_read ? "" : " unread"}`}
                 onClick={() => onNotifClick(n)}
-                style={{ cursor: n.url ? "pointer" : "default" }}
+                style={{ cursor: n.url || n.type ? "pointer" : "default" }}
               >
                 <div style={{ width: 10, flexShrink: 0, display: "flex", justifyContent: "center", paddingTop: 5 }}>
                   {!n.is_read && <div className="notif-dot" />}
@@ -452,7 +450,6 @@ const NotificationDropdown = ({ notifications, unreadCount, onClose, onMarkAllRe
 
 /* ─────────────────────────────────────────────
    GRADES SEARCH OVERLAY
-   Searches by course name, course code, or exam title
 ───────────────────────────────────────────── */
 const GradesSearchOverlay = ({ courses, onClose, onSelectCourse }) => {
   const [query, setQuery] = useState("");
@@ -581,8 +578,7 @@ const BottomNav = ({ active }) => (
 );
 
 /* ─────────────────────────────────────────────
-   TOPBAR — with notifications + grades search
-   (same structure as ExamsPage)
+   TOPBAR
 ───────────────────────────────────────────── */
 const Topbar = ({
   user, onLogout,
@@ -601,7 +597,6 @@ const Topbar = ({
         SECT Portal
       </span>
 
-      {/* Desktop: clickable search bar that opens grades overlay */}
       <div
         className="d-none d-md-flex align-items-center ms-4 position-relative"
         style={{ maxWidth: 300 }}
@@ -680,7 +675,6 @@ const Sidebar = ({ active }) => (
   </nav>
 );
 
-/* ─── GWA Banner — no standing text ─── */
 const GWABanner = ({ gpa, gradedCount, totalCount, semesterLabel }) => {
   const hasGWA = gpa !== null && gpa !== undefined;
   const barPct = hasGWA ? gpaToBarPct(gpa) : 0;
@@ -764,7 +758,6 @@ const CourseSection = ({ course, highlightQuery }) => {
   const hasPendingEssay = course.exams?.some(e => e.has_essay && !e.essay_graded && e.submitted);
   const now      = new Date();
 
-  // Accent color based on course code (deterministic, not random per render)
   const ACCENTS = [
     { accent: "#0056b3", iconBg: "#e8f0fe" },
     { accent: "#f59e0b", iconBg: "#fff7ed" },
@@ -782,12 +775,8 @@ const CourseSection = ({ course, highlightQuery }) => {
     <div className="course-card fade-up">
 
       {/* ── Course Header ── */}
-      <div style={{
-        padding: "16px 16px 0",
-        borderLeft: `4px solid ${acc.accent}`,
-      }}>
+      <div style={{ padding: "16px 16px 0", borderLeft: `4px solid ${acc.accent}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {/* Icon — consistent journal icon, no random illustrations */}
           <div style={{
             width: 44, height: 44, borderRadius: 11, background: acc.iconBg,
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
@@ -795,7 +784,6 @@ const CourseSection = ({ course, highlightQuery }) => {
             <i className="bi bi-journal-text" style={{ color: acc.accent, fontSize: 19 }}></i>
           </div>
 
-          {/* Name + meta */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 3 }}>
               <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", lineHeight: 1.3 }}>
@@ -826,7 +814,6 @@ const CourseSection = ({ course, highlightQuery }) => {
             </div>
           </div>
 
-          {/* Grade point for this course */}
           <div style={{ textAlign: "right", flexShrink: 0 }}>
             {hasGrade ? (
               <>
@@ -974,7 +961,7 @@ const CourseSection = ({ course, highlightQuery }) => {
    GRADES PAGE
 ══════════════════════════════════════ */
 const GradesPage = () => {
-  const navigate  = useNavigate();
+  const navigate    = useNavigate();
   const notifBtnRef = useRef(null);
 
   const [user,        setUser]        = useState(null);
@@ -986,9 +973,9 @@ const GradesPage = () => {
   const [highlightId, setHighlightId] = useState(null);
 
   /* ── Notification state ── */
-  const [notifOpen,      setNotifOpen]      = useState(false);
-  const [notifications,  setNotifications]  = useState(null);
-  const [unreadCount,    setUnreadCount]    = useState(0);
+  const [notifOpen,     setNotifOpen]     = useState(false);
+  const [notifications, setNotifications] = useState(null);
+  const [unreadCount,   setUnreadCount]   = useState(0);
 
   /* ── Data ── */
   useEffect(() => {
@@ -1008,7 +995,7 @@ const GradesPage = () => {
     })();
   }, []);
 
-  /* ── Notifications (same pattern as ExamsPage) ── */
+  /* ── Notifications ── */
   const fetchNotifications = useCallback(() => {
     API.get("/student/notifications")
       .then(res => {
@@ -1042,9 +1029,19 @@ const GradesPage = () => {
         })
         .catch(() => {});
     }
-    if (notif.url) {
+
+    if (notif.url || notif.type) {
       setNotifOpen(false);
-      navigate(notif.url);
+
+      if (notif.type === "new_subject") {
+        navigate("/student/subjects");
+        return;
+      }
+      if (notif.type === "new_exam") {
+        navigate(notif.url ? `${notif.url}/take` : "/student/exams");
+        return;
+      }
+      if (notif.url) navigate(notif.url);
     }
   };
 
@@ -1056,12 +1053,10 @@ const GradesPage = () => {
   /* When user picks a course from the search overlay */
   const handleSearchSelect = (course) => {
     setSearchOpen(false);
-    // Determine which semester tab to switch to so the course is visible
     const semKey = classifySemester(course.semester);
     const tabKey = (semKey === "other" || semKey === "all") ? "all" : semKey;
     setSemesterTab(tabKey);
     setHighlightId(course.course_id);
-    // Scroll after a short delay for the tab to render
     setTimeout(() => {
       const el = document.getElementById(`course-${course.course_id}`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1077,7 +1072,6 @@ const GradesPage = () => {
     return courses.filter(c => classifySemester(c.semester) === semesterTab);
   }, [courses, semesterTab]);
 
-  /* Counts per tab for badge */
   const semesterCounts = useMemo(() => {
     const counts = { all: courses.length, first: 0, second: 0, summer: 0 };
     courses.forEach(c => {
@@ -1087,7 +1081,6 @@ const GradesPage = () => {
     return counts;
   }, [courses]);
 
-  /* GWA for displayed subset */
   const displayedGPA = useMemo(() => {
     if (semesterTab === "all") return gpa;
     const graded = displayedCourses.filter(c => c.average !== null);
@@ -1102,11 +1095,9 @@ const GradesPage = () => {
     acc + (c.exams?.filter(e => e.has_essay && !e.essay_graded && e.submitted).length ?? 0), 0
   );
 
-  /* Label shown in GWA banner */
   const semLabelMap = { all: null, first: "1st Semester", second: "2nd Semester", summer: "Summer" };
   const gwaSemLabel = semLabelMap[semesterTab] ?? null;
 
-  /* Newly released grades (from the API notifications) */
   const hasNewGrades = (notifications ?? []).some(n =>
     (n.type === "results_updated" || n.type === "score_updated") && !n.is_read
   );
@@ -1115,7 +1106,6 @@ const GradesPage = () => {
     <>
       <style>{GLOBAL_CSS}</style>
 
-      {/* Grades search overlay */}
       {searchOpen && (
         <GradesSearchOverlay
           courses={courses}
@@ -1143,7 +1133,7 @@ const GradesPage = () => {
 
           <main style={{ flex: 1, padding: "20px 16px", paddingBottom: 88, minWidth: 0 }}>
 
-            {/* Mobile search bar — opens overlay */}
+            {/* Mobile search bar */}
             <div className="d-md-none mb-3 position-relative" onClick={() => setSearchOpen(true)}>
               <i className="bi bi-search" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13, zIndex: 1, pointerEvents: "none" }}></i>
               <input className="search-input" placeholder="Search grades…" readOnly style={{ cursor: "pointer" }} />
@@ -1176,7 +1166,6 @@ const GradesPage = () => {
 
             {!loading && !error && (
               <>
-                {/* GWA Banner */}
                 <GWABanner
                   gpa={displayedGPA}
                   gradedCount={gradedDisplayed}
@@ -1184,7 +1173,6 @@ const GradesPage = () => {
                   semesterLabel={gwaSemLabel}
                 />
 
-                {/* Pending essay notice */}
                 <PendingEssayBanner count={pendingEssayCount} />
 
                 {/* New grades alert */}
@@ -1206,7 +1194,7 @@ const GradesPage = () => {
                   </div>
                 )}
 
-                {/* ── Semester Filter Tabs ── */}
+                {/* Semester Filter Tabs */}
                 <div className="filter-track" style={{ marginBottom: 18 }}>
                   {SEMESTER_TABS.map(tab => {
                     const count = semesterCounts[tab.key] ?? 0;

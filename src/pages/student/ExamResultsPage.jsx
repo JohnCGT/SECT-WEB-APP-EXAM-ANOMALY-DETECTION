@@ -27,7 +27,7 @@ const GLOBAL_CSS = `
   .score-chip{
     background:#fff;border-radius:14px;
     box-shadow:0 2px 12px rgba(0,0,0,.08);
-    padding:16px 20px;text-align:center;flex:1;min-width:90px;
+    padding:12px 16px;text-align:center;flex:1;min-width:80px;
   }
   .prog-track{height:8px;border-radius:99px;background:#f1f5f9;overflow:hidden;}
   .prog-fill{height:100%;border-radius:99px;transition:width 1.2s cubic-bezier(.4,0,.2,1);}
@@ -43,20 +43,6 @@ const GLOBAL_CSS = `
     background:var(--card-bg);border-radius:var(--card-br);
     box-shadow:var(--card-sh);border:1px solid rgba(0,86,179,.06);
     overflow:hidden;
-  }
-  .opt-row{
-    display:flex;align-items:center;gap:12px;
-    padding:10px 14px;border-radius:10px;
-    border:1px solid #e2e8f0;transition:all .15s;
-  }
-  .opt-correct{background:#f0fdf4;border-color:#86efac;}
-  .opt-wrong{background:#fef2f2;border-color:#fca5a5;}
-  .opt-neutral{background:#f8faff;}
-  .opt-badge{
-    width:26px;height:26px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    font-size:11px;font-weight:700;flex-shrink:0;
-    background:#f1f5f9;color:#64748b;
   }
   .essay-box{
     background:#f8faff;border:1px solid #e2e8f0;
@@ -77,6 +63,26 @@ const GLOBAL_CSS = `
   .fade-up{animation:fadeUp .35s ease both;}
   .fade-up:nth-child(1){animation-delay:.04s}.fade-up:nth-child(2){animation-delay:.08s}
   .fade-up:nth-child(3){animation-delay:.12s}.fade-up:nth-child(4){animation-delay:.16s}
+
+  /* ── Mobile overrides ── */
+  @media(max-width:480px){
+    .score-chip{padding:10px 8px;min-width:0;}
+    .score-chip .score-val{font-size:22px!important;}
+    .hero-chips{gap:8px!important;}
+    .stats-footer-row > div{padding:10px 4px!important;}
+    .stats-footer-row .stat-val{font-size:16px!important;}
+    .q-card-inner{padding:14px 14px 16px!important;}
+    .q-header{flex-direction:column;align-items:flex-start!important;gap:6px!important;}
+    .q-pts{align-self:flex-end;}
+    .filter-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;}
+    .filter-scroll::-webkit-scrollbar{display:none;}
+    .review-header{flex-direction:column;align-items:flex-start!important;}
+    .hero-banner{padding:24px 16px 20px!important;}
+    .topbar-inner{padding:0 12px!important;}
+    .page-wrap{padding:16px 12px 60px!important;}
+    .tf-grid{gap:8px!important;}
+    .badge-row{flex-wrap:wrap;gap:6px!important;}
+  }
 `;
 
 const gradeLabel = (pct) => {
@@ -115,7 +121,7 @@ const ExamResultsPage = () => {
   );
 
   if (error) return (
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh", background:"#f0f4fb" }}>
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh", background:"#f0f4fb", padding:"0 16px" }}>
       <div style={{ textAlign:"center" }}>
         <i className="bi bi-exclamation-circle" style={{ fontSize:48, color:"#ef4444", display:"block", marginBottom:12 }}></i>
         <h2 style={{ fontSize:18, fontWeight:700, color:"#0f172a", margin:"0 0 8px" }}>{error}</h2>
@@ -132,38 +138,38 @@ const ExamResultsPage = () => {
   const passed  = pct >= 75;
   const grade   = gradeLabel(pct);
 
-  // ── Normalize is_correct ──────────────────────────────────────────────────
-  // The backend may return wrong values for is_correct (e.g. always false/0,
-  // or null). For MC and TF questions we can derive correctness ourselves by
-  // comparing student_answer to correct_answer — this is always reliable.
-  // For essays we leave it as-is since they need manual grading.
   const norm = (v) => String(v ?? "").trim().toLowerCase();
 
   const deriveIsCorrect = (q) => {
-    // Essays are always manually graded — don't override
     if (q.type === "essay") {
       if (q.is_correct === true  || q.is_correct === 1 || q.is_correct === "1") return true;
       if (q.is_correct === false || q.is_correct === 0 || q.is_correct === "0") return false;
-      return null; // pending
+      if (q.points_earned != null) return q.points_earned > 0 ? true : false;
+      return null; 
     }
 
-    // For MC and TF: if both student_answer and correct_answer exist, derive from comparison
     if (q.student_answer != null && q.correct_answer != null) {
       return norm(q.student_answer) === norm(q.correct_answer);
     }
-
-    // If student didn't answer (null/empty string), it's wrong
     if (q.student_answer == null || norm(q.student_answer) === "") return false;
 
-    // Fallback: trust backend value, coerced to boolean
     if (q.is_correct === true  || q.is_correct === 1 || q.is_correct === "1") return true;
     if (q.is_correct === false || q.is_correct === 0 || q.is_correct === "0") return false;
     return null;
   };
 
+  const isEssayGraded = (q) => {
+    if (q.type !== "essay") return false;
+    if (q.points_earned != null) return true;
+    if (q.is_correct === true || q.is_correct === 1 || q.is_correct === "1") return true;
+    if (q.is_correct === false || q.is_correct === 0 || q.is_correct === "0") return true;
+    return false;
+  };
+
   const normalizedQuestions = questions.map(q => ({
     ...q,
     is_correct: deriveIsCorrect(q),
+    _essay_graded: isEssayGraded(q),
   }));
 
   const correctCount = normalizedQuestions.filter(q => q.is_correct === true).length;
@@ -187,42 +193,41 @@ const ExamResultsPage = () => {
       <div style={{ background:"#f0f4fb", minHeight:"100vh" }}>
 
         {/* Topbar */}
-        <div className="result-topbar d-flex align-items-center px-3 px-lg-4 gap-3">
+        <div className="result-topbar d-flex align-items-center gap-3 topbar-inner" style={{ padding:"0 16px" }}>
           <button onClick={() => navigate(-1)} style={{
             display:"flex", alignItems:"center", gap:6,
             background:"transparent", border:"1px solid #e2e8f0", borderRadius:10,
             padding:"5px 12px", fontSize:12, fontWeight:600, color:"#64748b",
-            cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"border-color .15s,color .15s"
+            cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"border-color .15s,color .15s",
+            flexShrink:0
           }} onMouseEnter={e=>{e.currentTarget.style.borderColor="#0056b3";e.currentTarget.style.color="#0056b3"}}
              onMouseLeave={e=>{e.currentTarget.style.borderColor="#e2e8f0";e.currentTarget.style.color="#64748b"}}>
             <i className="bi bi-arrow-left"></i><span className="d-none d-sm-inline">Back</span>
           </button>
-          <span style={{ fontFamily:"'DM Sans',sans-serif", fontWeight:700, fontSize:15, color:"#0056b3", letterSpacing:"-.3px" }}>
+          <span style={{ fontFamily:"'DM Sans',sans-serif", fontWeight:700, fontSize:15, color:"#0056b3", letterSpacing:"-.3px", flexShrink:0 }}>
             SECT Portal
           </span>
           <Link to="/student/subjects" style={{
             marginLeft:"auto", display:"flex", alignItems:"center", gap:6,
             background:"#e8f0fe", color:"#0056b3", borderRadius:10, padding:"5px 12px",
-            fontSize:12, fontWeight:700, textDecoration:"none"
+            fontSize:12, fontWeight:700, textDecoration:"none", flexShrink:0
           }}>
             <i className="bi bi-journal-bookmark"></i>
             <span className="d-none d-sm-inline">My Subjects</span>
           </Link>
         </div>
 
-        <div style={{ maxWidth:860, margin:"0 auto", padding:"28px 16px", paddingBottom:60 }}>
+        <div className="page-wrap" style={{ maxWidth:860, margin:"0 auto", padding:"28px 16px", paddingBottom:60 }}>
 
           {/* ── Hero score card ── */}
           <div className="dash-card fade-up" style={{ marginBottom:20, overflow:"visible" }}>
-            {/* Gradient banner */}
-            <div style={{
+            <div className="hero-banner" style={{
               background:heroGrad, padding:"32px 28px 28px",
               position:"relative", overflow:"hidden"
             }}>
               <div style={{ position:"absolute", right:-40, top:-40, width:160, height:160, borderRadius:"50%", background:"rgba(255,255,255,.07)" }}/>
               <div style={{ position:"absolute", right:40, bottom:-60, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,.04)" }}/>
 
-              {/* Trophy / frown */}
               <div style={{ textAlign:"center", marginBottom:12 }}>
                 <i className={`bi ${passed ? "bi-trophy-fill" : "bi-emoji-frown"}`}
                   style={{ fontSize:44, color:"rgba(255,255,255,.9)" }}></i>
@@ -231,14 +236,17 @@ const ExamResultsPage = () => {
               <p style={{ margin:"0 0 20px", fontSize:12, color:"rgba(255,255,255,.65)", textAlign:"center", textTransform:"capitalize" }}>{exam.type}</p>
 
               {/* Score chips */}
-              <div style={{ display:"flex", gap:12, justifyContent:"center", flexWrap:"wrap" }}>
+              <div className="hero-chips" style={{ display:"flex", gap:12, justifyContent:"center", flexWrap:"wrap" }}>
                 {[
-                  { label:"Score", val:<>{submission.score}<span style={{fontSize:14,fontWeight:400,color:"#94a3b8"}}>/{submission.total_points}</span></>, color:"#0f172a" },
-                  { label:"Percentage", val:`${pct}%`, color:passed?"#22c55e":"#ef4444" },
+                  { label:"Score", val:<><span className="score-val" style={{fontSize:28,fontWeight:700,color:"#0f172a",lineHeight:1,letterSpacing:"-1px"}}>{submission.score}</span><span style={{fontSize:14,fontWeight:400,color:"#94a3b8"}}>/{submission.total_points}</span></>, color:"#0f172a" },
+                  { label:"Percentage", val:pct+"%", color:passed?"#22c55e":"#ef4444" },
                   { label:"Grade", val:grade.label, color:grade.color },
-                ].map(s => (
-                  <div key={s.label} className="score-chip">
-                    <div style={{ fontSize:28, fontWeight:700, color:s.color, lineHeight:1, letterSpacing:"-1px" }}>{s.val}</div>
+                ].map((s,i) => (
+                  <div key={i} className="score-chip">
+                    {i === 0
+                      ? <div style={{ lineHeight:1, letterSpacing:"-1px" }}>{s.val}</div>
+                      : <div className="score-val" style={{ fontSize:28, fontWeight:700, color:s.color, lineHeight:1, letterSpacing:"-1px" }}>{s.val}</div>
+                    }
                     <div style={{ fontSize:11, fontWeight:600, color:"#94a3b8", marginTop:4 }}>{s.label}</div>
                   </div>
                 ))}
@@ -258,7 +266,7 @@ const ExamResultsPage = () => {
             </div>
 
             {/* Stats footer row */}
-            <div style={{ display:"flex", borderTop:"1px solid #f1f5f9" }}>
+            <div className="stats-footer-row" style={{ display:"flex", borderTop:"1px solid #f1f5f9" }}>
               {[
                 { val:correctCount, label:"Correct",   color:"#22c55e" },
                 { val:wrongCount,   label:"Wrong",     color:"#ef4444" },
@@ -272,7 +280,7 @@ const ExamResultsPage = () => {
                   flex:1, textAlign:"center", padding:"14px 8px",
                   borderRight: i < 3 ? "1px solid #f1f5f9" : "none"
                 }}>
-                  <div style={{ fontSize:20, fontWeight:700, color:s.color }}>{s.val}</div>
+                  <div className="stat-val" style={{ fontSize:20, fontWeight:700, color:s.color }}>{s.val}</div>
                   <div style={{ fontSize:11, fontWeight:600, color:"#94a3b8", marginTop:2 }}>{s.label}</div>
                 </div>
               ))}
@@ -280,12 +288,12 @@ const ExamResultsPage = () => {
           </div>
 
           {/* ── Question Review header + filters ── */}
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, flexWrap:"wrap", gap:10 }}>
+          <div className="review-header" style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, flexWrap:"wrap", gap:10 }}>
             <div>
               <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:"#0f172a" }}>Question Review</h2>
               <p style={{ margin:"2px 0 0", fontSize:12, color:"#94a3b8" }}>{filtered.length} of {questions.length} questions shown</p>
             </div>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+            <div className="filter-scroll" style={{ display:"flex", gap:6, flexWrap:"nowrap" }}>
               {[
                 { key:"all",     label:`All (${questions.length})` },
                 { key:"correct", label:`✓ Correct (${correctCount})` },
@@ -300,32 +308,35 @@ const ExamResultsPage = () => {
             </div>
           </div>
 
-          {/* ── Question cards ── */}
           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
             {filtered.map((q, idx) => {
-              const isEssay   = q.type === "essay";
-              const isCorrect = q.is_correct;
-              const isPending = isEssay && q.is_correct === null;
+              const isEssay    = q.type === "essay";
+              const isCorrect  = q.is_correct;
+              const isGraded   = q._essay_graded;   
+              const isPending  = isEssay && !isGraded; 
 
-              const accentColor = isCorrect === true  ? "#22c55e"
+              const accentColor = isEssay               ? "#388bf0"   
+                                : isCorrect === true  ? "#22c55e"
                                 : isCorrect === false ? "#ef4444"
-                                : isPending           ? "#0ea5e9"
                                 : "#e2e8f0";
 
               return (
                 <div key={q.id} className="q-card fade-up"
                   style={{ animationDelay:`${idx * 0.04}s`, borderLeft:`4px solid ${accentColor}` }}>
-                  <div style={{ padding:"18px 20px 20px" }}>
+                  <div className="q-card-inner" style={{ padding:"18px 20px 20px" }}>
+
                     {/* Q header */}
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12, flexWrap:"wrap", gap:8 }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                    <div className="q-header" style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12, flexWrap:"wrap", gap:8 }}>
+                      <div className="badge-row" style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
                         <span style={{ background:"#f1f5f9", color:"#64748b", borderRadius:99, padding:"2px 9px", fontSize:11, fontWeight:700 }}>
                           Q{q.order}
                         </span>
                         <span style={{ background:"#f1f5f9", color:"#64748b", borderRadius:99, padding:"2px 9px", fontSize:11, fontWeight:600, textTransform:"capitalize" }}>
                           {q.type.replace("_"," ")}
                         </span>
-                        {!isEssay && isCorrect === true  && (
+
+                        {/* ── Status badge ── */}
+                        {!isEssay && isCorrect === true && (
                           <span style={{ background:"#f0fdf4", color:"#22c55e", borderRadius:99, padding:"2px 9px", fontSize:11, fontWeight:700 }}>
                             <i className="bi bi-check-lg me-1"></i>Correct
                           </span>
@@ -335,26 +346,32 @@ const ExamResultsPage = () => {
                             <i className="bi bi-x-lg me-1"></i>Wrong
                           </span>
                         )}
-                        {isEssay && (
-                          <span style={{ background:"#eff6ff", color:"#0ea5e9", borderRadius:99, padding:"2px 9px", fontSize:11, fontWeight:700 }}>
+
+                        {isEssay && isGraded && (
+                          <span style={{ background:"#dbe8f5", color:"#0068fa", borderRadius:99, padding:"2px 9px", fontSize:11, fontWeight:700 }}>
+                            <i className="bi bi-patch-check-fill me-1"></i>Graded
+                          </span>
+                        )}
+                        {isEssay && isPending && (
+                          <span style={{ background:"#dbe8f5", color:"#0068fa", borderRadius:99, padding:"2px 9px", fontSize:11, fontWeight:700 }}>
                             <i className="bi bi-hourglass-split me-1"></i>Pending Review
                           </span>
                         )}
                       </div>
-                      <span style={{
+
+                      {/* Points */}
+                      <span className="q-pts" style={{
                         fontSize:12, fontWeight:700, flexShrink:0,
-                        color: isCorrect === true ? "#22c55e" : isCorrect === false ? "#ef4444" : "#94a3b8"
+                        color: isEssay ? "#64748b" : isCorrect === true ? "#22c55e" : isCorrect === false ? "#ef4444" : "#94a3b8"
                       }}>
-                        {/* Use derived isCorrect (from answer comparison) for points display */}
                         {(() => {
+                          if (isPending) return <>—/{q.points} pts</>;
                           const earned =
-                            q.points_earned != null && q.points_earned > 0
-                              ? q.points_earned   // trust backend if it gave a positive value
+                            q.points_earned != null
+                              ? q.points_earned
                               : isCorrect === true
-                                ? q.points          // derived correct → full points
-                                : isCorrect === false
-                                  ? 0               // derived wrong → 0
-                                  : "—";            // essay pending
+                                ? q.points
+                                : 0;
                           return <>{earned}/{q.points} pts</>;
                         })()}
                       </span>
@@ -367,23 +384,20 @@ const ExamResultsPage = () => {
                     {q.type === "multiple_choice" && q.options && (
                       <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:16 }}>
                         {q.options.map((opt, oi) => {
-                          // Use top-level norm() for consistent normalization
                           const isSA = norm(q.student_answer) === norm(opt);
                           const isCA = norm(q.correct_answer) === norm(opt);
 
-                          // Style priority: correct answer always green, wrong student pick red, others neutral
-                          let rowBg = "#f8faff", rowBorder = "#e2e8f0", textColor = "#64748b", badgeBg = "#f1f5f9", badgeColor = "#94a3b8";
+                          let rowBg="#f8faff", rowBorder="#e2e8f0", textColor="#64748b", badgeBg="#f1f5f9", badgeColor="#94a3b8";
                           if (isCA)          { rowBg="#f0fdf4"; rowBorder="#86efac"; textColor="#166534"; badgeBg="#dcfce7"; badgeColor="#22c55e"; }
                           if (isSA && !isCA) { rowBg="#fef2f2"; rowBorder="#fca5a5"; textColor="#991b1b"; badgeBg="#fee2e2"; badgeColor="#ef4444"; }
 
                           return (
                             <div key={oi} style={{
-                              display:"flex", alignItems:"center", gap:12,
-                              padding:"10px 14px", borderRadius:10,
+                              display:"flex", alignItems:"center", gap:10,
+                              padding:"10px 12px", borderRadius:10,
                               border:`1px solid ${rowBorder}`, background:rowBg,
-                              transition:"all .15s"
+                              transition:"all .15s", flexWrap:"nowrap"
                             }}>
-                              {/* Letter badge */}
                               <div style={{
                                 width:26, height:26, borderRadius:"50%",
                                 display:"flex", alignItems:"center", justifyContent:"center",
@@ -392,27 +406,27 @@ const ExamResultsPage = () => {
                               }}>
                                 {String.fromCharCode(65 + oi)}
                               </div>
-
-                              {/* Option text */}
-                              <span style={{ flex:1, fontSize:13, fontWeight: isCA ? 600 : 400, color:textColor }}>
+                              <span style={{ flex:1, fontSize:13, fontWeight: isCA ? 600 : 400, color:textColor, minWidth:0 }}>
                                 {opt}
                               </span>
-
-                              {/* Right-side labels */}
-                              <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
+                              <div style={{ display:"flex", alignItems:"center", gap:4, flexShrink:0, flexWrap:"wrap", justifyContent:"flex-end" }}>
                                 {isCA && (
-                                  <span style={{ display:"flex", alignItems:"center", gap:4, background:"#dcfce7", color:"#22c55e", borderRadius:99, padding:"2px 8px", fontSize:11, fontWeight:700 }}>
-                                    <i className="bi bi-check-circle-fill"></i> Correct
+                                  <span style={{ display:"flex", alignItems:"center", gap:4, background:"#dcfce7", color:"#22c55e", borderRadius:99, padding:"2px 7px", fontSize:11, fontWeight:700, whiteSpace:"nowrap" }}>
+                                    <i className="bi bi-check-circle-fill"></i>
+                                    <span className="d-none d-sm-inline">Correct</span>
                                   </span>
                                 )}
                                 {isSA && isCA && (
-                                  <span style={{ display:"flex", alignItems:"center", gap:4, background:"#e8f0fe", color:"#0056b3", borderRadius:99, padding:"2px 8px", fontSize:11, fontWeight:700 }}>
-                                    Your answer
+                                  <span style={{ display:"flex", alignItems:"center", gap:4, background:"#e8f0fe", color:"#0056b3", borderRadius:99, padding:"2px 7px", fontSize:11, fontWeight:700, whiteSpace:"nowrap" }}>
+                                    <span className="d-none d-sm-inline">Your answer</span>
+                                    <span className="d-inline d-sm-none">Yours</span>
                                   </span>
                                 )}
                                 {isSA && !isCA && (
-                                  <span style={{ display:"flex", alignItems:"center", gap:4, background:"#fee2e2", color:"#ef4444", borderRadius:99, padding:"2px 8px", fontSize:11, fontWeight:700 }}>
-                                    <i className="bi bi-x-circle-fill"></i> Your answer
+                                  <span style={{ display:"flex", alignItems:"center", gap:4, background:"#fee2e2", color:"#ef4444", borderRadius:99, padding:"2px 7px", fontSize:11, fontWeight:700, whiteSpace:"nowrap" }}>
+                                    <i className="bi bi-x-circle-fill"></i>
+                                    <span className="d-none d-sm-inline">Your answer</span>
+                                    <span className="d-inline d-sm-none">Yours</span>
                                   </span>
                                 )}
                               </div>
@@ -425,9 +439,8 @@ const ExamResultsPage = () => {
                     {/* True / False */}
                     {q.type === "true_false" && (
                       <div style={{ marginBottom:16 }}>
-                        <div style={{ display:"flex", gap:10 }}>
+                        <div className="tf-grid" style={{ display:"flex", gap:10 }}>
                           {["True","False"].map(val => {
-                            // Use top-level norm() — handles "true"/"false", "1"/"0", "True"/"False"
                             const isSA = norm(q.student_answer) === norm(val);
                             const isCA = norm(q.correct_answer) === norm(val);
 
@@ -441,26 +454,24 @@ const ExamResultsPage = () => {
                                 border:`1px solid ${border}`, background:bg,
                                 display:"flex", flexDirection:"column", alignItems:"center", gap:4
                               }}>
-                                {/* Icon + label */}
                                 <div style={{ display:"flex", alignItems:"center", gap:6, color, fontSize:14, fontWeight:fontW }}>
                                   <i className={`bi ${val==="True" ? "bi-check-circle" : "bi-x-circle"}`}></i>
                                   {val}
                                 </div>
-                                {/* Sub-labels */}
                                 <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:2, marginTop:2 }}>
                                   {isCA && (
-                                    <span style={{ fontSize:10, fontWeight:700, color:"#22c55e", background:"#dcfce7", borderRadius:99, padding:"1px 7px" }}>
-                                      ✓ Correct Answer
+                                    <span style={{ fontSize:10, fontWeight:700, color:"#22c55e", background:"#dcfce7", borderRadius:99, padding:"1px 7px", whiteSpace:"nowrap" }}>
+                                      ✓ Correct
                                     </span>
                                   )}
                                   {isSA && isCA && (
-                                    <span style={{ fontSize:10, fontWeight:600, color:"#0056b3", background:"#e8f0fe", borderRadius:99, padding:"1px 7px" }}>
+                                    <span style={{ fontSize:10, fontWeight:600, color:"#0056b3", background:"#e8f0fe", borderRadius:99, padding:"1px 7px", whiteSpace:"nowrap" }}>
                                       Your answer
                                     </span>
                                   )}
                                   {isSA && !isCA && (
-                                    <span style={{ fontSize:10, fontWeight:700, color:"#ef4444", background:"#fee2e2", borderRadius:99, padding:"1px 7px" }}>
-                                      ✗ Your answer
+                                    <span style={{ fontSize:10, fontWeight:700, color:"#ef4444", background:"#fee2e2", borderRadius:99, padding:"1px 7px", whiteSpace:"nowrap" }}>
+                                      ✗ Yours
                                     </span>
                                   )}
                                 </div>
@@ -469,7 +480,6 @@ const ExamResultsPage = () => {
                           })}
                         </div>
 
-                        {/* Callout when student got it wrong */}
                         {isCorrect === false && (
                           <div style={{
                             marginTop:10, display:"flex", alignItems:"center", gap:8,
@@ -486,10 +496,11 @@ const ExamResultsPage = () => {
                     {/* Essay */}
                     {q.type === "essay" && (
                       <div style={{ marginBottom:16 }}>
-                        <p style={{ margin:"0 0 6px", fontSize:11, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".04em" }}>Your Answer</p>
+                        <p style={{ margin:"0 0 6px", fontSize:11, fontWeight:700, color:"#8093ac", textTransform:"uppercase", letterSpacing:".04em" }}>Your Answer</p>
                         <div className="essay-box">
                           {q.student_answer || <span style={{ color:"#94a3b8", fontStyle:"italic" }}>No answer provided</span>}
                         </div>
+
                         {q.rubric && (
                           <div style={{ marginTop:10 }}>
                             <p style={{ margin:"0 0 6px", fontSize:11, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:".04em" }}>
@@ -498,10 +509,33 @@ const ExamResultsPage = () => {
                             <div className="rubric-box">{q.rubric}</div>
                           </div>
                         )}
+
+                        {q.feedback && (
+                          <div style={{ marginTop:10 }}>
+                            <p style={{ margin:"0 0 6px", fontSize:11, fontWeight:700, color:"#8093ac", textTransform:"uppercase", letterSpacing:".04em" }}>
+                              <i className="bi bi-chat-left-text me-1"></i>Instructor Feedback
+                            </p>
+                            <div style={{
+                              background:"#f8faff", border:"1px solid #bfdbfe",
+                              borderRadius:10, padding:"12px 14px",
+                              fontSize:13, color:"#1e40af", lineHeight:1.7
+                            }}>{q.feedback}</div>
+                          </div>
+                        )}
+
+                        {isEssay && isGraded && (
+                          <div style={{
+                            marginTop:12, display:"flex", alignItems:"center", gap:8,
+                            background:"#f8fafc", border:"1px solid #e2e8f0",
+                            borderRadius:10, padding:"9px 14px", fontSize:13, color:"#475569"
+                          }}>
+                            <i className="bi bi-patch-check-fill" style={{ color:"#94a3b8", flexShrink:0 }}></i>
+                            <span>Points: <strong>{q.points_earned != null ? q.points_earned : "—"}/{q.points}</strong></span>
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    {/* Correct answer callout — MC only (TF has its own inline callout above) */}
                     {!isEssay && q.type === "multiple_choice" && isCorrect === false && (
                       <div className="correct-callout">
                         <i className="bi bi-lightbulb-fill" style={{ color:"#22c55e", flexShrink:0 }}></i>
@@ -514,7 +548,6 @@ const ExamResultsPage = () => {
             })}
           </div>
 
-          {/* Bottom CTA */}
           <div style={{ textAlign:"center", marginTop:40 }}>
             <Link to="/student/subjects" style={{
               display:"inline-flex", alignItems:"center", gap:8,
